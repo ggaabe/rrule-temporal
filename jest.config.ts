@@ -3,7 +3,7 @@
  * https://jestjs.io/docs/configuration
  */
 
-import type {Config} from 'jest';
+import type { Config } from "jest";
 
 const config: Config = {
   // All imported modules in your tests should be mocked automatically
@@ -89,8 +89,22 @@ const config: Config = {
   //   "node"
   // ],
 
-  // A map from regular expressions to module names or to arrays of module names that allow to stub out resources with a single module
-  // moduleNameMapper: {},
+  // ES Module/ts-jest specific settings
+  preset: "ts-jest/presets/default-esm", // Use ESM preset
+  extensionsToTreatAsEsm: [".ts"], // Treat .ts files as ES Modules
+  moduleNameMapper: {
+    // Handle module paths ending in .js or .ts (needed for ESM support)
+    "^(.{1,2}/.*).(m|t)js$": "$1",
+  },
+  transform: {
+    // Use ts-jest for .ts/.tsx files
+    "^.+.m?[tj]sx?$": [
+      "ts-jest",
+      {
+        useESM: true, // Tell ts-jest to use ESM
+      },
+    ],
+  },
 
   // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
   // modulePathIgnorePatterns: [],
@@ -100,9 +114,6 @@ const config: Config = {
 
   // An enum that specifies notification mode. Requires { notify: true }
   // notifyMode: "failure-change",
-
-  // A preset that is used as a base for Jest's configuration
-  // preset: undefined,
 
   // Run tests from one or more projects
   // projects: undefined,
@@ -146,7 +157,7 @@ const config: Config = {
   // snapshotSerializers: [],
 
   // The test environment that will be used for testing
-  // testEnvironment: "jest-environment-node",
+  testEnvironment: "node", // Ensure Node environment
 
   // Options that will be passed to the testEnvironment
   // testEnvironmentOptions: {},
@@ -173,9 +184,6 @@ const config: Config = {
 
   // This option allows use of a custom test runner
   // testRunner: "jest-circus/runner",
-
-  // A map from regular expressions to paths to transformers
-  // transform: undefined,
 
   // An array of regexp pattern strings that are matched against all source file paths, matched files will skip transformation
   // transformIgnorePatterns: [
