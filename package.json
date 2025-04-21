@@ -1,0 +1,45 @@
+{
+  "name": "rrule-temporal",
+  "version": "0.1.0",
+  "description": "Recurrence rule processing using Temporal PlainDate/PlainDateTime",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ggaabe/rrule-temporal.git"
+  },
+  "keywords": [
+    "rrule",
+    "recurrence",
+    "temporal",
+    "date",
+    "time",
+    "plaindate",
+    "plaindatetime"
+  ],
+  "author": "ggaabe",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ggaabe/rrule-temporal/issues"
+  },
+  "homepage": "https://github.com/ggaabe/rrule-temporal#readme",
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.14.1",
+    "jest": "^29.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1"
+  }
+}
