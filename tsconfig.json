@@ -13,8 +13,7 @@
         "noUncheckedIndexedAccess": true,
         "noImplicitOverride": true,
         /* If NOT transpiling code: */
-        "module": "preserve",
-        "noEmit": true,
+        // "module": "preserve",
         /* If your code runs in the DOM: */
         // "dom",
         /* If your code runs in Node.js: */
@@ -30,6 +29,7 @@
         // "jsx": "react-jsx",
         /* Bundler options */
         "moduleResolution": "Bundler",
+        "module": "ES2022",
         "lib": [
             "ES2022"
         ],

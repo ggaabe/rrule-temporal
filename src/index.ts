@@ -44,15 +44,15 @@ function parseRRuleString(
   if (/^DTSTART/m.test(input)) {
     // ICS snippet: split DTSTART and RRULE
     const [dtLine, rrLine] = input.split(/\r?\n/);
-    const m = dtLine.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/);
+    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/);
     if (!m) throw new Error("Invalid DTSTART in ICS snippet");
     tzid = m[1] || tzid;
-    const isoDate = `${m[2].slice(0, 4)}-${m[2].slice(4, 6)}-${m[2].slice(
+    const isoDate = `${m[2]!.slice(0, 4)}-${m[2]!.slice(4, 6)}-${m[2]!.slice(
       6,
       8
-    )}T${m[2].slice(9)}`;
+    )}T${m[2]!.slice(9)}`;
     dtstart = Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid);
-    rruleLine = rrLine;
+    rruleLine = rrLine!;
   } else {
     // Only RRULE line; require fallback
     if (!fallbackDtstart)
@@ -72,26 +72,26 @@ function parseRRuleString(
         opts.freq = val as Freq;
         break;
       case "INTERVAL":
-        opts.interval = parseInt(val, 10);
+        opts.interval = parseInt(val!, 10);
         break;
       case "COUNT":
-        opts.count = parseInt(val, 10);
+        opts.count = parseInt(val!, 10);
         break;
       case "UNTIL": {
         // RFC5545 UNTIL is YYYYMMDDTHHMMSSZ or without Z
-        if (/Z$/.test(val)) {
-          const iso = `${val.slice(0, 4)}-${val.slice(4, 6)}-${val.slice(
+        if (/Z$/.test(val!)) {
+          const iso = `${val!.slice(0, 4)}-${val!.slice(4, 6)}-${val!.slice(
             6,
             8
-          )}T${val.slice(9, 15)}Z`;
+          )}T${val!.slice(9, 15)}Z`;
           opts.until = Temporal.Instant.from(iso).toZonedDateTimeISO(
             tzid || "UTC"
           );
         } else {
-          const iso = `${val.slice(0, 4)}-${val.slice(4, 6)}-${val.slice(
+          const iso = `${val!.slice(0, 4)}-${val!.slice(4, 6)}-${val!.slice(
             6,
             8
-          )}T${val.slice(9, 15)}`;
+          )}T${val!.slice(9, 15)}`;
           opts.until = Temporal.PlainDateTime.from(iso).toZonedDateTime(
             tzid || "UTC"
           );
@@ -99,10 +99,10 @@ function parseRRuleString(
         break;
       }
       case "BYHOUR":
-        opts.byHour = val.split(",").map((n) => parseInt(n, 10));
+        opts.byHour = val!.split(",").map((n) => parseInt(n, 10));
         break;
       case "BYMINUTE":
-        opts.byMinute = val.split(",").map((n) => parseInt(n, 10));
+        opts.byMinute = val!.split(",").map((n) => parseInt(n, 10));
         break;
     }
   }
