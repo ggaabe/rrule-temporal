@@ -177,3 +177,51 @@ RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR;BYHOUR=0;BYMINUTE=0`.trim();
     ]);
   });
 });
+
+describe("RRuleTemporal - BYMONTH with MONTHLY freq (ICS snippet)", () => {
+  const ics = `DTSTART;TZID=UTC:20250115T000000
+RRULE:FREQ=MONTHLY;BYMONTH=1,4,7;BYHOUR=0;BYMINUTE=0;COUNT=3`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() returns exactly the 15th of Jan, Apr & Jul", () => {
+    const dates = rule.all();
+    expect(dates).toHaveLength(3);
+    expect(dates.map((d) => d.month)).toEqual([1, 4, 7]);
+    expect(dates.map((d) => d.day)).toEqual([15, 15, 15]);
+  });
+});
+
+describe("RRuleTemporal - BYMONTH with YEARLY freq (manual opts)", () => {
+  const dtstart = Temporal.ZonedDateTime.from({
+    year: 2025,
+    month: 1,
+    day: 10,
+    hour: 9,
+    minute: 0,
+    timeZone: "UTC",
+  });
+  const rule = new RRuleTemporal({
+    freq: "YEARLY",
+    interval: 1,
+    count: 4,
+    byMonth: [1, 6, 12],
+    byHour: [9],
+    byMinute: [0],
+    dtstart,
+  });
+
+  test("all() emits Jan ’25, Jun ’26, Dec ’27, Jan ’28", () => {
+    const dates = rule.all();
+    expect(dates).toHaveLength(4);
+    expect(dates.map((d) => ({ year: d.year, month: d.month }))).toEqual([
+      { year: 2025, month: 1 },
+      { year: 2026, month: 6 },
+      { year: 2027, month: 12 },
+      { year: 2028, month: 1 },
+    ]);
+    for (const d of dates) {
+      expect(d.hour).toBe(9);
+      expect(d.minute).toBe(0);
+    }
+  });
+});

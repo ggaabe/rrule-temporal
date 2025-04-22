@@ -316,6 +316,31 @@ export class RRuleTemporal {
       return dates;
     }
 
+    if (this.opts.freq === "YEARLY" && this.opts.byMonth) {
+      const months = [...this.opts.byMonth].sort((a, b) => a - b);
+      const start = this.originalDtstart;
+      let i = 0;
+      while (true) {
+        // pick which month for this occurrence
+        const cycle = Math.floor(i / months.length);
+        const idx = i % months.length;
+        const year = start.year + cycle * this.opts.interval!;
+        let occ = start.with({ year, month: months[idx] });
+        occ = this.applyTimeOverride(occ);
+
+        // stop on UNTIL
+        if (this.opts.until && occ > this.opts.until) break;
+        // stop on COUNT
+        if (this.opts.count !== undefined && i >= this.opts.count) break;
+        // iterator callback
+        if (iterator && !iterator(occ, i)) break;
+
+        dates.push(occ);
+        i++;
+      }
+      return dates;
+    }
+
     // --- fallback for non‑monthly or no BYDAY ---
     let current = this.computeFirst();
     while (true) {
