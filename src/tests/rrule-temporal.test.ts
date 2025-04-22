@@ -155,3 +155,22 @@ RRULE:FREQ=DAILY`.trim();
     expect(dates).toHaveLength(3);
   });
 });
+
+describe("RRuleTemporal - BYDAY frequencies", () => {
+  const ics = `DTSTART;TZID=America/Chicago:20250325T000000
+RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR;BYHOUR=0;BYMINUTE=0`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+  // 2025 Apr 22 00:00 UTC
+  const start = new Date(Date.UTC(2025, 3, 20, 0, 0));
+  // 2026 Apr 22 00:00 UTC
+  const end = new Date(Date.UTC(2026, 3, 22, 0, 0, 0));
+
+  test("between returns occurrences in window", () => {
+    const arrInc = rule.between(start, end, true);
+    console.log(
+      "arrInc: ",
+      arrInc.map((d) => d.toString())
+    );
+    expect(arrInc.map((d) => d.day)).toEqual([2, 3, 4]);
+  });
+});
