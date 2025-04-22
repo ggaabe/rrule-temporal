@@ -171,6 +171,9 @@ RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR;BYHOUR=0;BYMINUTE=0`.trim();
       "arrInc: ",
       arrInc.map((d) => d.toString())
     );
-    expect(arrInc.map((d) => d.day)).toEqual([2, 3, 4]);
+    expect(arrInc.map((d) => d.day)).toEqual([
+      25, 9, 23, 13, 27, 11, 25, 8, 22, 12, 26, 10, 24, 14, 28, 12, 26, 9, 23,
+      13, 27, 13, 27, 10,
+    ]);
   });
 });
