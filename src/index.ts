@@ -264,7 +264,11 @@ export class RRuleTemporal {
     return this.matchesByDay(zdt) && this.matchesByMonth(zdt);
   }
 
-  // --- updated all() to only emit matching occurrences ---
+  /**
+   * Returns all occurrences of the rule.
+   * @param iterator - An optional callback iterator function that can be used to filter or modify the occurrences.
+   * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
+   */
   all(
     iterator?: (date: Temporal.ZonedDateTime, i: number) => boolean
   ): Temporal.ZonedDateTime[] {
@@ -272,68 +276,75 @@ export class RRuleTemporal {
       throw new Error("all() requires iterator when no COUNT/UNTIL");
     }
     const dates: Temporal.ZonedDateTime[] = [];
-    let matchCount = 0;
 
-    // --- MONTHLY + BYDAY branch ---
+    // 1) MONTHLY + BYDAY (multi‐day expansions)
     if (this.opts.freq === "MONTHLY" && this.opts.byDay) {
-      const original = this.originalDtstart;
-      // start at first-of-month of dtstart
-      let monthCursor = original.with({ day: 1 });
+      const start = this.originalDtstart;
+      let monthCursor = start.with({ day: 1 });
+      let matchCount = 0;
 
       outer: while (true) {
-        // expand every 2FR/4FR/etc in this month
         const occs = this.generateMonthlyOccurrences(monthCursor);
-
         for (const occ of occs) {
-          // 1) stop on UNTIL
+          // skip anything before the very first DTSTART
+          if (Temporal.ZonedDateTime.compare(occ, start) < 0) {
+            continue;
+          }
+          // stop on UNTIL
           if (
             this.opts.until &&
             Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
           ) {
             break outer;
           }
-          // 2) skip anything before dtstart
-          if (Temporal.ZonedDateTime.compare(occ, original) < 0) {
-            continue;
-          }
-          // 3) stop on COUNT
+          // stop on COUNT
           if (this.opts.count !== undefined && matchCount >= this.opts.count) {
             break outer;
           }
-          // 4) iterator callback
+          // iterator callback
           if (iterator && !iterator(occ, matchCount)) {
             break outer;
           }
-          // 5) accept
           dates.push(occ);
           matchCount++;
         }
-
-        // advance by N months
         monthCursor = monthCursor.add({ months: this.opts.interval! });
       }
-
       return dates;
     }
 
+    // 2) YEARLY + BYMONTH (one per year, rotating through the byMonth array)
     if (this.opts.freq === "YEARLY" && this.opts.byMonth) {
-      const months = [...this.opts.byMonth].sort((a, b) => a - b);
       const start = this.originalDtstart;
+      const months = [...this.opts.byMonth].sort((a, b) => a - b);
       let i = 0;
+
       while (true) {
-        // pick which month for this occurrence
-        const cycle = Math.floor(i / months.length);
-        const idx = i % months.length;
-        const year = start.year + cycle * this.opts.interval!;
-        let occ = start.with({ year, month: months[idx] });
+        const year = start.year + i * this.opts.interval!;
+        const month = months[i % months.length];
+        let occ = start.with({ year, month });
         occ = this.applyTimeOverride(occ);
 
+        // skip the very first if it's before dtstart
+        if (i === 0 && Temporal.ZonedDateTime.compare(occ, start) < 0) {
+          i++;
+          continue;
+        }
         // stop on UNTIL
-        if (this.opts.until && occ > this.opts.until) break;
+        if (
+          this.opts.until &&
+          Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
+        ) {
+          break;
+        }
         // stop on COUNT
-        if (this.opts.count !== undefined && i >= this.opts.count) break;
+        if (this.opts.count !== undefined && i >= this.opts.count) {
+          break;
+        }
         // iterator callback
-        if (iterator && !iterator(occ, i)) break;
+        if (iterator && !iterator(occ, i)) {
+          break;
+        }
 
         dates.push(occ);
         i++;
@@ -341,19 +352,18 @@ export class RRuleTemporal {
       return dates;
     }
 
-    // --- fallback for non‑monthly or no BYDAY ---
+    // 3) fallback: step and filter
     let current = this.computeFirst();
+    let matchCount = 0;
+
     while (true) {
-      // UNTIL check
       if (
         this.opts.until &&
         Temporal.ZonedDateTime.compare(current, this.opts.until) > 0
       ) {
         break;
       }
-
       if (this.matchesAll(current)) {
-        // COUNT
         if (this.opts.count !== undefined && matchCount >= this.opts.count) {
           break;
         }
@@ -363,13 +373,19 @@ export class RRuleTemporal {
         dates.push(current);
         matchCount++;
       }
-
       current = this.applyTimeOverride(this.rawAdvance(current));
     }
+
     return dates;
   }
 
-  // --- updated between() to filter by constraints ---
+  /**
+   * Returns all occurrences of the rule within a specified time window.
+   * @param after - The start date or Temporal.ZonedDateTime object.
+   * @param before - The end date or Temporal.ZonedDateTime object.
+   * @param inc - Optional boolean flag to include the end date in the results.
+   * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule within the specified time window.
+   */
   between(
     after: Date | Temporal.ZonedDateTime,
     before: Date | Temporal.ZonedDateTime,
@@ -383,21 +399,16 @@ export class RRuleTemporal {
       before instanceof Date
         ? Temporal.Instant.from(before.toISOString())
         : before.toInstant();
-
     const results: Temporal.ZonedDateTime[] = [];
 
-    // --- MONTHLY + BYDAY branch ---
+    // 1) MONTHLY + BYDAY
     if (this.opts.freq === "MONTHLY" && this.opts.byDay) {
-      // begin in the month of the first occurrence
       let monthCursor = this.computeFirst().with({ day: 1 });
 
       outer: while (true) {
         const occs = this.generateMonthlyOccurrences(monthCursor);
-
         for (const occ of occs) {
           const inst = occ.toInstant();
-
-          // break when beyond 'before'
           if (
             inc
               ? Temporal.Instant.compare(inst, endInst) > 0
@@ -405,16 +416,12 @@ export class RRuleTemporal {
           ) {
             break outer;
           }
-
-          // only include if on/after 'after'
           if (Temporal.Instant.compare(inst, startInst) >= 0) {
             results.push(occ);
           }
         }
-
         monthCursor = monthCursor.add({ months: this.opts.interval! });
       }
-
       return results;
     }
 
@@ -431,7 +438,6 @@ export class RRuleTemporal {
         occ = this.applyTimeOverride(occ);
         const inst = occ.toInstant();
 
-        // break on window end
         if (
           inc
             ? Temporal.Instant.compare(inst, endInst) > 0
@@ -439,42 +445,40 @@ export class RRuleTemporal {
         ) {
           break;
         }
-        // only include if on/after 'after'
         if (Temporal.Instant.compare(inst, startInst) >= 0) {
           results.push(occ);
         }
-
         i++;
       }
-
       return results;
     }
 
-    // --- fallback for non‑monthly or no BYDAY ---
+    // 3) fallback
     let current = this.computeFirst();
     while (true) {
       const inst = current.toInstant();
-
-      // break on window end
       if (inc) {
         if (Temporal.Instant.compare(inst, endInst) > 0) break;
       } else {
         if (Temporal.Instant.compare(inst, endInst) >= 0) break;
       }
-
       if (
         Temporal.Instant.compare(inst, startInst) >= 0 &&
         this.matchesAll(current)
       ) {
         results.push(current);
       }
-
       current = this.applyTimeOverride(this.rawAdvance(current));
     }
     return results;
   }
 
-  // --- updated next() to honor BYDAY/BYMONTH ---
+  /**
+   * Returns the next occurrence of the rule after a specified date.
+   * @param after - The start date or Temporal.ZonedDateTime object.
+   * @param inc - Optional boolean flag to include occurrences on the start date.
+   * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
+   */
   next(
     after: Date | Temporal.ZonedDateTime = new Date(),
     inc = false
@@ -516,7 +520,12 @@ export class RRuleTemporal {
     }
   }
 
-  // --- updated previous() to honor BYDAY/BYMONTH ---
+  /**
+   * Returns the previous occurrence of the rule before a specified date.
+   * @param before - The end date or Temporal.ZonedDateTime object.
+   * @param inc - Optional boolean flag to include occurrences on the end date.
+   * @returns The previous occurrence of the rule before the specified date or null if no occurrences are found.
+   */
   previous(
     before: Date | Temporal.ZonedDateTime = new Date(),
     inc = false
