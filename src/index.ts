@@ -418,6 +418,38 @@ export class RRuleTemporal {
       return results;
     }
 
+    // 2) YEARLY + BYMONTH
+    if (this.opts.freq === "YEARLY" && this.opts.byMonth) {
+      const start = this.originalDtstart;
+      const months = [...this.opts.byMonth].sort((a, b) => a - b);
+      let i = 0;
+
+      outer: while (true) {
+        const year = start.year + i * this.opts.interval!;
+        const month = months[i % months.length];
+        let occ = start.with({ year, month });
+        occ = this.applyTimeOverride(occ);
+        const inst = occ.toInstant();
+
+        // break on window end
+        if (
+          inc
+            ? Temporal.Instant.compare(inst, endInst) > 0
+            : Temporal.Instant.compare(inst, endInst) >= 0
+        ) {
+          break;
+        }
+        // only include if on/after 'after'
+        if (Temporal.Instant.compare(inst, startInst) >= 0) {
+          results.push(occ);
+        }
+
+        i++;
+      }
+
+      return results;
+    }
+
     // --- fallback for non‑monthly or no BYDAY ---
     let current = this.computeFirst();
     while (true) {
