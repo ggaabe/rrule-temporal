@@ -158,6 +158,28 @@ RRULE:FREQ=DAILY`.trim();
 
 describe("RRuleTemporal - BYDAY frequencies", () => {
   const ics = `DTSTART;TZID=America/Chicago:20250325T000000
+RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR;BYHOUR=0;BYMINUTE=0`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+  // 2025 Apr 22 00:00 UTC
+  const start = new Date(Date.UTC(2025, 3, 20, 0, 0));
+  // 2026 Apr 22 00:00 UTC
+  const end = new Date(Date.UTC(2026, 3, 22, 0, 0, 0));
+
+  test("between returns occurrences in window", () => {
+    const arrInc = rule.between(start, end, true);
+    console.log(
+      "arrInc: ",
+      arrInc.map((d) => d.toString())
+    );
+    expect(arrInc.map((d) => d.day)).toEqual([
+      25, 9, 23, 13, 27, 11, 25, 8, 22, 12, 26, 10, 24, 14, 28, 12, 26, 9, 23,
+      13, 27, 13, 27, 10,
+    ]);
+  });
+});
+
+describe("RRuleTemporal - Negative BYDAY frequencies", () => {
+  const ics = `DTSTART;TZID=America/Chicago:20250325T000000
 RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR,-1SA;BYHOUR=0;BYMINUTE=0`.trim();
   const rule = new RRuleTemporal({ rruleString: ics });
   // 2025 Apr 22 00:00 UTC
