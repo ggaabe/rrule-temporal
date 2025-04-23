@@ -1,6 +1,6 @@
 {
   "name": "rrule-temporal",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Recurrence rule processing using Temporal PlainDate/PlainDateTime",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -8,11 +8,11 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup",
     "test": "jest"
   },
   "repository": {
