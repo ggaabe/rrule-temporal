@@ -183,22 +183,74 @@ export class RRuleTemporal {
   }
 
   private computeFirst(): Temporal.ZonedDateTime {
+    let zdt = this.originalDtstart;
+
+    // If it's WEEKLY with BYDAY, advance zdt to the first matching weekday ≥ dtstart
+    if (this.opts.freq === "WEEKLY" && this.opts.byDay?.length) {
+      const dayMap: Record<string, number> = {
+        MO: 1,
+        TU: 2,
+        WE: 3,
+        TH: 4,
+        FR: 5,
+        SA: 6,
+        SU: 7,
+      };
+      const targetDow = dayMap[this.opts.byDay[0]!]!;
+      const delta = (targetDow - zdt.dayOfWeek + 7) % 7;
+      zdt = zdt.add({ days: delta });
+    }
+
+    // then your existing BYHOUR/BYMINUTE override logic:
     const { byHour, byMinute } = this.opts;
-    let candidate = this.originalDtstart;
     if (byHour || byMinute) {
-      candidate = this.applyTimeOverride(candidate);
+      zdt = this.applyTimeOverride(zdt);
       if (
         Temporal.Instant.compare(
-          candidate.toInstant(),
+          zdt.toInstant(),
           this.originalDtstart.toInstant()
         ) < 0
       ) {
-        candidate = this.applyTimeOverride(
-          this.rawAdvance(this.originalDtstart)
-        );
+        zdt = this.applyTimeOverride(this.rawAdvance(this.originalDtstart));
       }
     }
-    return candidate;
+
+    return zdt;
+  }
+
+  // inside class RRuleTemporal:
+
+  private generateWeeklyOccurrences(
+    sample: Temporal.ZonedDateTime
+  ): Temporal.ZonedDateTime[] {
+    const { byDay } = this.opts;
+
+    // Map token → ISO dayOfWeek
+    const dayMap: Record<string, number> = {
+      MO: 1,
+      TU: 2,
+      WE: 3,
+      TH: 4,
+      FR: 5,
+      SA: 6,
+      SU: 7,
+    };
+
+    // If no BYDAY, default to the sample’s own weekday token
+    const tokens =
+      byDay && byDay.length
+        ? byDay
+        : [Object.entries(dayMap).find(([, d]) => d === sample.dayOfWeek)![0]];
+
+    // For each token, find the date in [sample, sample+6d] matching that weekday
+    const occs = tokens.map((tok) => {
+      const targetDow = dayMap[tok]!;
+      const delta = (targetDow - sample.dayOfWeek + 7) % 7;
+      return this.applyTimeOverride(sample.add({ days: delta }));
+    });
+
+    // Return in chronological order
+    return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 
   // --- NEW: constraint checks ---
@@ -277,33 +329,27 @@ export class RRuleTemporal {
     }
     const dates: Temporal.ZonedDateTime[] = [];
 
-    // 1) MONTHLY + BYDAY (multi‐day expansions)
+    // --- 1) MONTHLY + BYDAY (multi-day expansions) ---
     if (this.opts.freq === "MONTHLY" && this.opts.byDay) {
       const start = this.originalDtstart;
       let monthCursor = start.with({ day: 1 });
       let matchCount = 0;
 
-      outer: while (true) {
+      outer_month: while (true) {
         const occs = this.generateMonthlyOccurrences(monthCursor);
         for (const occ of occs) {
-          // skip anything before the very first DTSTART
-          if (Temporal.ZonedDateTime.compare(occ, start) < 0) {
-            continue;
-          }
-          // stop on UNTIL
+          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
           if (
             this.opts.until &&
             Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
           ) {
-            break outer;
+            break outer_month;
           }
-          // stop on COUNT
           if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer;
+            break outer_month;
           }
-          // iterator callback
           if (iterator && !iterator(occ, matchCount)) {
-            break outer;
+            break outer_month;
           }
           dates.push(occ);
           matchCount++;
@@ -313,7 +359,73 @@ export class RRuleTemporal {
       return dates;
     }
 
-    // 2) YEARLY + BYMONTH (one per year, rotating through the byMonth array)
+    // --- 2) WEEKLY + BYDAY (or default to DTSTART’s weekday) ---
+    if (this.opts.freq === "WEEKLY") {
+      const start = this.originalDtstart;
+      // Build the list of target weekdays (1=Mon..7=Sun)
+      const dayMap: Record<string, number> = {
+        MO: 1,
+        TU: 2,
+        WE: 3,
+        TH: 4,
+        FR: 5,
+        SA: 6,
+        SU: 7,
+      };
+      // If no BYDAY, default to DTSTART’s weekday token
+      const tokens = this.opts.byDay
+        ? [...this.opts.byDay]
+        : [Object.entries(dayMap).find(([, d]) => d === start.dayOfWeek)![0]];
+      const dows = tokens
+        .map((tok) => dayMap[tok])
+        .filter((d): d is number => d !== undefined)
+        .sort((a, b) => a - b);
+
+      // Find the very first weekCursor: the earliest of this week’s matching days ≥ start
+      const firstWeekDates = dows.map((dw) => {
+        const delta = (dw - start.dayOfWeek + 7) % 7;
+        return start.add({ days: delta });
+      });
+      let weekCursor = firstWeekDates.reduce((a, b) =>
+        Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b
+      );
+      let matchCount = 0;
+
+      outer_week: while (true) {
+        // Generate this week’s occurrences
+        const baseDow = weekCursor.dayOfWeek;
+        const occs = dows
+          .map((dw) => {
+            const delta = dw - baseDow;
+            return this.applyTimeOverride(weekCursor.add({ days: delta }));
+          })
+          .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+
+        for (const occ of occs) {
+          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
+          if (
+            this.opts.until &&
+            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
+          ) {
+            break outer_week;
+          }
+          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
+            break outer_week;
+          }
+          if (iterator && !iterator(occ, matchCount)) {
+            break outer_week;
+          }
+          dates.push(occ);
+          matchCount++;
+        }
+
+        weekCursor = weekCursor.add({ weeks: this.opts.interval! });
+      }
+
+      return dates;
+    }
+
+    // --- 3) YEARLY + BYMONTH (one per year, rotating) ---
     if (this.opts.freq === "YEARLY" && this.opts.byMonth) {
       const start = this.originalDtstart;
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
@@ -325,23 +437,19 @@ export class RRuleTemporal {
         let occ = start.with({ year, month });
         occ = this.applyTimeOverride(occ);
 
-        // skip the very first if it's before dtstart
         if (i === 0 && Temporal.ZonedDateTime.compare(occ, start) < 0) {
           i++;
           continue;
         }
-        // stop on UNTIL
         if (
           this.opts.until &&
           Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
         ) {
           break;
         }
-        // stop on COUNT
         if (this.opts.count !== undefined && i >= this.opts.count) {
           break;
         }
-        // iterator callback
         if (iterator && !iterator(occ, i)) {
           break;
         }
@@ -352,7 +460,7 @@ export class RRuleTemporal {
       return dates;
     }
 
-    // 3) fallback: step and filter
+    // --- 4) fallback: step + filter ---
     let current = this.computeFirst();
     let matchCount = 0;
 
@@ -378,6 +486,152 @@ export class RRuleTemporal {
 
     return dates;
   }
+
+  // between(
+  //   after: Date | Temporal.ZonedDateTime,
+  //   before: Date | Temporal.ZonedDateTime,
+  //   inc = false
+  // ): Temporal.ZonedDateTime[] {
+  //   const startInst =
+  //     after instanceof Date
+  //       ? Temporal.Instant.from(after.toISOString())
+  //       : after.toInstant();
+  //   const endInst =
+  //     before instanceof Date
+  //       ? Temporal.Instant.from(before.toISOString())
+  //       : before.toInstant();
+  //   const results: Temporal.ZonedDateTime[] = [];
+
+  //   // --- 1) MONTHLY + BYDAY ---
+  //   if (this.opts.freq === "MONTHLY" && this.opts.byDay) {
+  //     let monthCursor = this.computeFirst().with({ day: 1 });
+
+  //     outer_m: while (true) {
+  //       const occs = this.generateMonthlyOccurrences(monthCursor);
+  //       for (const occ of occs) {
+  //         const inst = occ.toInstant();
+  //         if (
+  //           inc
+  //             ? Temporal.Instant.compare(inst, endInst) > 0
+  //             : Temporal.Instant.compare(inst, endInst) >= 0
+  //         ) {
+  //           break outer_m;
+  //         }
+  //         if (Temporal.Instant.compare(inst, startInst) >= 0) {
+  //           results.push(occ);
+  //         }
+  //       }
+  //       monthCursor = monthCursor.add({ months: this.opts.interval! });
+  //     }
+  //     return results;
+  //   }
+
+  //   // --- 2) WEEKLY + BYDAY (or default dtstart weekday) ---
+  //   if (this.opts.freq === "WEEKLY") {
+  //     const start = this.originalDtstart;
+  //     const dayMap: Record<string, number> = {
+  //       MO: 1,
+  //       TU: 2,
+  //       WE: 3,
+  //       TH: 4,
+  //       FR: 5,
+  //       SA: 6,
+  //       SU: 7,
+  //     };
+  //     const tokens = this.opts.byDay
+  //       ? [...this.opts.byDay]
+  //       : [Object.entries(dayMap).find(([, d]) => d === start.dayOfWeek)![0]];
+  //     const dows = tokens
+  //       .map((tok) => dayMap[tok])
+  //       .filter((d): d is number => d !== undefined)
+  //       .sort((a, b) => a - b);
+
+  //     // find first weekCursor
+  //     const firstWeekDates = dows.map((dw) => {
+  //       const delta = (dw - start.dayOfWeek + 7) % 7;
+  //       return start.add({ days: delta });
+  //     });
+  //     let weekCursor = firstWeekDates.reduce((a, b) =>
+  //       Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b
+  //     );
+
+  //     outer_w: while (true) {
+  //       const baseDow = weekCursor.dayOfWeek;
+  //       const occs = dows
+  //         .map((dw) => {
+  //           const delta = dw - baseDow;
+  //           return this.applyTimeOverride(weekCursor.add({ days: delta }));
+  //         })
+  //         .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+
+  //       for (const occ of occs) {
+  //         const inst = occ.toInstant();
+  //         if (
+  //           inc
+  //             ? Temporal.Instant.compare(inst, endInst) > 0
+  //             : Temporal.Instant.compare(inst, endInst) >= 0
+  //         ) {
+  //           break outer_w;
+  //         }
+  //         if (Temporal.Instant.compare(inst, startInst) >= 0) {
+  //           results.push(occ);
+  //         }
+  //       }
+
+  //       weekCursor = weekCursor.add({ weeks: this.opts.interval! });
+  //     }
+
+  //     return results;
+  //   }
+
+  //   // --- 3) YEARLY + BYMONTH ---
+  //   if (this.opts.freq === "YEARLY" && this.opts.byMonth) {
+  //     const start = this.originalDtstart;
+  //     const months = [...this.opts.byMonth].sort((a, b) => a - b);
+  //     let i = 0;
+
+  //     outer_y: while (true) {
+  //       const year = start.year + i * this.opts.interval!;
+  //       const month = months[i % months.length];
+  //       let occ = start.with({ year, month });
+  //       occ = this.applyTimeOverride(occ);
+  //       const inst = occ.toInstant();
+
+  //       if (
+  //         inc
+  //           ? Temporal.Instant.compare(inst, endInst) > 0
+  //           : Temporal.Instant.compare(inst, endInst) >= 0
+  //       ) {
+  //         break;
+  //       }
+  //       if (Temporal.Instant.compare(inst, startInst) >= 0) {
+  //         results.push(occ);
+  //       }
+  //       i++;
+  //     }
+  //     return results;
+  //   }
+
+  //   // --- 4) fallback ---
+  //   let current = this.computeFirst();
+  //   while (true) {
+  //     const inst = current.toInstant();
+  //     if (inc) {
+  //       if (Temporal.Instant.compare(inst, endInst) > 0) break;
+  //     } else {
+  //       if (Temporal.Instant.compare(inst, endInst) >= 0) break;
+  //     }
+  //     if (
+  //       Temporal.Instant.compare(inst, startInst) >= 0 &&
+  //       this.matchesAll(current)
+  //     ) {
+  //       results.push(current);
+  //     }
+  //     current = this.applyTimeOverride(this.rawAdvance(current));
+  //   }
+
+  //   return results;
+  // }
 
   /**
    * Returns all occurrences of the rule within a specified time window.
@@ -449,6 +703,41 @@ export class RRuleTemporal {
           results.push(occ);
         }
         i++;
+      }
+      return results;
+    }
+
+    if (this.opts.freq === "WEEKLY") {
+      const startInst =
+        after instanceof Date
+          ? Temporal.Instant.from(after.toISOString())
+          : after.toInstant();
+      const endInst =
+        before instanceof Date
+          ? Temporal.Instant.from(before.toISOString())
+          : before.toInstant();
+
+      let weekCursor = this.computeFirst();
+      const results: Temporal.ZonedDateTime[] = [];
+
+      outer: while (true) {
+        const occs = this.generateWeeklyOccurrences(weekCursor);
+        for (const occ of occs) {
+          const inst = occ.toInstant();
+          // break when beyond end
+          if (
+            inc
+              ? Temporal.Instant.compare(inst, endInst) > 0
+              : Temporal.Instant.compare(inst, endInst) >= 0
+          ) {
+            break outer;
+          }
+          // include if on/after start
+          if (Temporal.Instant.compare(inst, startInst) >= 0) {
+            results.push(occ);
+          }
+        }
+        weekCursor = weekCursor.add({ weeks: this.opts.interval! });
       }
       return results;
     }

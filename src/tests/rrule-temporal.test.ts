@@ -225,3 +225,57 @@ describe("RRuleTemporal - BYMONTH with YEARLY freq (manual opts)", () => {
     }
   });
 });
+
+describe("RRuleTemporal - Weekly BYDAY simple all()", () => {
+  const ics = `DTSTART;TZID=America/Chicago:20250406T000000
+RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0;COUNT=4`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() returns 4 consecutive Mondays", () => {
+    const dates = rule.all();
+    // dayOfWeek 1 == Monday
+    expect(dates).toHaveLength(4);
+    expect(dates.map((d) => d.day)).toEqual([7, 14, 21, 28]);
+    dates.forEach((d) => expect(d.dayOfWeek).toBe(1));
+  });
+});
+
+describe("RRuleTemporal - Weekly BYDAY simple between()", () => {
+  const ics = `DTSTART;TZID=America/Chicago:20250325T000000
+RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  // Window: April 22 2025 UTC → May 20 2025 UTC
+  const start = new Date(Date.UTC(2025, 3, 22, 0, 0)); // April is month=3
+  const end = new Date(Date.UTC(2025, 4, 20, 0, 0)); // May is month=4
+
+  test("between() returns the Mondays falling in that window", () => {
+    const arrInc = rule.between(start, end, true);
+    // Expect 2025-04-28, 05-05, 05-12, 05-19
+    expect(arrInc.map((d) => d.day)).toEqual([28, 5, 12, 19]);
+    arrInc.forEach((d) => expect(d.dayOfWeek).toBe(1));
+  });
+});
+
+describe("RRuleTemporal - Weekly BYDAY frequencies without positional prefix", () => {
+  const ics = `DTSTART;TZID=America/Chicago:20250325T000000
+RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+  // 2025 Apr 22 00:00 UTC
+  const start = new Date(Date.UTC(2025, 3, 22, 0, 0));
+  // 2026 Apr 22 00:00 UTC
+  const end = new Date(Date.UTC(2026, 3, 22, 0, 0, 0));
+
+  test("between returns occurrences in window", () => {
+    const arrInc = rule.between(start, end, true);
+    console.log(
+      "arrInc: ",
+      arrInc.map((d) => d.toString())
+    );
+    expect(arrInc.map((d) => d.day)).toEqual([
+      28, 5, 12, 19, 26, 2, 9, 16, 23, 30, 7, 14, 21, 28, 4, 11, 18, 25, 1, 8,
+      15, 22, 29, 6, 13, 20, 27, 3, 10, 17, 24, 1, 8, 15, 22, 29, 5, 12, 19, 26,
+      2, 9, 16, 23, 2, 9, 16, 23, 30, 6, 13, 20,
+    ]);
+  });
+});
