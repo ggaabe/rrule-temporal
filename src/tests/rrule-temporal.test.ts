@@ -118,7 +118,7 @@ RRULE:FREQ=MONTHLY;BYHOUR=12;BYMINUTE=0;COUNT=12`.trim();
     if (!nxt) {
       throw new Error("nxt is undefined");
     }
-    expect(nxt.month).toBe(4); // April’s occurrence
+    expect(nxt.month).toBe(4); // April's occurrence
     expect(nxt.hour).toBe(12);
   });
 
@@ -139,7 +139,47 @@ RRULE:FREQ=MONTHLY;BYHOUR=12;BYMINUTE=0;COUNT=12`.trim();
     if (!prev) {
       throw new Error("prev is undefined");
     }
-    expect(prev.month).toBe(6); // June’s occurrence (on or before)
+    expect(prev.month).toBe(6); // June's occurrence (on or before)
+  });
+
+  test("previous gives occurrence on same day as dtstart", () => {
+    // DTSTART matches the rule (Daily at 15:10)
+    const icsSameDay = `DTSTART;TZID=America/Chicago:20250505T151000
+RRULE:FREQ=DAILY;UNTIL=20250530T050000Z;BYHOUR=15;BYMINUTE=10`.trim();
+    const ruleSameDay = new RRuleTemporal({ rruleString: icsSameDay });
+
+    // Date for previous() call: 1 minute after the occurrence time
+    const beforeDate = new Date(
+      Temporal.ZonedDateTime.from({
+        year: 2025,
+        month: 5,
+        day: 5,
+        hour: 15,
+        minute: 11, // One minute after the occurrence time
+        second: 0,
+        timeZone: "America/Chicago",
+      }).toInstant().epochMilliseconds
+    );
+
+    const prev = ruleSameDay.previous(beforeDate);
+    expect(prev).not.toBeNull();
+    if (!prev) {
+      throw new Error("prev is undefined");
+    }
+
+    // Expect the occurrence at 15:10 on the same day (which is the DTSTART)
+    const expectedDate = Temporal.ZonedDateTime.from({
+      year: 2025,
+      month: 5,
+      day: 5,
+      hour: 15,
+      minute: 10,
+      second: 0,
+      timeZone: "America/Chicago",
+    });
+
+    // Compare ZonedDateTimes for equality
+    expect(prev.equals(expectedDate)).toBe(true);
   });
 });
 
@@ -232,7 +272,7 @@ describe("RRuleTemporal - BYMONTH with YEARLY freq (manual opts)", () => {
     dtstart,
   });
 
-  test("all() emits Jan ’25, Jun ’26, Dec ’27, Jan ’28", () => {
+  test("all() emits Jan '25, Jun '26, Dec '27, Jan '28", () => {
     const dates = rule.all();
     expect(dates).toHaveLength(4);
     expect(dates.map((d) => ({ year: d.year, month: d.month }))).toEqual([
