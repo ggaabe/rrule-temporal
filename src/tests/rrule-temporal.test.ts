@@ -341,3 +341,99 @@ RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0`.trim();
     ]);
   });
 });
+
+describe("RRuleTemporal - next() with Timezones", () => {
+  test("Rule in ET, next() called with UTC date", () => {
+    const icsET = `DTSTART;TZID=America/New_York:20250601T100000
+RRULE:FREQ=DAILY;BYHOUR=10;BYMINUTE=0;COUNT=5`.trim();
+    const ruleET = new RRuleTemporal({ rruleString: icsET });
+
+    // June 1st 2025, 00:00:00 UTC
+    const afterUTC = new Date(Date.UTC(2025, 5, 1, 0, 0, 0));
+
+    const nxt = ruleET.next(afterUTC);
+    expect(nxt).not.toBeNull();
+    if (!nxt) throw new Error("nxt is undefined");
+
+    // Expect next occurrence to be 10:00 in America/New_York
+    expect(nxt.timeZoneId).toBe("America/New_York");
+    expect(nxt.hour).toBe(10);
+    expect(nxt.year).toBe(2025);
+    expect(nxt.month).toBe(6);
+    expect(nxt.day).toBe(1);
+  });
+
+  test("Rule in PT, next() called with ET date", () => {
+    const icsPT = `DTSTART;TZID=America/Los_Angeles:20250710T140000
+RRULE:FREQ=DAILY;BYHOUR=14;BYMINUTE=0;COUNT=5`.trim();
+    const rulePT = new RRuleTemporal({ rruleString: icsPT });
+
+    // July 10th 2025, 10:00:00 America/New_York (which is 07:00:00 PT)
+    const afterET = new Date(
+      Temporal.ZonedDateTime.from({
+        year: 2025,
+        month: 7,
+        day: 10,
+        hour: 10, // 10 AM ET
+        minute: 0,
+        timeZone: "America/New_York",
+      }).toInstant().epochMilliseconds
+    );
+
+    const nxt = rulePT.next(afterET);
+    expect(nxt).not.toBeNull();
+    if (!nxt) throw new Error("nxt is undefined");
+
+    // Expect next occurrence to be 14:00 (2 PM) in America/Los_Angeles
+    expect(nxt.timeZoneId).toBe("America/Los_Angeles");
+    expect(nxt.hour).toBe(14);
+    expect(nxt.year).toBe(2025);
+    expect(nxt.month).toBe(7);
+    expect(nxt.day).toBe(10);
+  });
+
+  test("Rule crossing DST change (Chicago)", () => {
+    // Rule triggers daily at 2 AM Chicago time. DST starts March 9, 2025
+    const icsChicagoDST = `DTSTART;TZID=America/Chicago:20250308T020000
+RRULE:FREQ=DAILY;BYHOUR=2;BYMINUTE=0;COUNT=3`.trim();
+    const ruleChicagoDST = new RRuleTemporal({ rruleString: icsChicagoDST });
+
+    // Start looking from just before the first occurrence
+    const afterStart = new Date(
+      Temporal.ZonedDateTime.from({
+        year: 2025,
+        month: 3,
+        day: 8,
+        hour: 1,
+        minute: 59,
+        timeZone: "America/Chicago",
+      }).toInstant().epochMilliseconds
+    );
+
+    const first = ruleChicagoDST.next(afterStart); // Should be Mar 8, 2:00 CST (UTC-6)
+    expect(first).not.toBeNull();
+    if (!first) throw new Error("first is undefined");
+    expect(first.toString()).toBe("2025-03-08T02:00:00-06:00[America/Chicago]");
+
+    // DST starts Mar 9, 2 AM CST becomes 3 AM CDT
+    const second = ruleChicagoDST.next(
+      new Date(first.toInstant().epochMilliseconds)
+    ); // Should be Mar 9, 2:00 -> jumps to 3:00 CDT (UTC-5)
+    expect(second).not.toBeNull();
+    if (!second) throw new Error("second is undefined");
+    // The local time remains 2:00 AM according to the rule, even though the UTC offset changes
+    // Correction: 2:00 AM CDT does not exist on Mar 9. Expect 3:00 AM CDT.
+    expect(second.toString()).toBe(
+      "2025-03-09T03:00:00-05:00[America/Chicago]"
+    );
+    expect(second.hour).toBe(3); // Hour will be 3 AM local time as 2 AM was skipped
+
+    const third = ruleChicagoDST.next(
+      new Date(second.toInstant().epochMilliseconds)
+    ); // Should be Mar 10, 2:00 CDT (UTC-5)
+    expect(third).not.toBeNull();
+    if (!third) throw new Error("third is undefined");
+    expect(third.toString()).toBe("2025-03-10T02:00:00-05:00[America/Chicago]");
+    expect(third.hour).toBe(2); // Hour remains 2 AM local time
+  });
+});
