@@ -128,13 +128,19 @@ console.log(rule2.between(start, end, true).map(d => d.toString()));
 Find the next or previous occurrence relative to any date:
 
 ```typescript
-// Monthly at 12:00 UTC, 12 total
+// Monthly at 12:00 America/Chicago, 12 total
 const ics3 = `
-DTSTART;TZID=UTC:20250101T120000
+DTSTART;TZID=America/Chicago:20250101T120000
 RRULE:FREQ=MONTHLY;BYHOUR=12;BYMINUTE=0;COUNT=12
 `.trim();
 
 const rule3 = new RRuleTemporal({ rruleString: ics3 });
+
+// Next occurrence after the current time in Central Time
+// Where hour and minute conditions are met
+const firstOccurrence = rule.next(
+  Temporal.Now.zonedDateTimeISO("America/Chicago")
+);
 
 // Next after 2025-03-15T00:00:00Z
 const nxt = rule3.next(new Date("2025-03-15T00:00:00Z"));
