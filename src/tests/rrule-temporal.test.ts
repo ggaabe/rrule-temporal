@@ -562,3 +562,155 @@ RRULE:FREQ=MONTHLY;BYDAY=1MO,-1MO;BYHOUR=8,20;BYMINUTE=0;COUNT=6`.trim();
     expect(hrs).toEqual([8, 20, 8, 20]); // four hits in November
   });
 });
+
+describe("RRuleTemporal options() method", () => {
+  test("should return options with tzid from ICS string", () => {
+    const ics = `
+DTSTART;TZID=America/New_York:20240101T100000
+RRULE:FREQ=DAILY;COUNT=5`.trim();
+    const rule = new RRuleTemporal({ rruleString: ics });
+    const opts = rule.options();
+    expect(opts.tzid).toBe("America/New_York");
+    expect(opts.freq).toBe("DAILY");
+    expect(opts.count).toBe(5);
+    expect(
+      opts.dtstart.equals(
+        Temporal.ZonedDateTime.from("2024-01-01T10:00:00[America/New_York]")
+      )
+    ).toBe(true);
+  });
+
+  test("should return options with tzid from dtstart object (manual opts)", () => {
+    const dtstart = Temporal.ZonedDateTime.from(
+      "20240315T090000[Europe/Paris]"
+    );
+    const rule = new RRuleTemporal({
+      freq: "WEEKLY",
+      dtstart,
+      interval: 2,
+    });
+    const opts = rule.options();
+    expect(opts.tzid).toBe("Europe/Paris");
+    expect(opts.freq).toBe("WEEKLY");
+    expect(opts.interval).toBe(2);
+    expect(opts.dtstart.equals(dtstart)).toBe(true);
+  });
+
+  test("should return options with explicit tzid overriding dtstart object's tzid (manual opts)", () => {
+    const dtstart = Temporal.ZonedDateTime.from(
+      "20240315T090000[Europe/Paris]"
+    );
+    const rule = new RRuleTemporal({
+      freq: "MONTHLY",
+      dtstart,
+      tzid: "Asia/Tokyo",
+    });
+    const opts = rule.options();
+    expect(opts.tzid).toBe("Asia/Tokyo"); // Explicit tzid should win
+    expect(opts.freq).toBe("MONTHLY");
+    // dtstart itself should retain its original timezone for comparison if needed,
+    // but the rule's tzid is what's important for generation.
+    expect(opts.dtstart.timeZoneId).toBe("Europe/Paris");
+    // The originalDtstart stored in the class will be the one passed.
+    // The tzid in options is the one used for rule processing.
+  });
+
+  test("should default tzid to UTC if not in ICS DTSTART and no explicit tzid", () => {
+    // DTSTART without TZID, implies floating, but parser defaults to UTC if not specified
+    // or if the UNTIL has a Z. For consistency, let's assume parser sets a tzid.
+    // The parseRRuleString function defaults tzid to "UTC" if not found in DTSTART
+    // and then uses it for UNTIL if UNTIL is not UTC.
+    // If DTSTART has no TZID, it's parsed as PlainDateTime then toZonedDateTime with tzid (which defaults to "" then "UTC").
+    const ics = `
+DTSTART:20240701T120000
+RRULE:FREQ=YEARLY`.trim();
+    const rule = new RRuleTemporal({ rruleString: ics });
+    const opts = rule.options();
+    // parseRRuleString will assign "" initially, then constructor might default to "UTC"
+    // or use the tzid from dtstart if it was ZonedDateTime.
+    // Given the current parseRRuleString, dtstart becomes ZonedDateTime in UTC.
+    expect(opts.tzid).toBe("UTC"); // Defaulting behavior of parseRRuleString
+    expect(opts.freq).toBe("YEARLY");
+    expect(
+      opts.dtstart.equals(
+        Temporal.PlainDateTime.from("2024-07-01T12:00:00").toZonedDateTime(
+          "UTC"
+        )
+      )
+    ).toBe(true);
+  });
+
+  test("should use tzid from dtstart if tzid is not explicitly passed in manual options", () => {
+    const dtstart = Temporal.ZonedDateTime.from(
+      "2025-01-01T00:00:00[America/Denver]"
+    );
+    const rule = new RRuleTemporal({
+      freq: "DAILY",
+      dtstart: dtstart,
+    });
+    const opts = rule.options();
+    expect(opts.tzid).toBe("America/Denver");
+    expect(opts.dtstart.timeZoneId).toBe("America/Denver");
+  });
+
+  test("should correctly parse and store all provided options from rruleString", () => {
+    const ics = `
+DTSTART;TZID=America/Los_Angeles:20230101T103000
+RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;UNTIL=20240101T103000Z;BYHOUR=10,14;BYMINUTE=30,45;BYDAY=1MO,-1FR;BYMONTH=1,7`.trim();
+    const rule = new RRuleTemporal({ rruleString: ics });
+    const opts = rule.options();
+
+    expect(opts.tzid).toBe("America/Los_Angeles");
+    expect(opts.freq).toBe("MONTHLY");
+    expect(opts.interval).toBe(2);
+    expect(opts.count).toBe(10);
+    expect(
+      opts.until?.equals(
+        Temporal.Instant.from("2024-01-01T10:30:00Z").toZonedDateTimeISO(
+          "America/Los_Angeles"
+        )
+      )
+    ).toBe(true);
+    expect(opts.byHour).toEqual([10, 14]);
+    expect(opts.byMinute).toEqual([30, 45]);
+    expect(opts.byDay).toEqual(["1MO", "-1FR"]);
+    expect(opts.byMonth).toEqual([1, 7]);
+    expect(opts.dtstart.toString()).toBe(
+      "2023-01-01T10:30:00-08:00[America/Los_Angeles]"
+    );
+  });
+
+  test("should correctly store all provided manual options", () => {
+    const dtstart = Temporal.ZonedDateTime.from(
+      "2023-05-10T08:00:00[Europe/Berlin]"
+    );
+    const until = Temporal.ZonedDateTime.from(
+      "2024-05-10T08:00:00[Europe/Berlin]"
+    );
+    const manualOpts: import("../index").RRuleOpts = {
+      freq: "WEEKLY",
+      interval: 1,
+      count: 52,
+      until,
+      byHour: [8, 12],
+      byMinute: [0],
+      byDay: ["MO", "WE", "FR"],
+      byMonth: [5, 6],
+      dtstart,
+      tzid: "Europe/Berlin",
+    };
+    const rule = new RRuleTemporal(manualOpts);
+    const opts = rule.options();
+
+    expect(opts.tzid).toBe("Europe/Berlin");
+    expect(opts.freq).toBe("WEEKLY");
+    expect(opts.interval).toBe(1);
+    expect(opts.count).toBe(52);
+    expect(opts.until?.equals(until)).toBe(true);
+    expect(opts.byHour).toEqual([8, 12]);
+    expect(opts.byMinute).toEqual([0]);
+    expect(opts.byDay).toEqual(["MO", "WE", "FR"]);
+    expect(opts.byMonth).toEqual([5, 6]);
+    expect(opts.dtstart.equals(dtstart)).toBe(true);
+  });
+});

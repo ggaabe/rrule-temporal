@@ -35,7 +35,7 @@ interface ManualOpts extends BaseOpts {
   byMinute?: number[];
   byDay?: string[]; // e.g. ["MO","WE","FR"]
   byMonth?: number[]; // e.g. [1,4,7]
-  dtstart: string | Temporal.ZonedDateTime;
+  dtstart: Temporal.ZonedDateTime;
 }
 interface IcsOpts extends BaseOpts {
   rruleString: string; // full "DTSTART...\nRRULE..." snippet
@@ -50,7 +50,7 @@ function parseRRuleString(
   fallbackDtstart?: Temporal.ZonedDateTime
 ): ManualOpts {
   let dtstart: Temporal.ZonedDateTime;
-  let tzid: string = "";
+  let tzid: string = "UTC";
   let rruleLine: string;
 
   if (/^DTSTART/m.test(input)) {
@@ -351,6 +351,10 @@ export class RRuleTemporal {
 
   private matchesAll(zdt: Temporal.ZonedDateTime): boolean {
     return this.matchesByDay(zdt) && this.matchesByMonth(zdt);
+  }
+
+  options() {
+    return this.opts;
   }
 
   /**
