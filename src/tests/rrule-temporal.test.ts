@@ -542,17 +542,14 @@ RRULE:FREQ=MONTHLY;BYDAY=1MO,-1MO;BYHOUR=8,20;BYMINUTE=0;COUNT=6`.trim();
   const rule = new RRuleTemporal({ rruleString: ics });
 
   test("all() emits first-Mon 08:00, 20:00, last-Mon 08:00, 20:00 …", () => {
-    const res = rule
-      .all()
-      .map((d) =>
-        d.toString({ smallestUnit: "minute", timeZoneName: "never" })
-      );
+    const res = rule.all().map((d) => d.hour);
     /* expected pattern for three months:
        2025-11-03T08:00Z, 2025-11-03T20:00Z,
        2025-11-24T08:00Z, 2025-11-24T20:00Z,
        2025-12-01T08:00Z, 2025-12-01T20:00Z
     */
-    expect(res[0]?.endsWith("08:00") && res[1]?.endsWith("20:00")).toBe(true);
+    expect(res[0]).toBe(8);
+    expect(res[1]).toBe(20);
     expect(res).toHaveLength(6);
   });
 

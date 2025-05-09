@@ -374,6 +374,15 @@ export class RRuleTemporal {
 
       outer_month: while (true) {
         const occs = this.generateMonthlyOccurrences(monthCursor);
+        // Skip this month entirely if **any** occurrence precedes DTSTART.
+        if (
+          monthCursor.month === start.month &&
+          occs.some((o) => Temporal.ZonedDateTime.compare(o, start) < 0)
+        ) {
+          monthCursor = monthCursor.add({ months: this.opts.interval! });
+          continue outer_month;
+        }
+
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
           if (
