@@ -1,6 +1,23 @@
 import { RRuleTemporal } from "../index";
 import { Temporal } from "@js-temporal/polyfill";
 
+function zdt(
+  y: number,
+  m: number,
+  d: number,
+  h: number,
+  tz = "America/New_York"
+) {
+  return Temporal.ZonedDateTime.from({
+    year: y,
+    month: m,
+    day: d,
+    hour: h,
+    minute: 0,
+    timeZone: tz,
+  });
+}
+
 describe("RRuleTemporal - ICS snippet parsing", () => {
   const ics = `DTSTART;TZID=America/Chicago:20250320T170000
 RRULE:FREQ=DAILY;BYHOUR=17;BYMINUTE=0;COUNT=5`.trim();
@@ -435,5 +452,116 @@ RRULE:FREQ=DAILY;BYHOUR=2;BYMINUTE=0;COUNT=3`.trim();
     if (!third) throw new Error("third is undefined");
     expect(third.toString()).toBe("2025-03-10T02:00:00-05:00[America/Chicago]");
     expect(third.hour).toBe(2); // Hour remains 2 AM local time
+  });
+});
+
+describe("RRuleTemporal - Multiple BYHOUR values", () => {
+  const ics = `DTSTART;TZID=America/New_York:20250801T000000
+RRULE:FREQ=DAILY;BYHOUR=6,7,9;BYMINUTE=0;COUNT=10`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("next() correctly cycles through multiple BYHOUR values", () => {
+    // Start looking from before the first occurrence on Aug 1st
+    const initialDate = new Date(
+      Temporal.ZonedDateTime.from({
+        year: 2025,
+        month: 8,
+        day: 1,
+        hour: 5, // Before the first BYHOUR (6)
+        minute: 0,
+        timeZone: "America/New_York",
+      }).toInstant().epochMilliseconds
+    );
+
+    const first = rule.next(initialDate);
+    expect(first).not.toBeNull();
+    if (!first) throw new Error("first is undefined");
+    expect(first.timeZoneId).toBe("America/New_York");
+    expect(first.year).toBe(2025);
+    expect(first.month).toBe(8);
+    expect(first.day).toBe(1);
+    expect(first.hour).toBe(6);
+
+    const second = rule.next(new Date(first.toInstant().epochMilliseconds));
+    expect(second).not.toBeNull();
+    if (!second) throw new Error("second is undefined");
+    expect(second.hour).toBe(7);
+
+    const third = rule.next(new Date(second.toInstant().epochMilliseconds));
+    expect(third).not.toBeNull();
+    if (!third) throw new Error("third is undefined");
+    expect(third.hour).toBe(9);
+
+    // Check that it rolls over to the next day correctly
+    const fourth = rule.next(new Date(third.toInstant().epochMilliseconds));
+    expect(fourth).not.toBeNull();
+    if (!fourth) throw new Error("fourth is undefined");
+    expect(fourth.day).toBe(2);
+    expect(fourth.hour).toBe(6);
+  });
+});
+
+describe("BYHOUR enumeration – DAILY + COUNT", () => {
+  const rule = new RRuleTemporal({
+    rruleString: `DTSTART;TZID=America/New_York:20250801T000000
+RRULE:FREQ=DAILY;BYHOUR=6,12,18;BYMINUTE=0;COUNT=7`, // 7 total occurrences
+  });
+
+  test("all() emits 6 → 12 → 18 → 6 … pattern", () => {
+    const hrs = rule.all().map((d) => d.hour);
+    expect(hrs).toEqual([6, 12, 18, 6, 12, 18, 6]);
+  });
+});
+
+describe("BYHOUR enumeration – WEEKLY BYDAY×BYHOUR", () => {
+  const ics = `
+DTSTART;TZID=America/Chicago:20250901T000000
+RRULE:FREQ=WEEKLY;BYDAY=MO,FR;BYHOUR=9,17;BYMINUTE=0;COUNT=8`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("Sequence cycles MO-9 → MO-17 → FR-9 → FR-17 …", () => {
+    const seq = rule.all().map((d) => `${d.dayOfWeek}-${d.hour}`);
+    // MO=1, FR=5
+    expect(seq).toEqual([
+      "1-9",
+      "1-17",
+      "5-9",
+      "5-17",
+      "1-9",
+      "1-17",
+      "5-9",
+      "5-17",
+    ]);
+  });
+});
+
+describe("BYHOUR enumeration – MONTHLY with ordinal BYDAY", () => {
+  const ics = `
+DTSTART;TZID=UTC:20251015T000000
+RRULE:FREQ=MONTHLY;BYDAY=1MO,-1MO;BYHOUR=8,20;BYMINUTE=0;COUNT=6`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() emits first-Mon 08:00, 20:00, last-Mon 08:00, 20:00 …", () => {
+    const res = rule
+      .all()
+      .map((d) =>
+        d.toString({ smallestUnit: "minute", timeZoneName: "never" })
+      );
+    /* expected pattern for three months:
+       2025-11-03T08:00Z, 2025-11-03T20:00Z,
+       2025-11-24T08:00Z, 2025-11-24T20:00Z,
+       2025-12-01T08:00Z, 2025-12-01T20:00Z
+    */
+    expect(res[0]?.endsWith("08:00") && res[1]?.endsWith("20:00")).toBe(true);
+    expect(res).toHaveLength(6);
+  });
+
+  test("between() includes every hour in window", () => {
+    const start = zdt(2025, 11, 1, 0, "UTC").toInstant().epochMilliseconds;
+    const end = zdt(2025, 11, 30, 23, "UTC").toInstant().epochMilliseconds;
+    const hrs = rule
+      .between(new Date(start), new Date(end), true)
+      .map((d) => d.hour);
+    expect(hrs).toEqual([8, 20, 8, 20]); // four hits in November
   });
 });

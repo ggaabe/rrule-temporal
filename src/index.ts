@@ -108,10 +108,16 @@ function parseRRuleString(
         break;
       }
       case "BYHOUR":
-        opts.byHour = val!.split(",").map((n) => parseInt(n, 10));
+        opts.byHour = val!
+          .split(",")
+          .map((n) => parseInt(n, 10))
+          .sort((a, b) => a - b);
         break;
       case "BYMINUTE":
-        opts.byMinute = val!.split(",").map((n) => parseInt(n, 10));
+        opts.byMinute = val!
+          .split(",")
+          .map((n) => parseInt(n, 10))
+          .sort((a, b) => a - b);
         break;
       case "BYDAY":
         opts.byDay = val!.split(","); // e.g. ["MO","2FR","-1SU"]
@@ -170,6 +176,43 @@ export class RRuleTemporal {
       default:
         throw new Error(`Unsupported FREQ: ${freq}`);
     }
+  }
+
+  /**  Expand one base ZonedDateTime into all BYHOUR × BYMINUTE combinations,
+   *  keeping chronological order.  If BYHOUR/BYMINUTE are not present the
+   *  original date is returned unchanged.
+   */
+  private expandByHourMinute(
+    base: Temporal.ZonedDateTime
+  ): Temporal.ZonedDateTime[] {
+    const hours = this.opts.byHour ?? [base.hour];
+    const minutes = this.opts.byMinute ?? [base.minute];
+
+    const out: Temporal.ZonedDateTime[] = [];
+    for (const h of hours) {
+      for (const m of minutes) {
+        out.push(base.with({ hour: h, minute: m }));
+      }
+    }
+    return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+  }
+
+  private nextCandidateSameDate(
+    zdt: Temporal.ZonedDateTime
+  ): Temporal.ZonedDateTime {
+    const { byHour, byMinute } = this.opts;
+    if (byHour && byHour.length > 1) {
+      const idx = byHour.indexOf(zdt.hour);
+      if (idx !== -1 && idx < byHour.length - 1) {
+        // next hour on the same day
+        return zdt.with({
+          hour: byHour[idx + 1],
+          minute: byMinute ? byMinute[0] : zdt.minute,
+        });
+      }
+    }
+    // we were already at the last BYHOUR -> advance the date
+    return this.applyTimeOverride(this.rawAdvance(zdt));
   }
 
   private applyTimeOverride(
@@ -243,13 +286,12 @@ export class RRuleTemporal {
         : [Object.entries(dayMap).find(([, d]) => d === sample.dayOfWeek)![0]];
 
     // For each token, find the date in [sample, sample+6d] matching that weekday
-    const occs = tokens.map((tok) => {
+    const occs = tokens.flatMap((tok) => {
       const targetDow = dayMap[tok]!;
       const delta = (targetDow - sample.dayOfWeek + 7) % 7;
-      return this.applyTimeOverride(sample.add({ days: delta }));
+      const sameDate = sample.add({ days: delta });
+      return this.expandByHourMinute(sameDate);
     });
-
-    // Return in chronological order
     return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 
@@ -481,7 +523,7 @@ export class RRuleTemporal {
         dates.push(current);
         matchCount++;
       }
-      current = this.applyTimeOverride(this.rawAdvance(current));
+      current = this.nextCandidateSameDate(current);
     }
 
     return dates;
@@ -611,7 +653,7 @@ export class RRuleTemporal {
       ) {
         results.push(current);
       }
-      current = this.applyTimeOverride(this.rawAdvance(current));
+      current = this.nextCandidateSameDate(current);
     }
     return results;
   }
@@ -659,7 +701,7 @@ export class RRuleTemporal {
         return null;
       }
 
-      current = this.applyTimeOverride(this.rawAdvance(current));
+      current = this.nextCandidateSameDate(current);
     }
   }
 
@@ -705,7 +747,7 @@ export class RRuleTemporal {
         break;
       }
 
-      current = this.applyTimeOverride(this.rawAdvance(current));
+      current = this.nextCandidateSameDate(current);
     }
 
     return prev;
@@ -816,7 +858,7 @@ export class RRuleTemporal {
 
     // 5) Apply your BYHOUR/BYMINUTE overrides and sort chronologically
     return results
-      .map((zdt) => this.applyTimeOverride(zdt))
+      .flatMap((zdt) => this.expandByHourMinute(zdt))
       .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 }
