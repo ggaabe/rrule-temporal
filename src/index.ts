@@ -266,9 +266,6 @@ export class RRuleTemporal {
   private generateWeeklyOccurrences(
     sample: Temporal.ZonedDateTime
   ): Temporal.ZonedDateTime[] {
-    const { byDay } = this.opts;
-
-    // Map token → ISO dayOfWeek
     const dayMap: Record<string, number> = {
       MO: 1,
       TU: 2,
@@ -278,20 +275,18 @@ export class RRuleTemporal {
       SA: 6,
       SU: 7,
     };
+    const tokens = this.opts.byDay?.length
+      ? [...this.opts.byDay] // rule-specified weekdays
+      : [Object.entries(dayMap).find(([, d]) => d === sample.dayOfWeek)![0]]; // default = same weekday
 
-    // If no BYDAY, default to the sample’s own weekday token
-    const tokens =
-      byDay && byDay.length
-        ? byDay
-        : [Object.entries(dayMap).find(([, d]) => d === sample.dayOfWeek)![0]];
-
-    // For each token, find the date in [sample, sample+6d] matching that weekday
+    // Build occurrences for every weekday × every BYHOUR
     const occs = tokens.flatMap((tok) => {
       const targetDow = dayMap[tok]!;
       const delta = (targetDow - sample.dayOfWeek + 7) % 7;
       const sameDate = sample.add({ days: delta });
       return this.expandByHourMinute(sameDate);
     });
+
     return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 
@@ -437,9 +432,10 @@ export class RRuleTemporal {
         // Generate this week’s occurrences
         const baseDow = weekCursor.dayOfWeek;
         const occs = dows
-          .map((dw) => {
+          .flatMap((dw) => {
             const delta = dw - baseDow;
-            return this.applyTimeOverride(weekCursor.add({ days: delta }));
+            const sameDate = weekCursor.add({ days: delta });
+            return this.expandByHourMinute(sameDate);
           })
           .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
 
@@ -782,17 +778,14 @@ export class RRuleTemporal {
   ): Temporal.ZonedDateTime[] {
     const { byDay, byMonth, tzid } = this.opts;
 
-    // 1) Skip entire month if BYMONTH excludes it
-    if (byMonth && !byMonth.includes(sample.month)) {
-      return [];
-    }
+    // 1) Skip whole month if BYMONTH says so
+    if (byMonth && !byMonth.includes(sample.month)) return [];
 
-    // 2) If no BYDAY, just return the sample (we'll override time later)
+    // 2) If no BYDAY ⇒ just take this exact calendar day
     if (!byDay || byDay.length === 0) {
-      return [sample];
+      return this.expandByHourMinute(sample);
     }
 
-    // Map MO,TU…SU → dayOfWeek numbers
     const dayMap: Record<string, number> = {
       MO: 1,
       TU: 2,
@@ -803,62 +796,43 @@ export class RRuleTemporal {
       SU: 7,
     };
 
-    // Parse tokens into { ord, wd }
     type Token = { ord: number; wd: number };
     const tokens: Token[] = byDay
       .map((tok) => {
         const m = tok.match(/^([+-]?\d)?(MO|TU|WE|TH|FR|SA|SU)$/);
         if (!m) return null;
-        const ord = m[1] ? parseInt(m[1], 10) : 0;
-        const wd = dayMap[m[2]!];
-        return { ord, wd };
+        return { ord: m[1] ? parseInt(m[1], 10) : 0, wd: dayMap[m[2]!] };
       })
       .filter((x): x is Token => x !== null);
 
-    // 3) Build a map from weekday → all day‑of‑month numbers
-    const year = sample.year;
-    const month = sample.month;
-    let cursor = Temporal.ZonedDateTime.from({
-      year,
-      month,
-      day: 1,
-      hour: sample.hour,
-      minute: sample.minute,
-      second: sample.second,
-      timeZone: tzid,
-    });
-    const weekdayBuckets: Record<number, number[]> = {};
-    while (cursor.month === month) {
+    // Bucket every weekday in this month
+    const buckets: Record<number, number[]> = {};
+    let cursor = sample.with({ day: 1 });
+    while (cursor.month === sample.month) {
       const dow = cursor.dayOfWeek;
-      weekdayBuckets[dow] = weekdayBuckets[dow] || [];
-      weekdayBuckets[dow].push(cursor.day);
+      (buckets[dow] ||= []).push(cursor.day);
       cursor = cursor.add({ days: 1 });
     }
 
-    // 4) For each token, pick the right day‑of‑month
-    const results: Temporal.ZonedDateTime[] = [];
+    // Resolve tokens → concrete days
+    const hits: Temporal.ZonedDateTime[] = [];
     for (const { ord, wd } of tokens) {
-      const days = weekdayBuckets[wd] || [];
-      if (!days.length) continue;
+      const list = buckets[wd] ?? [];
+      if (!list.length) continue;
 
       if (ord === 0) {
-        // simple weekday: include *all* Fridays, e.g.
-        for (const d of days) {
-          results.push(sample.with({ day: d }));
-        }
+        // every Monday, etc.
+        for (const d of list) hits.push(sample.with({ day: d }));
       } else {
-        // ordinal: 2FR → days[1], -1FR → days[days.length-1], etc.
-        const idx = ord > 0 ? ord - 1 : days.length + ord;
-        const dayNum = days[idx];
-        if (dayNum) {
-          results.push(sample.with({ day: dayNum }));
-        }
+        const idx = ord > 0 ? ord - 1 : list.length + ord;
+        const dayN = list[idx];
+        if (dayN) hits.push(sample.with({ day: dayN }));
       }
     }
 
-    // 5) Apply your BYHOUR/BYMINUTE overrides and sort chronologically
-    return results
-      .flatMap((zdt) => this.expandByHourMinute(zdt))
+    // Expand to all BYHOUR/BYMINUTE and sort
+    return hits
+      .flatMap((z) => this.expandByHourMinute(z))
       .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 }
