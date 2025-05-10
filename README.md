@@ -6,9 +6,7 @@ This was created to advance the rrule library to use Temporal, and to provide a 
 
 https://github.com/jkbrzt/rrule/issues/450#issuecomment-1055853095
 
-## Demo Site:
-
-https://ggaabe.github.io/rrule-temporal/
+## [Demo Site](https://ggaabe.github.io/rrule-temporal/)
 
 ## Installation
 
