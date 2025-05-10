@@ -154,8 +154,18 @@ export default function App() {
 
   // -------------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-gray-50 p-4 text-sm">
-      <h1 className="text-2xl font-bold mb-4">rrule-temporal Playground</h1>
+    <div className="min-h-screen p-4 text-sm">
+      <h1 className="text-2xl font-bold mb-4">
+        <a
+          href="https://github.com/ggaabe/rrule-temporal"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:underline text-blue-700"
+        >
+          rrule-temporal
+        </a>{" "}
+        Playground
+      </h1>
 
       {/* mode switch */}
       <div className="mb-4 space-x-2">
@@ -164,7 +174,7 @@ export default function App() {
             key={m}
             onClick={() => setMode(m)}
             className={`px-3 py-1 rounded border ${
-              mode === m ? "bg-blue-600 text-white" : "bg-white"
+              mode === m ? "bg-blue-600 text-white" : "bg-white text-black"
             }`}
           >
             {m.charAt(0).toUpperCase() + m.slice(1)}
@@ -172,7 +182,7 @@ export default function App() {
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-1">
         {/* ───────── INPUT COLUMN ───────── */}
         <div>
           <h2 className="text-xl font-semibold mb-2">Input</h2>
@@ -286,17 +296,17 @@ export default function App() {
         </div>
 
         {/* ───────── OUTPUT COLUMN ───────── */}
-        <div>
+        <div className="ml-1">
           <h2 className="text-xl font-semibold mb-2">Output</h2>
           {ruleString && (
-            <pre className="bg-white p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto">
+            <pre className=" p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto">
               {ruleString}
             </pre>
           )}
 
-          <div className="overflow-x-auto max-h-[28rem] overflow-y-auto border rounded bg-white shadow text-xs">
+          <div className="overflow-x-auto max-h-[28rem] overflow-y-auto border rounded shadow text-xs">
             <table className="min-w-full">
-              <thead className="sticky top-0 bg-gray-100">
+              <thead className="sticky top-0 ">
                 <tr>
                   <th className="px-2 py-1 border">#</th>
                   <th className="px-2 py-1 border">Day</th>
@@ -307,15 +317,12 @@ export default function App() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr
-                    key={r.idx}
-                    className={r.idx % 2 ? "bg-gray-50" : undefined}
-                  >
-                    <td className="px-2 py-1 border text-center">{r.idx}</td>
-                    <td className="px-2 py-1 border">{r.dow}</td>
-                    <td className="px-2 py-1 border">{`${r.day} ${r.month} ${r.year}`}</td>
-                    <td className="px-2 py-1 border">{r.time}</td>
-                    <td className="px-2 py-1 border">{r.tz}</td>
+                  <tr key={r.idx} className={r.idx % 2 ? "" : undefined}>
+                    <td className="px-2 border text-center">{r.idx}</td>
+                    <td className="px-2  border">{r.dow}</td>
+                    <td className="px-2  border">{`${r.day} ${r.month} ${r.year}`}</td>
+                    <td className="px-2  border">{r.time}</td>
+                    <td className="px-2 border">{r.tz}</td>
                   </tr>
                 ))}
               </tbody>

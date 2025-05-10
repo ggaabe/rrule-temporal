@@ -1,10 +1,12 @@
 /* src/index.css  */
 @import "tailwindcss/preflight";
 @import "tailwindcss/utilities";
+@import "tailwindcss";
 
-/* any custom layer additions go after the directives */
 
-:root {
+
+
+/* :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -17,7 +19,7 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
+} */
 
 a {
   font-weight: 500;
@@ -72,3 +74,34 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: white;
+    background-color: #242424;
+    --spacing: 0.5rem; /* Example value, adjust as needed */
+  }
+
+  button {
+    background-color: #242424;
+  }
+
+}
+
+/* Define a global CSS variable for spacing */
+/* :root {
+  --spacing: 0.5rem; 
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+} */
+
