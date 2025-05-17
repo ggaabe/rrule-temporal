@@ -5,7 +5,7 @@
 // – Changing either view keeps both in sync.
 // – TailwindCSS v4 (preflight/utilities) assumed.
 // --------------------------------------------------------------------------------
-
+// Set to use local package
 import { useEffect, useMemo, useState } from "react";
 import { Temporal } from "@js-temporal/polyfill";
 import { RRuleTemporal } from "../../src";
