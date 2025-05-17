@@ -47,6 +47,10 @@ jobs:
         run: rm -rf demo/node_modules
         # This runs from the GITHUB_WORKSPACE root
 
+      - name: Clear npm cache
+        run: npm cache clean --force
+        # This runs from the GITHUB_WORKSPACE root, affecting the global npm cache for the runner
+
       - name: Install demo dependencies
         working-directory: ./demo
         run: npm ci
