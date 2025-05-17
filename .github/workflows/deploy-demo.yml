@@ -50,7 +50,7 @@ jobs:
 
       - name: Install demo dependencies
         working-directory: ./demo
-        run: npm ci
+        run: npm install # Changed from npm ci for diagnostics
 
       - name: Build demo application
         # working-directory: ./demo # This is handled by defaults now
