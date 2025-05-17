@@ -721,3 +721,31 @@ RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;UNTIL=20240101T103000Z;BYHOUR=10,14;BYMIN
     expect(opts.dtstart.equals(dtstart)).toBe(true);
   });
 });
+
+describe("RRuleTemporal - BYMONTHDAY", () => {
+  test("positive month days", () => {
+    const ics = `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=10,15;COUNT=4`.trim();
+    const rule = new RRuleTemporal({ rruleString: ics });
+    const days = rule.all().map((d) => d.day);
+    expect(days).toEqual([10, 15, 10, 15]);
+  });
+
+  test("negative month day", () => {
+    const ics = `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3`.trim();
+    const rule = new RRuleTemporal({ rruleString: ics });
+    const days = rule.all().map((d) => d.day);
+    expect(days).toEqual([30, 31, 30]);
+  });
+
+  test("toText with manual opts", () => {
+    const dtstart = Temporal.ZonedDateTime.from("2025-01-01T00:00Z[UTC]");
+    const rule = new RRuleTemporal({
+      freq: "MONTHLY",
+      byMonthDay: [1, 15],
+      dtstart,
+    });
+    expect(rule.toText()).toBe(
+      "every month on the 1st and 15th day of the month"
+    );
+  });
+});

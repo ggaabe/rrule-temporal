@@ -115,6 +115,7 @@ interface ManualOpts extends BaseOpts {
   byMinute?: number[];
   byDay?: string[]; // e.g. ["MO","WE","FR"]
   byMonth?: number[]; // e.g. [1,4,7]
+  byMonthDay?: number[]; // e.g. [1,15,-1]
   dtstart: Temporal.ZonedDateTime;
 }
 interface IcsOpts extends BaseOpts {
@@ -204,6 +205,11 @@ function parseRRuleString(
         break;
       case "BYMONTH":
         opts.byMonth = val!.split(",").map((n) => parseInt(n, 10));
+        break;
+      case "BYMONTHDAY":
+        opts.byMonthDay = val!
+          .split(",")
+          .map((n) => parseInt(n, 10));
         break;
     }
   }
@@ -429,8 +435,24 @@ export class RRuleTemporal {
     return byMonth.includes(zdt.month);
   }
 
+  private matchesByMonthDay(zdt: Temporal.ZonedDateTime): boolean {
+    const { byMonthDay } = this.opts;
+    if (!byMonthDay) return true;
+    const lastDay = zdt
+      .with({ day: 1 })
+      .add({ months: 1 })
+      .subtract({ days: 1 }).day;
+    return byMonthDay.some((d) =>
+      d > 0 ? zdt.day === d : zdt.day === lastDay + d + 1
+    );
+  }
+
   private matchesAll(zdt: Temporal.ZonedDateTime): boolean {
-    return this.matchesByDay(zdt) && this.matchesByMonth(zdt);
+    return (
+      this.matchesByDay(zdt) &&
+      this.matchesByMonth(zdt) &&
+      this.matchesByMonthDay(zdt)
+    );
   }
 
   options() {
@@ -450,8 +472,8 @@ export class RRuleTemporal {
     }
     const dates: Temporal.ZonedDateTime[] = [];
 
-    // --- 1) MONTHLY + BYDAY (multi-day expansions) ---
-    if (this.opts.freq === "MONTHLY" && this.opts.byDay) {
+    // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
+    if (this.opts.freq === "MONTHLY" && (this.opts.byDay || this.opts.byMonthDay)) {
       const start = this.originalDtstart;
       let monthCursor = start.with({ day: 1 });
       let matchCount = 0;
@@ -640,8 +662,8 @@ export class RRuleTemporal {
         : before.toInstant();
     const results: Temporal.ZonedDateTime[] = [];
 
-    // 1) MONTHLY + BYDAY
-    if (this.opts.freq === "MONTHLY" && this.opts.byDay) {
+    // 1) MONTHLY + BYDAY/BYMONTHDAY
+    if (this.opts.freq === "MONTHLY" && (this.opts.byDay || this.opts.byMonthDay)) {
       let monthCursor = this.computeFirst().with({ day: 1 });
 
       outer: while (true) {
@@ -857,6 +879,7 @@ export class RRuleTemporal {
       byMinute,
       byDay,
       byMonth,
+      byMonthDay,
     } = this.opts;
 
     parts.push(`FREQ=${freq}`);
@@ -873,6 +896,7 @@ export class RRuleTemporal {
     if (byMinute) parts.push(`BYMINUTE=${byMinute.join(",")}`);
     if (byDay) parts.push(`BYDAY=${byDay.join(",")}`);
     if (byMonth) parts.push(`BYMONTH=${byMonth.join(",")}`);
+    if (byMonthDay) parts.push(`BYMONTHDAY=${byMonthDay.join(",")}`);
 
     return [dtLine, `RRULE:${parts.join(";")}`].join("\n");
   }
@@ -889,6 +913,7 @@ export class RRuleTemporal {
       byDay,
       byHour,
       byMonth,
+      byMonthDay,
     } = this.opts;
 
     const parts: string[] = ["every"];
@@ -938,6 +963,14 @@ export class RRuleTemporal {
       parts.push("in", list(byMonth, (m) => MONTH_NAMES[m - 1]));
     }
 
+    if (byMonthDay) {
+      parts.push(
+        "on the",
+        list(byMonthDay, (d) => ordinal(d)),
+        "day of the month"
+      );
+    }
+
     if (byHour) {
       parts.push("at", list(byHour, (h) => h.toString()));
     }
@@ -961,13 +994,29 @@ export class RRuleTemporal {
   private generateMonthlyOccurrences(
     sample: Temporal.ZonedDateTime
   ): Temporal.ZonedDateTime[] {
-    const { byDay, byMonth, tzid } = this.opts;
+    const { byDay, byMonth, byMonthDay } = this.opts;
 
     // 1) Skip whole month if BYMONTH says so
     if (byMonth && !byMonth.includes(sample.month)) return [];
 
-    // 2) If no BYDAY ⇒ just take this exact calendar day
-    if (!byDay || byDay.length === 0) {
+    const lastDay = sample.with({ day: 1 }).add({ months: 1 }).subtract({ days: 1 }).day;
+
+    // days matched by BYMONTHDAY tokens
+    let byMonthDayHits: number[] = [];
+    if (byMonthDay && byMonthDay.length > 0) {
+      byMonthDayHits = byMonthDay
+        .map((d) => (d > 0 ? d : lastDay + d + 1))
+        .filter((d) => d >= 1 && d <= lastDay);
+    }
+
+    if (!byDay && byMonthDayHits.length) {
+      const dates = byMonthDayHits.map((d) => sample.with({ day: d }));
+      return dates
+        .flatMap((z) => this.expandByHourMinute(z))
+        .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+    }
+
+    if (!byDay) {
       return this.expandByHourMinute(sample);
     }
 
@@ -999,22 +1048,28 @@ export class RRuleTemporal {
       cursor = cursor.add({ days: 1 });
     }
 
-    // Resolve tokens → concrete days
-    const hits: Temporal.ZonedDateTime[] = [];
+    // Resolve tokens → concrete days from BYDAY
+    const byDayHits: number[] = [];
     for (const { ord, wd } of tokens) {
       const list = buckets[wd] ?? [];
       if (!list.length) continue;
 
       if (ord === 0) {
         // every Monday, etc.
-        for (const d of list) hits.push(sample.with({ day: d }));
+        for (const d of list) byDayHits.push(d);
       } else {
         const idx = ord > 0 ? ord - 1 : list.length + ord;
         const dayN = list[idx];
-        if (dayN) hits.push(sample.with({ day: dayN }));
+        if (dayN) byDayHits.push(dayN);
       }
     }
+    // Combine with BYMONTHDAY if present
+    let finalDays = byDayHits;
+    if (byMonthDayHits.length) {
+      finalDays = finalDays.filter((d) => byMonthDayHits.includes(d));
+    }
 
+    const hits = finalDays.map((d) => sample.with({ day: d }));
     // Expand to all BYHOUR/BYMINUTE and sort
     return hits
       .flatMap((z) => this.expandByHourMinute(z))
