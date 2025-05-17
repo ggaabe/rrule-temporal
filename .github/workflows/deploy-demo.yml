@@ -34,10 +34,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20' # Use a version compatible with your project
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            demo/package-lock.json
+          # Caching disabled for diagnostics
 
       - name: Install root dependencies
         run: npm ci
