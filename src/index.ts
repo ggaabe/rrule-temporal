@@ -68,7 +68,7 @@ function list(
 
 function formatByDayToken(tok: string | number): string {
   if (typeof tok === "number") return tok.toString();
-  const m = tok.match(/^([+-]?\d)?(MO|TU|WE|TH|FR|SA|SU)$/);
+  const m = tok.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
   if (!m) return tok;
   const ord = m[1] ? parseInt(m[1], 10) : 0;
   const weekdayMap: { [key: string]: number } = {
@@ -266,6 +266,16 @@ function formatTime(hour: number, minute = 0): string {
     return `${hr12}:${String(minute).padStart(2, "0")} ${ampm}`;
   }
   return `${hr12} ${ampm}`;
+}
+
+function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zdt.timeZoneId,
+    timeZoneName: "short",
+    hour: "numeric",
+  }).formatToParts(new Date(zdt.epochMilliseconds));
+  const tzPart = parts.find((p) => p.type === "timeZoneName");
+  return tzPart?.value || zdt.timeZoneId;
 }
 
 export class RRuleTemporal {
@@ -1037,6 +1047,7 @@ export class RRuleTemporal {
       until,
       byDay,
       byHour,
+      byMinute,
       byMonth,
       byMonthDay,
     } = this.opts;
@@ -1100,10 +1111,12 @@ export class RRuleTemporal {
     }
 
     if (byHour) {
-      parts.push(
-        "at",
-        list(byHour, (h) => h.toString())
+      const minutes = byMinute ?? [0];
+      const times = byHour.flatMap((h) =>
+        minutes.map((m) => formatTime(h, m))
       );
+      parts.push("at", list(times));
+      parts.push(tzAbbreviation(this.originalDtstart));
     }
 
     if (until) {
