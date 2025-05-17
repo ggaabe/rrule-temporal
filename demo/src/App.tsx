@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Temporal } from "@js-temporal/polyfill";
-import { RRuleTemporal } from "rrule-temporal";
+import { RRuleTemporal } from "../../src";
 
 const defaultICS = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=WEEKLY;BYHOUR=12;COUNT=30`;
 
