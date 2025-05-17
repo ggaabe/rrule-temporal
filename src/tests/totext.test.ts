@@ -1,13 +1,7 @@
 import { RRuleTemporal, DateFormatter } from "../index";
 import { Temporal } from "@js-temporal/polyfill";
 
-function zdt(
-  y: number,
-  m: number,
-  d: number,
-  h: number,
-  tz = "UTC"
-) {
+function zdt(y: number, m: number, d: number, h: number, tz = "UTC") {
   return Temporal.ZonedDateTime.from({
     year: y,
     month: m,
@@ -20,7 +14,10 @@ function zdt(
 
 describe("RRuleTemporal.toText", () => {
   test("daily rule", () => {
-    const rule = new RRuleTemporal({ freq: "DAILY", dtstart: zdt(2025, 1, 1, 0) });
+    const rule = new RRuleTemporal({
+      freq: "DAILY",
+      dtstart: zdt(2025, 1, 1, 0),
+    });
     expect(rule.toText()).toBe("every day");
   });
 
@@ -62,12 +59,17 @@ describe("RRuleTemporal.toText", () => {
   });
 
   test("until formatted", () => {
-    const until = Temporal.Instant.from("2012-11-10T00:00:00Z").toZonedDateTimeISO("UTC");
-    const rule = new RRuleTemporal({ freq: "WEEKLY", until, dtstart: zdt(2012, 1, 1, 0) });
+    const until = Temporal.Instant.from(
+      "2012-11-10T00:00:00Z"
+    ).toZonedDateTimeISO("UTC");
+    const rule = new RRuleTemporal({
+      freq: "WEEKLY",
+      until,
+      dtstart: zdt(2012, 1, 1, 0),
+    });
     expect(rule.toText()).toBe("every week until November 10, 2012");
 
     const fmt: DateFormatter = (y, m, d) => `${d}. ${m}, ${y}`;
     expect(rule.toText(fmt)).toBe("every week until 10. November, 2012");
   });
 });
-
