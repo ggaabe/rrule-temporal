@@ -48,7 +48,7 @@ export default function App() {
   const [err, setErr] = useState<string | null>(null);
 
   // -------- derived rule + occurrences -------------------------------------
-  const { ruleString, rows } = useMemo(() => {
+  const { ruleString, ruleText, rows } = useMemo(() => {
     try {
       const rule = new RRuleTemporal({ rruleString: ics.trim() });
       const fmt = new Intl.DateTimeFormat(undefined, {
@@ -80,10 +80,10 @@ export default function App() {
           };
         });
       setErr(null);
-      return { ruleString: rule.toString(), rows };
+      return { ruleString: rule.toString(), ruleText: rule.toText(), rows };
     } catch (e: any) {
       setErr(e.message);
-      return { ruleString: "", rows: [] };
+      return { ruleString: "", ruleText: "", rows: [] };
     }
   }, [ics]);
 
@@ -298,6 +298,7 @@ export default function App() {
         {/* ───────── OUTPUT COLUMN ───────── */}
         <div className="ml-1">
           <h2 className="text-xl font-semibold mb-2">Output</h2>
+          {ruleText && <p className="mb-2 italic">{ruleText}</p>}
           {ruleString && (
             <pre className=" p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto">
               {ruleString}
