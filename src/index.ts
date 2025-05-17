@@ -213,9 +213,7 @@ function parseRRuleString(
         opts.byMonth = val!.split(",").map((n) => parseInt(n, 10));
         break;
       case "BYMONTHDAY":
-        opts.byMonthDay = val!
-          .split(",")
-          .map((n) => parseInt(n, 10));
+        opts.byMonthDay = val!.split(",").map((n) => parseInt(n, 10));
         break;
     }
   }
@@ -526,7 +524,10 @@ export class RRuleTemporal {
     const dates: Temporal.ZonedDateTime[] = [];
 
     // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
-    if (this.opts.freq === "MONTHLY" && (this.opts.byDay || this.opts.byMonthDay)) {
+    if (
+      this.opts.freq === "MONTHLY" &&
+      (this.opts.byDay || this.opts.byMonthDay)
+    ) {
       const start = this.originalDtstart;
       let monthCursor = start.with({ day: 1 });
       let matchCount = 0;
@@ -632,7 +633,12 @@ export class RRuleTemporal {
     }
 
     // --- 3) YEARLY + BYMONTH (one per year, rotating) ---
-    if (this.opts.freq === "YEARLY" && this.opts.byMonth && !this.opts.byDay && !this.opts.byMonthDay) {
+    if (
+      this.opts.freq === "YEARLY" &&
+      this.opts.byMonth &&
+      !this.opts.byDay &&
+      !this.opts.byMonthDay
+    ) {
       const start = this.originalDtstart;
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
       let i = 0;
@@ -749,7 +755,10 @@ export class RRuleTemporal {
     const results: Temporal.ZonedDateTime[] = [];
 
     // 1) MONTHLY + BYDAY/BYMONTHDAY
-    if (this.opts.freq === "MONTHLY" && (this.opts.byDay || this.opts.byMonthDay)) {
+    if (
+      this.opts.freq === "MONTHLY" &&
+      (this.opts.byDay || this.opts.byMonthDay)
+    ) {
       let monthCursor = this.computeFirst().with({ day: 1 });
 
       outer: while (true) {
@@ -1078,14 +1087,14 @@ export class RRuleTemporal {
     if (byMonth) {
       parts.push(
         "in",
-        list(byMonth, (m) => MONTH_NAMES[m - 1])
+        list(byMonth, (m) => MONTH_NAMES[(m as number) - 1]!)
       );
     }
 
     if (byMonthDay) {
       parts.push(
         "on the",
-        list(byMonthDay, (d) => ordinal(d)),
+        list(byMonthDay, (d) => ordinal(d as number)),
         "day of the month"
       );
     }
@@ -1120,7 +1129,10 @@ export class RRuleTemporal {
     // 1) Skip whole month if BYMONTH says so
     if (byMonth && !byMonth.includes(sample.month)) return [];
 
-    const lastDay = sample.with({ day: 1 }).add({ months: 1 }).subtract({ days: 1 }).day;
+    const lastDay = sample
+      .with({ day: 1 })
+      .add({ months: 1 })
+      .subtract({ days: 1 }).day;
 
     // days matched by BYMONTHDAY tokens
     let byMonthDayHits: number[] = [];
@@ -1217,4 +1229,3 @@ export class RRuleTemporal {
     return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 }
-
