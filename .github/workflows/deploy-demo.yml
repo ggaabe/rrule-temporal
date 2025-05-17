@@ -36,9 +36,10 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             demo/package-lock.json
-
-      - name: Install root dependencies
-        run: npm ci
+            - name: Install root dependencies
+        
+      - run: npm ci
+        name: "Install root dependencies"
         working-directory: . # Run this at the repository root
 
       - name: Clean demo node_modules
@@ -50,6 +51,7 @@ jobs:
         run: npm ci --install-links=false # ensure a fresh node_modules
 
       - name: Build demo application
+        working-directory: ./demo
         run: npm run build
 
       - name: Setup Pages
