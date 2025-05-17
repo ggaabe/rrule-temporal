@@ -37,10 +37,6 @@ jobs:
             package-lock.json
             demo/package-lock.json
 
-      - name: Install root dependencies
-        run: npm ci
-        working-directory: . # Run this at the repository root
-
       - name: Install demo dependencies
         working-directory: ./demo
         run: npm ci # Reverted to npm ci, relies on a correct package-lock.json
