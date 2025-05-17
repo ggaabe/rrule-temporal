@@ -50,7 +50,6 @@ jobs:
       - name: Build demo application
         working-directory: ./demo
         run: npm run build
-        working-directory: ./demo
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
