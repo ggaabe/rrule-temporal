@@ -36,10 +36,15 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             demo/package-lock.json
+            - name: Install root dependencies
+        
+      - run: npm ci
+        name: "Install root dependencies"
+        working-directory: . # Run this at the repository root
 
       - name: Install demo dependencies
         working-directory: ./demo
-        run: npm ci # Reverted to npm ci, relies on a correct package-lock.json
+        run: npm ci --force # Reverted to npm ci, relies on a correct package-lock.json
 
       - name: Build demo application
         working-directory: ./demo
