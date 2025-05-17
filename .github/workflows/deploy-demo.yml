@@ -3,11 +3,11 @@ name: Deploy Demo to GitHub Pages
 on:
   push:
     branches:
-      - main # Or your default branch, e.g., master
+      - main # Or your primary branch name
     paths:
-      - 'demo/**' # Only run if demo directory changes
-      - '.github/workflows/deploy-demo.yml' # Or if the workflow itself changes
-  workflow_dispatch: # Allows manual triggering
+      - 'demo/**' # Only run if demo files change
+      - '.github/workflows/deploy-demo.yml' # Or the name of this workflow file
+  workflow_dispatch: # Allows manual triggering from the Actions tab
 
 permissions:
   contents: read
@@ -15,7 +15,8 @@ permissions:
   id-token: write
 
 jobs:
-  build-and-deploy-demo:
+  build-and-deploy:
+    name: Build and Deploy Demo
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -26,21 +27,24 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        # working-directory is not applicable to uses steps directly like this
+        # checkout action checks out to the GITHUB_WORKSPACE root
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20' # Use a version compatible with your project
           cache: 'npm'
-          cache-dependency-path: demo/package-lock.json
+          cache-dependency-path: demo/package-lock.json # Correct path from workspace root
 
-      - name: Clean install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
+      - name: Install dependencies
+        # working-directory: ./demo # This is handled by defaults now
+        run: npm ci
 
-      - name: Build demo
-        run: npm run build
+      - name: Build demo application
+        # working-directory: ./demo # This is handled by defaults now
+        run: npm run build # Vite outputs to demo/dist by default relative to its root (demo/)
+                          # So, the artifact path will be ./demo/dist from workspace root
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -48,6 +52,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          # Path is relative to the GITHUB_WORKSPACE
           path: ./demo/dist
 
       - name: Deploy to GitHub Pages
