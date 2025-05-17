@@ -42,6 +42,7 @@ jobs:
         run: npm ci # Reverted to npm ci, relies on a correct package-lock.json
 
       - name: Build demo application
+        working-directory: ./demo
         run: npm run build
 
       - name: Setup Pages
