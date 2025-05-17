@@ -33,7 +33,8 @@ RRULE:FREQ=DAILY;BYHOUR=17;BYMINUTE=0;COUNT=5`.trim();
   });
 
   test("toString includes UNTIL when present", () => {
-    const icsUntil = `DTSTART;TZID=America/Chicago:20250401T000000\nRRULE:FREQ=DAILY;BYHOUR=0;BYMINUTE=0;UNTIL=20250405T000000Z`.trim();
+    const icsUntil =
+      `DTSTART;TZID=America/Chicago:20250401T000000\nRRULE:FREQ=DAILY;BYHOUR=0;BYMINUTE=0;UNTIL=20250405T000000Z`.trim();
     const ruleUntil = new RRuleTemporal({ rruleString: icsUntil });
     const out = ruleUntil.toString();
     expect(out).toContain("UNTIL=20250405T000000Z");
@@ -313,7 +314,8 @@ describe("RRuleTemporal - BYMONTH with YEARLY freq (manual opts)", () => {
 });
 
 describe("RRuleTemporal - BYDAY with YEARLY freq", () => {
-  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=YEARLY;BYDAY=+1FR;COUNT=3`.trim();
+  const ics =
+    `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=YEARLY;BYDAY=+1FR;COUNT=3`.trim();
   const rule = new RRuleTemporal({ rruleString: ics });
 
   test("all() returns first Friday each January", () => {
@@ -331,7 +333,8 @@ describe("RRuleTemporal - BYDAY with YEARLY freq", () => {
 });
 
 describe("RRuleTemporal - BYMONTH and BYDAY with YEARLY freq", () => {
-  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=YEARLY;BYMONTH=5;BYDAY=+1FR;COUNT=3`.trim();
+  const ics =
+    `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=YEARLY;BYMONTH=5;BYDAY=+1FR;COUNT=3`.trim();
   const rule = new RRuleTemporal({ rruleString: ics });
 
   test("all() returns first Friday of May", () => {
@@ -726,7 +729,7 @@ RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;UNTIL=20240101T103000Z;BYHOUR=10,14;BYMIN
     const until = Temporal.ZonedDateTime.from(
       "2024-05-10T08:00:00[Europe/Berlin]"
     );
-    const manualOpts: import("../index").RRuleOpts = {
+    const manualOpts: import("../index").RRuleOptions = {
       freq: "WEEKLY",
       interval: 1,
       count: 52,
@@ -756,14 +759,16 @@ RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;UNTIL=20240101T103000Z;BYHOUR=10,14;BYMIN
 
 describe("RRuleTemporal - BYMONTHDAY", () => {
   test("positive month days", () => {
-    const ics = `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=10,15;COUNT=4`.trim();
+    const ics =
+      `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=10,15;COUNT=4`.trim();
     const rule = new RRuleTemporal({ rruleString: ics });
     const days = rule.all().map((d) => d.day);
     expect(days).toEqual([10, 15, 10, 15]);
   });
 
   test("negative month day", () => {
-    const ics = `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3`.trim();
+    const ics =
+      `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3`.trim();
     const rule = new RRuleTemporal({ rruleString: ics });
     const days = rule.all().map((d) => d.day);
     expect(days).toEqual([30, 31, 30]);

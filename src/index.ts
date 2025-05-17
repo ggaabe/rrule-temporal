@@ -97,16 +97,16 @@ type Freq =
   | "MINUTELY"
   | "SECONDLY";
 
-interface RRuleOptions {
-  freq: Freq;
-  interval: number;
-  count?: number;
-  until?: Temporal.ZonedDateTime;
-  byHour?: number[];
-  byMinute?: number[];
-  dtstart: Temporal.ZonedDateTime;
-  tzid?: string;
-}
+// interface RRuleOptions {
+//   freq: Freq;
+//   interval: number;
+//   count?: number;
+//   until?: Temporal.ZonedDateTime;
+//   byHour?: number[];
+//   byMinute?: number[];
+//   dtstart: Temporal.ZonedDateTime;
+//   tzid?: string;
+// }
 
 // Extended ManualOpts to include BYDAY and BYMONTH
 interface BaseOpts {
@@ -127,7 +127,7 @@ interface ManualOpts extends BaseOpts {
 interface IcsOpts extends BaseOpts {
   rruleString: string; // full "DTSTART...\nRRULE..." snippet
 }
-export type RRuleOpts = ManualOpts | IcsOpts;
+export type RRuleOptions = ManualOpts | IcsOpts;
 
 /**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts
@@ -221,43 +221,43 @@ function parseRRuleString(
   return opts;
 }
 
-function joinList(items: string[]): string {
-  if (items.length === 1) return items[0]!;
-  const last = items[items.length - 1];
-  return items.slice(0, -1).join(", ") + " and " + last;
-}
+// function joinList(items: string[]): string {
+//   if (items.length === 1) return items[0]!;
+//   const last = items[items.length - 1];
+//   return items.slice(0, -1).join(", ") + " and " + last;
+// }
 
-function nth(n: number): string {
-  if (n === -1) return "last";
-  const abs = Math.abs(n);
-  const suffix =
-    abs % 10 === 1 && abs % 100 !== 11
-      ? "st"
-      : abs % 10 === 2 && abs % 100 !== 12
-      ? "nd"
-      : abs % 10 === 3 && abs % 100 !== 13
-      ? "rd"
-      : "th";
-  return n < 0 ? `${abs}${suffix} last` : `${abs}${suffix}`;
-}
+// function nth(n: number): string {
+//   if (n === -1) return "last";
+//   const abs = Math.abs(n);
+//   const suffix =
+//     abs % 10 === 1 && abs % 100 !== 11
+//       ? "st"
+//       : abs % 10 === 2 && abs % 100 !== 12
+//       ? "nd"
+//       : abs % 10 === 3 && abs % 100 !== 13
+//       ? "rd"
+//       : "th";
+//   return n < 0 ? `${abs}${suffix} last` : `${abs}${suffix}`;
+// }
 
-function formatDay(token: string): string {
-  const m = token.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
-  if (!m) return token;
-  const ord = m[1] ? parseInt(m[1], 10) : 0;
-  const map = {
-    MO: 0,
-    TU: 1,
-    WE: 2,
-    TH: 3,
-    FR: 4,
-    SA: 5,
-    SU: 6,
-  } as const;
-  const idx = map[m[2] as keyof typeof map]!;
-  const name = WEEKDAY_NAMES[idx]!;
-  return ord ? `${nth(ord)} ${name}` : name;
-}
+// function formatDay(token: string): string {
+//   const m = token.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
+//   if (!m) return token;
+//   const ord = m[1] ? parseInt(m[1], 10) : 0;
+//   const map = {
+//     MO: 0,
+//     TU: 1,
+//     WE: 2,
+//     TH: 3,
+//     FR: 4,
+//     SA: 5,
+//     SU: 6,
+//   } as const;
+//   const idx = map[m[2] as keyof typeof map]!;
+//   const name = WEEKDAY_NAMES[idx]!;
+//   return ord ? `${nth(ord)} ${name}` : name;
+// }
 
 function formatTime(hour: number, minute = 0): string {
   const hr12 = ((hour + 11) % 12) + 1;
@@ -473,7 +473,7 @@ export class RRuleTemporal {
       }
 
       // build all days in month with this weekday
-      const year = zdt.year;
+      // const year = zdt.year;
       const month = zdt.month;
       let dt = zdt.with({ day: 1 });
       const candidates: number[] = [];
@@ -1112,9 +1112,7 @@ export class RRuleTemporal {
 
     if (byHour) {
       const minutes = byMinute ?? [0];
-      const times = byHour.flatMap((h) =>
-        minutes.map((m) => formatTime(h, m))
-      );
+      const times = byHour.flatMap((h) => minutes.map((m) => formatTime(h, m)));
       parts.push("at", list(times));
       parts.push(tzAbbreviation(this.originalDtstart));
     }
