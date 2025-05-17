@@ -1,6 +1,33 @@
 // rrule-temporal.ts
 import { Temporal } from "@js-temporal/polyfill";
 
+const DAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+export type DateFormatter = (year: number, month: string, day: number) => string;
+const defaultDateFormatter: DateFormatter = (y, m, d) => `${m} ${d}, ${y}`;
+
 // Allowed frequency values
 type Freq =
   | "YEARLY"
@@ -129,6 +156,53 @@ function parseRRuleString(
   }
 
   return opts;
+}
+
+function joinList(items: string[]): string {
+  if (items.length === 1) return items[0]!;
+  const last = items[items.length - 1];
+  return items.slice(0, -1).join(", ") + " and " + last;
+}
+
+function nth(n: number): string {
+  if (n === -1) return "last";
+  const abs = Math.abs(n);
+  const suffix =
+    abs % 10 === 1 && abs % 100 !== 11
+      ? "st"
+      : abs % 10 === 2 && abs % 100 !== 12
+      ? "nd"
+      : abs % 10 === 3 && abs % 100 !== 13
+      ? "rd"
+      : "th";
+  return n < 0 ? `${abs}${suffix} last` : `${abs}${suffix}`;
+}
+
+function formatDay(token: string): string {
+  const m = token.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
+  if (!m) return token;
+  const ord = m[1] ? parseInt(m[1], 10) : 0;
+  const map = {
+    MO: 0,
+    TU: 1,
+    WE: 2,
+    TH: 3,
+    FR: 4,
+    SA: 5,
+    SU: 6,
+  } as const;
+  const idx = map[m[2] as keyof typeof map]!;
+  const name = DAY_NAMES[idx]!;
+  return ord ? `${nth(ord)} ${name}` : name;
+}
+
+function formatTime(hour: number, minute = 0): string {
+  const hr12 = ((hour + 11) % 12) + 1;
+  const ampm = hour < 12 ? "AM" : "PM";
+  if (minute) {
+    return `${hr12}:${String(minute).padStart(2, "0")} ${ampm}`;
+  }
+  return `${hr12} ${ampm}`;
 }
 
 export class RRuleTemporal {
@@ -795,6 +869,83 @@ export class RRuleTemporal {
     if (byMonth) parts.push(`BYMONTH=${byMonth.join(",")}`);
 
     return [dtLine, `RRULE:${parts.join(";")}`].join("\n");
+  }
+
+  toText(dateFormatter: DateFormatter = defaultDateFormatter): string {
+    const { freq, interval = 1, byDay, byMonth, byHour, byMinute, count, until } = this.opts;
+    const freqWord: Record<Freq, string> = {
+      YEARLY: "year",
+      MONTHLY: "month",
+      WEEKLY: "week",
+      DAILY: "day",
+      HOURLY: "hour",
+      MINUTELY: "minute",
+      SECONDLY: "second",
+    };
+    const parts: string[] = [];
+    let usedSpecial = false;
+    if (freq === "WEEKLY" && byDay && interval === 1) {
+      const tokens = byDay.map((d) => d.replace(/^[+-]?\d+/, ""));
+      const set = new Set(tokens);
+      const weekdays = ["MO", "TU", "WE", "TH", "FR"];
+      const alldays = [...weekdays, "SA", "SU"];
+      if (weekdays.every((d) => set.has(d)) && set.size === weekdays.length) {
+        parts.push("every weekday");
+        usedSpecial = true;
+      } else if (alldays.every((d) => set.has(d)) && set.size === alldays.length) {
+        parts.push("every day");
+        usedSpecial = true;
+      }
+    }
+    if (!usedSpecial) {
+      parts.push("every");
+      if (interval !== 1) parts.push(String(interval));
+      parts.push(interval !== 1 ? freqWord[freq] + "s" : freqWord[freq]);
+    }
+    if (byMonth && byMonth.length) {
+      parts.push("in");
+      parts.push(joinList(byMonth.map((m) => MONTH_NAMES[m - 1]!)));
+    }
+    if (byDay && byDay.length && !(freq === "WEEKLY" && usedSpecial)) {
+      parts.push("on");
+      parts.push(joinList(byDay.map(formatDay)));
+    }
+    let tzAbbr: string | undefined;
+    if (byHour && byHour.length) {
+      parts.push("at");
+      if (this.tzid) {
+        const fmt = new Intl.DateTimeFormat("en-US", {
+          timeZone: this.tzid,
+          timeZoneName: "short",
+        });
+        const str = fmt.format(new Date(this.originalDtstart.epochMilliseconds));
+        tzAbbr = str.split(/\s+/).pop();
+      }
+      const times: string[] = [];
+      for (const h of byHour) {
+        if (byMinute && byMinute.length) {
+          for (const m of byMinute) {
+            times.push(formatTime(h, m));
+          }
+        } else {
+          times.push(formatTime(h));
+        }
+      }
+      parts.push(joinList(times));
+      if (tzAbbr) parts.push(tzAbbr);
+    }
+    if (count !== undefined) {
+      parts.push("for");
+      parts.push(String(count));
+      parts.push(count === 1 ? "time" : "times");
+    }
+    if (until) {
+      parts.push("until");
+      parts.push(
+        dateFormatter(until.year, MONTH_NAMES[until.month - 1]!, until.day)
+      );
+    }
+    return parts.join(" ");
   }
 
   /**
