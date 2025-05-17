@@ -632,7 +632,7 @@ export class RRuleTemporal {
     }
 
     // --- 3) YEARLY + BYMONTH (one per year, rotating) ---
-    if (this.opts.freq === "YEARLY" && this.opts.byMonth) {
+    if (this.opts.freq === "YEARLY" && this.opts.byMonth && !this.opts.byDay && !this.opts.byMonthDay) {
       const start = this.originalDtstart;
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
       let i = 0;
@@ -666,7 +666,40 @@ export class RRuleTemporal {
       return dates;
     }
 
-    // --- 4) fallback: step + filter ---
+    // --- 4) YEARLY + BYDAY/BYMONTHDAY ---
+    if (
+      this.opts.freq === "YEARLY" &&
+      (this.opts.byDay || this.opts.byMonthDay)
+    ) {
+      const start = this.originalDtstart;
+      let yearCursor = start.with({ month: 1, day: 1 });
+      let matchCount = 0;
+
+      outer_year: while (true) {
+        const occs = this.generateYearlyOccurrences(yearCursor);
+        for (const occ of occs) {
+          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
+          if (
+            this.opts.until &&
+            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
+          ) {
+            break outer_year;
+          }
+          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
+            break outer_year;
+          }
+          if (iterator && !iterator(occ, matchCount)) {
+            break outer_year;
+          }
+          dates.push(occ);
+          matchCount++;
+        }
+        yearCursor = yearCursor.add({ years: this.opts.interval! });
+      }
+      return dates;
+    }
+
+    // --- 5) fallback: step + filter ---
     let current = this.computeFirst();
     let matchCount = 0;
 
@@ -740,7 +773,12 @@ export class RRuleTemporal {
     }
 
     // 2) YEARLY + BYMONTH
-    if (this.opts.freq === "YEARLY" && this.opts.byMonth) {
+    if (
+      this.opts.freq === "YEARLY" &&
+      this.opts.byMonth &&
+      !this.opts.byDay &&
+      !this.opts.byMonthDay
+    ) {
       const start = this.originalDtstart;
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
       let i = 0;
@@ -763,6 +801,34 @@ export class RRuleTemporal {
           results.push(occ);
         }
         i++;
+      }
+      return results;
+    }
+
+    // YEARLY + BYDAY/BYMONTHDAY
+    if (
+      this.opts.freq === "YEARLY" &&
+      (this.opts.byDay || this.opts.byMonthDay)
+    ) {
+      const start = this.originalDtstart;
+      let yearCursor = start.with({ month: 1, day: 1 });
+
+      outer_year: while (true) {
+        const occs = this.generateYearlyOccurrences(yearCursor);
+        for (const occ of occs) {
+          const inst = occ.toInstant();
+          if (
+            inc
+              ? Temporal.Instant.compare(inst, endInst) > 0
+              : Temporal.Instant.compare(inst, endInst) >= 0
+          ) {
+            break outer_year;
+          }
+          if (Temporal.Instant.compare(inst, startInst) >= 0) {
+            results.push(occ);
+          }
+        }
+        yearCursor = yearCursor.add({ years: this.opts.interval! });
       }
       return results;
     }
@@ -1130,4 +1196,25 @@ export class RRuleTemporal {
       .flatMap((z) => this.expandByHourMinute(z))
       .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
+
+  /**
+   * Given any date in a year, return all ZonedDateTimes in that year matching
+   * the BYDAY/BYMONTHDAY/BYMONTH constraints. Months default to DTSTART's month
+   * if BYMONTH is not specified.
+   */
+  private generateYearlyOccurrences(
+    sample: Temporal.ZonedDateTime
+  ): Temporal.ZonedDateTime[] {
+    const months = this.opts.byMonth
+      ? [...this.opts.byMonth].sort((a, b) => a - b)
+      : [this.originalDtstart.month];
+
+    const occs = months.flatMap((m) => {
+      const monthSample = sample.with({ month: m, day: 1 });
+      return this.generateMonthlyOccurrences(monthSample);
+    });
+
+    return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+  }
 }
+

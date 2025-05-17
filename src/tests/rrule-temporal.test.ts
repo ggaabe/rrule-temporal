@@ -312,6 +312,38 @@ describe("RRuleTemporal - BYMONTH with YEARLY freq (manual opts)", () => {
   });
 });
 
+describe("RRuleTemporal - BYDAY with YEARLY freq", () => {
+  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=YEARLY;BYDAY=+1FR;COUNT=3`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() returns first Friday each January", () => {
+    const dates = rule.all();
+    expect(dates.map((d) => d.toPlainDate().toString())).toEqual([
+      "2025-01-03",
+      "2026-01-02",
+      "2027-01-01",
+    ]);
+    dates.forEach((d) => {
+      expect(d.hour).toBe(12);
+      expect(d.minute).toBe(0);
+    });
+  });
+});
+
+describe("RRuleTemporal - BYMONTH and BYDAY with YEARLY freq", () => {
+  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=YEARLY;BYMONTH=5;BYDAY=+1FR;COUNT=3`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() returns first Friday of May", () => {
+    const dates = rule.all();
+    expect(dates.map((d) => d.toPlainDate().toString())).toEqual([
+      "2025-05-02",
+      "2026-05-01",
+      "2027-05-07",
+    ]);
+  });
+});
+
 describe("RRuleTemporal - Weekly BYDAY simple all()", () => {
   const ics = `DTSTART;TZID=America/Chicago:20250406T000000
 RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0;COUNT=4`.trim();
