@@ -768,12 +768,27 @@ export class RRuleTemporal {
       .replace(/[-:]/g, "");
     const dtLine = `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
     const parts: string[] = [];
-    const { freq, interval, count, byHour, byMinute, byDay, byMonth } =
-      this.opts;
+    const {
+      freq,
+      interval,
+      count,
+      until,
+      byHour,
+      byMinute,
+      byDay,
+      byMonth,
+    } = this.opts;
 
     parts.push(`FREQ=${freq}`);
     if (interval !== 1) parts.push(`INTERVAL=${interval}`);
     if (count !== undefined) parts.push(`COUNT=${count}`);
+    if (until) {
+      const u = until
+        .toInstant()
+        .toString()
+        .replace(/[-:]/g, "");
+      parts.push(`UNTIL=${u.slice(0, 15)}Z`);
+    }
     if (byHour) parts.push(`BYHOUR=${byHour.join(",")}`);
     if (byMinute) parts.push(`BYMINUTE=${byMinute.join(",")}`);
     if (byDay) parts.push(`BYDAY=${byDay.join(",")}`);

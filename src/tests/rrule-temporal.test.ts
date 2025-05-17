@@ -32,6 +32,13 @@ RRULE:FREQ=DAILY;BYHOUR=17;BYMINUTE=0;COUNT=5`.trim();
     expect(out).toContain("COUNT=5");
   });
 
+  test("toString includes UNTIL when present", () => {
+    const icsUntil = `DTSTART;TZID=America/Chicago:20250401T000000\nRRULE:FREQ=DAILY;BYHOUR=0;BYMINUTE=0;UNTIL=20250405T000000Z`.trim();
+    const ruleUntil = new RRuleTemporal({ rruleString: icsUntil });
+    const out = ruleUntil.toString();
+    expect(out).toContain("UNTIL=20250405T000000Z");
+  });
+
   test("all() returns exactly count occurrences at 5pm CT each day", () => {
     const dates = rule.all();
     expect(dates).toHaveLength(5);
