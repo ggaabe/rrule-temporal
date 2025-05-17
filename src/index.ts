@@ -157,7 +157,7 @@ function formatDay(token: string): string {
   return ord ? `${nth(ord)} ${name}` : name;
 }
 
-}
+
 
 export class RRuleTemporal {
   private tzid: string;

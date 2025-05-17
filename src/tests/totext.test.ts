@@ -18,10 +18,7 @@ describe("toText", () => {
     ["Every hour", "RRULE:FREQ=HOURLY"],
     ["Every 4 hours", "RRULE:INTERVAL=4;FREQ=HOURLY"],
     ["Every week on Tuesday", "RRULE:FREQ=WEEKLY;BYDAY=TU"],
-    [
-      "Every week on Monday and Wednesday",
-      "RRULE:FREQ=WEEKLY;BYDAY=MO,WE",
-    ],
+    ["Every week on Monday and Wednesday", "RRULE:FREQ=WEEKLY;BYDAY=MO,WE"],
     ["Every weekday", "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"],
     ["Every 2 weeks", "RRULE:INTERVAL=2;FREQ=WEEKLY"],
     ["Every month", "RRULE:FREQ=MONTHLY"],
