@@ -44,7 +44,7 @@ jobs:
 
       - name: Install demo dependencies
         working-directory: ./demo
-        run: npm ci --force # Reverted to npm ci, relies on a correct package-lock.json
+        run: npm i --force # Reverted to npm ci, relies on a correct package-lock.json
 
       - name: Build demo application
         working-directory: ./demo
