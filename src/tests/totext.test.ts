@@ -27,7 +27,7 @@ describe("RRuleTemporal.toText", () => {
       byHour: [10, 12, 17],
       dtstart: zdt(2025, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every day at 10, 12 and 17");
+    expect(rule.toText()).toBe("every day at 10 AM, 12 PM and 5 PM UTC");
   });
 
   test("weekly with byday and hours", () => {
@@ -37,7 +37,17 @@ describe("RRuleTemporal.toText", () => {
       byHour: [10, 12, 17],
       dtstart: zdt(2025, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every week on Sunday at 10, 12 and 17");
+    expect(rule.toText()).toBe("every week on Sunday at 10 AM, 12 PM and 5 PM UTC");
+  });
+
+  test("daily with hour and minute", () => {
+    const rule = new RRuleTemporal({
+      freq: "DAILY",
+      byHour: [17],
+      byMinute: [30],
+      dtstart: zdt(2025, 1, 1, 0, "America/Chicago"),
+    });
+    expect(rule.toText()).toBe("every day at 5:30 PM CST");
   });
 
   test("weekdays shortcut", () => {
