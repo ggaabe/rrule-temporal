@@ -1,7 +1,10 @@
 // rrule-temporal.ts
 import { Temporal } from "@js-temporal/polyfill";
 
-const DAY_NAMES = [
+// ---------------------------------------------------------------------------
+// Helper utilities for the toText() feature
+// ---------------------------------------------------------------------------
+const WEEKDAY_NAMES = [
   "Monday",
   "Tuesday",
   "Wednesday",
@@ -10,6 +13,7 @@ const DAY_NAMES = [
   "Saturday",
   "Sunday",
 ];
+
 const MONTH_NAMES = [
   "January",
   "February",
@@ -25,8 +29,57 @@ const MONTH_NAMES = [
   "December",
 ];
 
-export type DateFormatter = (year: number, month: string, day: number) => string;
-const defaultDateFormatter: DateFormatter = (y, m, d) => `${m} ${d}, ${y}`;
+
+export type DateFormatter = (
+  year: number,
+  month: string,
+  day: number
+) => string;
+
+const defaultDateFormatter: DateFormatter = (
+  year: number,
+  month: string,
+  day: number
+) => `${month} ${day}, ${year}`;
+
+function ordinal(n: number): string {
+  const abs = Math.abs(n);
+  const suffix =
+    abs % 10 === 1 && abs % 100 !== 11
+      ? "st"
+      : abs % 10 === 2 && abs % 100 !== 12
+      ? "nd"
+      : abs % 10 === 3 && abs % 100 !== 13
+      ? "rd"
+      : "th";
+  return n < 0 ? `last` : `${abs}${suffix}`;
+}
+
+function list(
+  arr: (string | number)[],
+  mapFn: (x: string | number) => string = (x) => `${x}`,
+  final = "and"
+) {
+  const mapped = arr.map(mapFn);
+  if (mapped.length === 1) return mapped[0];
+  return (
+    mapped.slice(0, -1).join(", ") +
+    ` ${final} ` +
+    mapped[mapped.length - 1]
+  );
+}
+
+function formatByDayToken(tok: string): string {
+  const m = tok.match(/^([+-]?\d)?(MO|TU|WE|TH|FR|SA|SU)$/);
+  if (!m) return tok;
+  const ord = m[1] ? parseInt(m[1], 10) : 0;
+  const name = WEEKDAY_NAMES[
+    { MO: 0, TU: 1, WE: 2, TH: 3, FR: 4, SA: 5, SU: 6 }[m[2] as any]
+  ];
+  if (ord === 0) return name;
+  if (ord === -1) return `last ${name}`;
+  return `${ordinal(ord)} ${name}`;
+}
 
 // Allowed frequency values
 type Freq =
@@ -192,7 +245,7 @@ function formatDay(token: string): string {
     SU: 6,
   } as const;
   const idx = map[m[2] as keyof typeof map]!;
-  const name = DAY_NAMES[idx]!;
+  const name = WEEKDAY_NAMES[idx]!;
   return ord ? `${nth(ord)} ${name}` : name;
 }
 
@@ -945,6 +998,83 @@ export class RRuleTemporal {
         dateFormatter(until.year, MONTH_NAMES[until.month - 1]!, until.day)
       );
     }
+    return parts.join(" ");
+  }
+
+  /**
+   * Convert this rule to a human readable English description.
+   */
+  toText(formatter: DateFormatter = defaultDateFormatter): string {
+    const {
+      freq,
+      interval = 1,
+      count,
+      until,
+      byDay,
+      byHour,
+      byMonth,
+    } = this.opts;
+
+    const parts: string[] = ["every"];
+
+    const base = {
+      YEARLY: "year",
+      MONTHLY: "month",
+      WEEKLY: "week",
+      DAILY: "day",
+      HOURLY: "hour",
+      MINUTELY: "minute",
+      SECONDLY: "second",
+    }[freq];
+
+    // Special cases for WEEKLY with full weekday sets
+    const daysNormalized = byDay?.map((d) => d.toUpperCase());
+    const isWeekdays =
+      daysNormalized &&
+      daysNormalized.length === 5 &&
+      ["MO", "TU", "WE", "TH", "FR"].every((d) => daysNormalized.includes(d));
+    const isEveryday =
+      daysNormalized &&
+      daysNormalized.length === 7 &&
+      ["MO", "TU", "WE", "TH", "FR", "SA", "SU"].every((d) =>
+        daysNormalized.includes(d)
+      );
+
+    if (freq === "WEEKLY" && interval === 1 && isWeekdays) {
+      parts.push("weekday");
+    } else if (freq === "WEEKLY" && interval === 1 && isEveryday) {
+      parts.push("day");
+    } else {
+      if (interval !== 1) {
+        parts.push(interval.toString(), base + "s");
+      } else {
+        parts.push(base);
+      }
+    }
+
+    if (freq === "WEEKLY" && byDay && !isWeekdays && !isEveryday) {
+      parts.push("on", list(byDay, formatByDayToken));
+    } else if (byDay && freq !== "WEEKLY") {
+      parts.push("on", list(byDay, formatByDayToken));
+    }
+
+    if (byMonth) {
+      parts.push("in", list(byMonth, (m) => MONTH_NAMES[m - 1]));
+    }
+
+    if (byHour) {
+      parts.push("at", list(byHour, (h) => h.toString()));
+    }
+
+    if (until) {
+      parts.push(
+        "until",
+        formatter(until.year, MONTH_NAMES[until.month - 1], until.day)
+      );
+    } else if (count !== undefined) {
+      parts.push("for", count.toString(), count === 1 ? "time" : "times");
+    }
+
     return parts.join(" ");
   }
 
