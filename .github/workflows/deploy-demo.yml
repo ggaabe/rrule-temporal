@@ -43,8 +43,12 @@ jobs:
         run: npm ci
         working-directory: . # Run this at the repository root
 
-      - name: Install dependencies
-        # working-directory: ./demo # This is handled by defaults now
+      - name: Clean demo node_modules
+        run: rm -rf demo/node_modules
+        # This runs from the GITHUB_WORKSPACE root
+
+      - name: Install demo dependencies
+        working-directory: ./demo
         run: npm ci
 
       - name: Build demo application
