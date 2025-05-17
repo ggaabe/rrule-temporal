@@ -50,7 +50,9 @@ jobs:
 
       - name: Install demo dependencies
         working-directory: ./demo
-        run: npm install # Changed from npm ci for diagnostics
+        run: |
+          npm install --ignore-scripts
+          npm rebuild esbuild --force
 
       - name: Build demo application
         # working-directory: ./demo # This is handled by defaults now
