@@ -41,9 +41,13 @@ jobs:
         run: npm ci
         working-directory: . # Run this at the repository root
 
+      - name: Clean demo node_modules
+        working-directory: ./demo
+        run: rm -rf node_modules
+
       - name: Install demo dependencies
         working-directory: ./demo
-        run: npm ci # Reverted to npm ci, relies on a correct package-lock.json
+        run: npm ci --install-links=false # ensure a fresh node_modules
 
       - name: Build demo application
         run: npm run build
