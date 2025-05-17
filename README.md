@@ -1,12 +1,14 @@
 # rrule-temporal
 
-Recurrence rule (RFC 5545) processing using Temporal PlainDate/PlainDateTime.
+Recurrence rule (RFC&nbsp;5545) processing built on the Temporal API.
+The library accepts the familiar `RRULE` format and returns
+`Temporal.ZonedDateTime` instances for easy time‑zone aware scheduling.
 
-This was created to advance the rrule library to use Temporal, and to provide a more modern API, as the original rrule library is [not maintained anymore](https://github.com/jkbrzt/rrule/issues/615). Maintainers suggested to use Temporal instead of Date:
+See the [demo site](https://ggaabe.github.io/rrule-temporal/) for an interactive playground.
+
+> This was created to advance the rrule library to use Temporal, and to provide a more modern API, as the original rrule library is [not maintained anymore](https://github.com/jkbrzt/rrule/issues/615). Maintainers suggested to use Temporal instead of Date:
 
 https://github.com/jkbrzt/rrule/issues/450#issuecomment-1055853095
-
-## [Demo Site](https://ggaabe.github.io/rrule-temporal/)
 
 ## Installation
 
@@ -14,192 +16,106 @@ https://github.com/jkbrzt/rrule/issues/450#issuecomment-1055853095
 npm install rrule-temporal
 ```
 
-## Usage
+## Quick start
 
-## 1. Parsing an ICS snippet
-
-Parse a full DTSTART/RRULE snippet and reproduce it or enumerate all occurrences:
+Parse an ICS snippet and enumerate the occurrences:
 
 ```typescript
-// Daily at 17:00 America/Chicago, 5 total occurrences
-const ics = `
-DTSTART;TZID=America/Chicago:20250320T170000
-RRULE:FREQ=DAILY;BYHOUR=17;BYMINUTE=0;COUNT=5
-`.trim();
-
-const rule = new RRuleTemporal({ rruleString: ics });
-
-// toString() outputs the original DTSTART and RRULE line:
-console.log(rule.toString());
-/*
-DTSTART;TZID=America/Chicago:20250320T170000
-RRULE:FREQ=DAILY;BYHOUR=17;BYMINUTE=0;COUNT=5
-*/
-
-// all() returns an array of Temporal.ZonedDateTime:
-const dates = rule.all();
-dates.forEach(dt => console.log(dt.toString()));
-// [
-//   "2025-03-20T17:00:00[America/Chicago]",
-//   "2025-03-21T17:00:00[America/Chicago]",
-//   // … total of 5 days
-// ]
-```
-
-## 2. Enumerate occurrences in a time window
-
-```typescript
-
-  const ics = `DTSTART;TZID=America/Chicago:20250401T000000
-RRULE:FREQ=DAILY;BYHOUR=0;BYMINUTE=0;UNTIL=20250405T000000Z`.trim();
-  const rule = new RRuleTemporal({ rruleString: ics });
-  const start = new Date(Date.UTC(2025, 3, 2, 0, 0)); // Apr 2 00:00 UTC
-  // after:
-  const end = new Date(
-    // 2025-04-04 00:00 America/Chicago → 05:00 UTC
-    Date.UTC(2025, 3, 4, 5, 0, 0)
-  );
-
-  test("between returns occurrences in window inclusive/exclusive", () => {
-    const arrExc = rule.between(start, end, false);
-    expect(arrExc.map((d) => d.day)).toEqual([2, 3]);
-
-    const arrInc = rule.between(start, end, true);
-    expect(arrInc.map((d) => d.day)).toEqual([2, 3, 4]);
-  });
-``` 
-
-## 3. Manual options
-
-Build a rule from explicit options, overriding start time and interval:
-
-```typescript
-// Every 2 days at 09:15 America/Chicago, 3 occurrences, starting 2025-04-20 08:30 CT
-const dtstart = Temporal.ZonedDateTime.from({
-  year: 2025, month: 4, day: 20,
-  hour: 8, minute: 30,
-  timeZone: "America/Chicago"
-});
+import { RRuleTemporal } from "rrule-temporal";
 
 const rule = new RRuleTemporal({
-  freq:     "DAILY",
+  rruleString: `DTSTART;TZID=UTC:20250101T090000\nRRULE:FREQ=DAILY;COUNT=3`
+});
+
+rule.all().forEach(dt => console.log(dt.toString()));
+// 2025-01-01T09:00:00[UTC]
+// 2025-01-02T09:00:00[UTC]
+// 2025-01-03T09:00:00[UTC]
+```
+
+## Creating a rule with options
+
+Instead of a full ICS string you can supply the recurrence parameters directly:
+
+```typescript
+import { Temporal } from "@js-temporal/polyfill";
+
+const rule = new RRuleTemporal({
+  freq: "DAILY",
   interval: 2,
-  count:    3,
-  byHour:   [9],
+  count: 3,
+  byHour: [9],
   byMinute: [15],
-  dtstart,
-  tzid:     "America/Chicago",
+  tzid: "America/Chicago",
+  dtstart: Temporal.ZonedDateTime.from({
+    year: 2025, month: 4, day: 20,
+    hour: 8, minute: 30,
+    timeZone: "America/Chicago"
+  })
 });
 
-rule.all().forEach((dt, i) => {
-  console.log(i, dt.toString());
-});
-// 0 "2025-04-20T09:15:00[America/Chicago]"
-// 1 "2025-04-22T09:15:00[America/Chicago]"
-// 2 "2025-04-24T09:15:00[America/Chicago]"
+rule.all().forEach(dt => console.log(dt.toString()));
 ```
 
-## 4. Windowed queries with between()
+## Querying occurrences
 
-Fetch occurrences in a given time window, with inclusive/exclusive end:
+Use the provided methods to enumerate or search for occurrences:
+
 ```typescript
-// Daily at 00:00 CT until 2025-04-05T00:00Z inclusive
-const ics2 = `
-DTSTART;TZID=America/Chicago:20250401T000000
-RRULE:FREQ=DAILY;BYHOUR=0;BYMINUTE=0;UNTIL=20250405T000000Z
-`.trim();
-
-const rule2 = new RRuleTemporal({ rruleString: ics2 });
-
-// Define UTC window: from 2025-04-02 00:00 UTC through 2025-04-04 05:00 UTC
+// Get all events within a window
 const start = new Date(Date.UTC(2025, 3, 2, 0, 0));
-const end   = new Date(Date.UTC(2025, 3, 4, 5, 0));
+const end = new Date(Date.UTC(2025, 3, 4, 5, 0));
+const hits = rule.between(start, end, true);
 
-console.log(rule2.between(start, end, false).map(d => d.toString()));
-// [
-//   "2025-04-02T00:00:00[America/Chicago]",
-//   "2025-04-03T00:00:00[America/Chicago]"
-// ]
-
-console.log(rule2.between(start, end, true).map(d => d.toString()));
-// adds "2025-04-04T00:00:00[America/Chicago]"
+// Next and previous occurrences
+const next = rule.next();
+const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 ```
 
-## 5. Next/previous occurrence
-
-Find the next or previous occurrence relative to any date:
+## Converting back to text
 
 ```typescript
-// Monthly at 12:00 America/Chicago, 12 total
-const ics3 = `
-DTSTART;TZID=America/Chicago:20250101T120000
-RRULE:FREQ=MONTHLY;BYHOUR=12;BYMINUTE=0;COUNT=12
-`.trim();
-
-const rule3 = new RRuleTemporal({ rruleString: ics3 });
-
-// Next occurrence after the current time in Central Time
-// Where hour and minute conditions are met
-const firstOccurrence = rule.next(
-  Temporal.Now.zonedDateTimeISO("America/Chicago")
-);
-
-// Next after 2025-03-15T00:00:00Z
-const nxt = rule3.next(new Date("2025-03-15T00:00:00Z"));
-console.log(nxt?.toString()); // "2025-04-01T12:00:00[UTC]"
-
-// Previous on or before 2025-06-05T00:00:00Z
-const prev = rule3.previous(new Date("2025-06-05T00:00:00Z"), true);
-console.log(prev?.toString()); // "2025-06-01T12:00:00[UTC]"
+rule.toString(); // DTSTART and RRULE lines
+rule.toText();   // human readable description
 ```
 
-## 6. toString()
+## API
 
-Convert the rule back to an ICS string:
+| Method | Description |
+| ------ | ----------- |
+| `new RRuleTemporal(opts)` | Create a rule from an ICS snippet or manual options. |
+| `all(iterator?)` | Return every occurrence. When the rule has no end the optional iterator is required. |
+| `between(after, before, inclusive?)` | Occurrences within a time range. |
+| `next(after?, inclusive?)` | Next occurrence after a given date. |
+| `previous(before?, inclusive?)` | Previous occurrence before a date. |
+| `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
+| `toText(formatter?)` | English description of the rule. |
+| `options()` | Return the normalized options object. |
+
+## Further examples
+
+Enumerating weekdays within a month or rotating through months can be achieved
+with the more advanced RFC&nbsp;5545 fields:
 
 ```typescript
-console.log(rule.toString());
-// DTSTART;TZID=America/Chicago:20250320T170000
-// RRULE:FREQ=DAILY;BYHOUR=17;BYMINUTE=0;COUNT=5
-```
+// 2nd & 4th Fridays each month at midnight CT, first 6 occurrences
+const ruleA = new RRuleTemporal({
+  rruleString: `DTSTART;TZID=America/Chicago:20250325T000000\nRRULE:FREQ=MONTHLY;BYDAY=2FR,4FR;BYHOUR=0;BYMINUTE=0;COUNT=6`
+});
+ruleA.all().forEach(dt => console.log(dt.toString()));
 
-## 7. BYDAY/BYMONTH examples:
-
-```typescript
-// 2nd & 4th Fridays each month at 00:00 CT, first 6 occurrences
-const ics4 = `
-DTSTART;TZID=America/Chicago:20250325T000000
-RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR;BYHOUR=0;BYMINUTE=0;COUNT=6
-`.trim();
-
-const rule4 = new RRuleTemporal({ rruleString: ics4 });
-rule4.all().forEach(dt => console.log(dt.toString()));
-// [
-//   "2025-04-11T00:00:00[America/Chicago]",
-//   "2025-04-25T00:00:00[America/Chicago]",
-//   "2025-05-09T00:00:00[America/Chicago]",
-//   …
-]
-
-// Yearly rotated through Jan, Jun, Dec at 09:00 UTC, 4 occurrences
-const dtstart5 = Temporal.ZonedDateTime.from({
+// Rotate yearly through Jan, Jun and Dec at 09:00 UTC
+const dtstart = Temporal.ZonedDateTime.from({
   year: 2025, month: 1, day: 10, hour: 9, minute: 0, timeZone: "UTC"
 });
-const rule5 = new RRuleTemporal({
-  freq:     "YEARLY",
+const ruleB = new RRuleTemporal({
+  freq: "YEARLY",
   interval: 1,
-  count:    4,
-  byMonth:  [1, 6, 12],
-  byHour:   [9],
+  count: 4,
+  byMonth: [1, 6, 12],
+  byHour: [9],
   byMinute: [0],
-  dtstart:  dtstart5
+  dtstart
 });
-rule5.all().forEach(dt => console.log(dt.toString()));
-// [
-//   "2025-01-10T09:00:00[UTC]",
-//   "2026-06-10T09:00:00[UTC]",
-//   "2027-12-10T09:00:00[UTC]",
-//   "2028-01-10T09:00:00[UTC]"
-// ]
+ruleB.all().forEach(dt => console.log(dt.toString()));
 ```
-
