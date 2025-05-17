@@ -58,28 +58,34 @@ function list(
   arr: (string | number)[],
   mapFn: (x: string | number) => string = (x) => `${x}`,
   final = "and"
-) {
+): string {
   const mapped = arr.map(mapFn);
-  if (mapped.length === 1) return mapped[0];
+  if (mapped.length === 1) return mapped[0]!;
   return (
-    mapped.slice(0, -1).join(", ") +
-    ` ${final} ` +
-    mapped[mapped.length - 1]
+    mapped.slice(0, -1).join(", ") + ` ${final} ` + mapped[mapped.length - 1]
   );
 }
 
-function formatByDayToken(tok: string): string {
+function formatByDayToken(tok: string | number): string {
+  if (typeof tok === "number") return tok.toString();
   const m = tok.match(/^([+-]?\d)?(MO|TU|WE|TH|FR|SA|SU)$/);
   if (!m) return tok;
   const ord = m[1] ? parseInt(m[1], 10) : 0;
-  const name = WEEKDAY_NAMES[
-    { MO: 0, TU: 1, WE: 2, TH: 3, FR: 4, SA: 5, SU: 6 }[m[2] as any]
-  ];
-  if (ord === 0) return name;
+  const weekdayMap: { [key: string]: number } = {
+    MO: 0,
+    TU: 1,
+    WE: 2,
+    TH: 3,
+    FR: 4,
+    SA: 5,
+    SU: 6,
+  };
+  const idx = weekdayMap[m[2] as keyof typeof weekdayMap];
+  const name = WEEKDAY_NAMES[idx!];
+  if (ord === 0) return name!;
   if (ord === -1) return `last ${name}`;
   return `${ordinal(ord)} ${name}`;
 }
-
 
 // Allowed frequency values
 type Freq =
@@ -209,6 +215,53 @@ function parseRRuleString(
   }
 
   return opts;
+}
+
+function joinList(items: string[]): string {
+  if (items.length === 1) return items[0]!;
+  const last = items[items.length - 1];
+  return items.slice(0, -1).join(", ") + " and " + last;
+}
+
+function nth(n: number): string {
+  if (n === -1) return "last";
+  const abs = Math.abs(n);
+  const suffix =
+    abs % 10 === 1 && abs % 100 !== 11
+      ? "st"
+      : abs % 10 === 2 && abs % 100 !== 12
+      ? "nd"
+      : abs % 10 === 3 && abs % 100 !== 13
+      ? "rd"
+      : "th";
+  return n < 0 ? `${abs}${suffix} last` : `${abs}${suffix}`;
+}
+
+function formatDay(token: string): string {
+  const m = token.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
+  if (!m) return token;
+  const ord = m[1] ? parseInt(m[1], 10) : 0;
+  const map = {
+    MO: 0,
+    TU: 1,
+    WE: 2,
+    TH: 3,
+    FR: 4,
+    SA: 5,
+    SU: 6,
+  } as const;
+  const idx = map[m[2] as keyof typeof map]!;
+  const name = WEEKDAY_NAMES[idx]!;
+  return ord ? `${nth(ord)} ${name}` : name;
+}
+
+function formatTime(hour: number, minute = 0): string {
+  const hr12 = ((hour + 11) % 12) + 1;
+  const ampm = hour < 12 ? "AM" : "PM";
+  if (minute) {
+    return `${hr12}:${String(minute).padStart(2, "0")} ${ampm}`;
+  }
+  return `${hr12} ${ampm}`;
 }
 
 export class RRuleTemporal {
@@ -848,25 +901,14 @@ export class RRuleTemporal {
       .replace(/[-:]/g, "");
     const dtLine = `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
     const parts: string[] = [];
-    const {
-      freq,
-      interval,
-      count,
-      until,
-      byHour,
-      byMinute,
-      byDay,
-      byMonth,
-    } = this.opts;
+    const { freq, interval, count, until, byHour, byMinute, byDay, byMonth } =
+      this.opts;
 
     parts.push(`FREQ=${freq}`);
     if (interval !== 1) parts.push(`INTERVAL=${interval}`);
     if (count !== undefined) parts.push(`COUNT=${count}`);
     if (until) {
-      const u = until
-        .toInstant()
-        .toString()
-        .replace(/[-:]/g, "");
+      const u = until.toInstant().toString().replace(/[-:]/g, "");
       parts.push(`UNTIL=${u.slice(0, 15)}Z`);
     }
     if (byHour) parts.push(`BYHOUR=${byHour.join(",")}`);
@@ -935,17 +977,23 @@ export class RRuleTemporal {
     }
 
     if (byMonth) {
-      parts.push("in", list(byMonth, (m) => MONTH_NAMES[m - 1]));
+      parts.push(
+        "in",
+        list(byMonth, (m) => MONTH_NAMES[m - 1])
+      );
     }
 
     if (byHour) {
-      parts.push("at", list(byHour, (h) => h.toString()));
+      parts.push(
+        "at",
+        list(byHour, (h) => h.toString())
+      );
     }
 
     if (until) {
       parts.push(
         "until",
-        formatter(until.year, MONTH_NAMES[until.month - 1], until.day)
+        formatter(until.year, MONTH_NAMES[until.month - 1]!, until.day)
       );
     } else if (count !== undefined) {
       parts.push("for", count.toString(), count === 1 ? "time" : "times");
@@ -953,7 +1001,6 @@ export class RRuleTemporal {
 
     return parts.join(" ");
   }
-
   /**
    * Given any date in a month, return all the ZonedDateTimes in that month
    * matching your opts.byDay and opts.byMonth (or the single "same day" if no BYDAY).
