@@ -27,37 +27,26 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # working-directory is not applicable to uses steps directly like this
-        # checkout action checks out to the GITHUB_WORKSPACE root
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20' # Use a version compatible with your project
-          # Caching disabled for diagnostics
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            demo/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
         working-directory: . # Run this at the repository root
 
-      - name: Clean demo node_modules
-        run: rm -rf demo/node_modules
-        # This runs from the GITHUB_WORKSPACE root
-
-      - name: Clear npm cache
-        run: npm cache clean --force
-        # This runs from the GITHUB_WORKSPACE root, affecting the global npm cache for the runner
-
       - name: Install demo dependencies
         working-directory: ./demo
-        run: |
-          npm install --ignore-scripts
-          npm rebuild esbuild --force
+        run: npm ci # Reverted to npm ci, relies on a correct package-lock.json
 
       - name: Build demo application
-        # working-directory: ./demo # This is handled by defaults now
-        run: npm run build # Vite outputs to demo/dist by default relative to its root (demo/)
-                          # So, the artifact path will be ./demo/dist from workspace root
+        run: npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -65,7 +54,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Path is relative to the GITHUB_WORKSPACE
           path: ./demo/dist
 
       - name: Deploy to GitHub Pages
