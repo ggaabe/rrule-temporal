@@ -206,6 +206,81 @@ RRULE:FREQ=DAILY;UNTIL=20250530T050000Z;BYHOUR=15;BYMINUTE=10`.trim();
     // Compare ZonedDateTimes for equality
     expect(prev.equals(expectedDate)).toBe(true);
   });
+
+  test("next() with no arguments defaults to Date.now()", () => {
+    const now = Temporal.Now.zonedDateTimeISO("UTC");
+    let ruleHour = now.hour + 2;
+    let ruleDate = now.toPlainDate();
+    if (ruleHour > 23) {
+      ruleHour = 1;
+      ruleDate = ruleDate.add({ days: 1 }); // if it's late, rule starts tomorrow
+    }
+
+    const rule = new RRuleTemporal({
+      rruleString: `DTSTART;TZID=UTC:${ruleDate.year.toString()}${ruleDate.month
+        .toString()
+        .padStart(2, "0")}${ruleDate.day.toString().padStart(2, "0")}T${ruleHour
+        .toString()
+        .padStart(2, "0")}0000
+RRULE:FREQ=DAILY;BYHOUR=${ruleHour};BYMINUTE=0;COUNT=5`,
+    });
+
+    const nxt = rule.next();
+    expect(nxt).not.toBeNull();
+    if (!nxt) throw new Error("nxt is undefined");
+
+    expect(nxt.hour).toBe(ruleHour);
+    expect(nxt.minute).toBe(0);
+
+    const today = Temporal.Now.zonedDateTimeISO("UTC").toPlainDate();
+    const tomorrow = today.add({ days: 1 });
+    const nxtDate = nxt.toPlainDate();
+
+    // The next occurrence should be on the ruleDate (which is today or tomorrow based on ruleHour)
+    expect(nxtDate.equals(ruleDate)).toBe(true);
+  });
+
+  test("previous() with no arguments defaults to Date.now()", () => {
+    const now = Temporal.Now.zonedDateTimeISO("UTC");
+    let ruleHour = now.hour - 2;
+    let ruleStartOffsetDays = -2; // Start rule in the past
+
+    if (ruleHour < 0) {
+      ruleHour = 22; // if it's early morning, rule hour was yesterday evening
+    }
+
+    // Ensure DTSTART is sufficiently in the past to have occurrences yesterday or today
+    const dtstartDate = now.toPlainDate().add({ days: ruleStartOffsetDays });
+
+    const rule = new RRuleTemporal({
+      rruleString: `DTSTART;TZID=UTC:${dtstartDate.year.toString()}${dtstartDate.month
+        .toString()
+        .padStart(2, "0")}${dtstartDate.day
+        .toString()
+        .padStart(2, "0")}T${ruleHour.toString().padStart(2, "0")}0000
+RRULE:FREQ=DAILY;BYHOUR=${ruleHour};BYMINUTE=0;COUNT=10`,
+    });
+
+    const prev = rule.previous();
+    expect(prev).not.toBeNull();
+    if (!prev) throw new Error("prev is undefined");
+
+    expect(prev.hour).toBe(ruleHour);
+    expect(prev.minute).toBe(0);
+
+    const today = Temporal.Now.zonedDateTimeISO("UTC").toPlainDate();
+    const yesterday = today.add({ days: -1 });
+    const prevDate = prev.toPlainDate();
+
+    // The previous occurrence should be today if ruleHour has passed, or yesterday if ruleHour is in the future today.
+    if (ruleHour < now.hour) {
+      // Rule time has passed for today
+      expect(prevDate.equals(today)).toBe(true);
+    } else {
+      // Rule time is later today, so previous was yesterday
+      expect(prevDate.equals(yesterday)).toBe(true);
+    }
+  });
 });
 
 describe("RRuleTemporal - unbounded all() error", () => {
