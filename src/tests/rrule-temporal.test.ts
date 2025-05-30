@@ -453,6 +453,47 @@ RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0`.trim();
   });
 });
 
+describe("RRuleTemporal - Weekly BYDAY order does not affect between()", () => {
+  const tzid = "America/Denver";
+  const dtstart = Temporal.ZonedDateTime.from({
+    year: 2025,
+    month: 4,
+    day: 30,
+    hour: 12,
+    minute: 0,
+    timeZone: tzid,
+  });
+
+  const baseOpts = {
+    freq: "WEEKLY" as const,
+    interval: 1,
+    count: 7,
+    byHour: [12],
+    byMinute: [0],
+    tzid,
+    dtstart,
+  };
+
+  test("different BYDAY order yields same results", () => {
+    const rule1 = new RRuleTemporal({
+      ...baseOpts,
+      byDay: ["MO", "TU", "WE", "TH", "FR", "SA", "SU"],
+    });
+    const rule2 = new RRuleTemporal({
+      ...baseOpts,
+      byDay: ["TH", "FR", "SA", "SU", "MO", "TU", "WE"],
+    });
+
+    const endDate = dtstart.add({ weeks: 1 });
+    const arr1 = rule1.between(dtstart, endDate, true);
+    const arr2 = rule2.between(dtstart, endDate, true);
+
+    expect(arr1.map((d) => d.toString())).toEqual(
+      arr2.map((d) => d.toString())
+    );
+  });
+});
+
 describe("RRuleTemporal - Weekly BYDAY frequencies without positional prefix", () => {
   const ics = `DTSTART;TZID=America/Chicago:20250325T000000
 RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0`.trim();

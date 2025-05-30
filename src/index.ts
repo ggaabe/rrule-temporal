@@ -386,9 +386,19 @@ export class RRuleTemporal {
         SA: 6,
         SU: 7,
       };
-      const targetDow = dayMap[this.opts.byDay[0]!]!;
-      const delta = (targetDow - zdt.dayOfWeek + 7) % 7;
-      zdt = zdt.add({ days: delta });
+
+      // Find the soonest matching weekday on or after the DTSTART
+      const deltas = this.opts.byDay
+        .map((tok) => {
+          const wdTok = tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1];
+          return wdTok ? (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7 : null;
+        })
+        .filter((d): d is number => d !== null);
+
+      if (deltas.length) {
+        const delta = Math.min(...deltas);
+        zdt = zdt.add({ days: delta });
+      }
     }
 
     // then your existing BYHOUR/BYMINUTE override logic:
