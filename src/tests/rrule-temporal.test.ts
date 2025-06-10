@@ -902,3 +902,30 @@ describe("RRuleTemporal - BYMONTHDAY", () => {
     );
   });
 });
+
+describe("Regression - next() and previous() with BYDAY rule", () => {
+  const rruleString = `DTSTART:20250609T000000Z\nRRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=2MO`;
+  const rule = new RRuleTemporal({ rruleString });
+
+  test("next() returns the following 2nd Monday", () => {
+    const date = new Date("2025-06-09T00:00:00.000Z");
+    const nxt = rule.next(date);
+    expect(nxt).not.toBeNull();
+    if (!nxt) throw new Error("nxt is undefined");
+    // Should be July 14, 2025 (the next 2nd Monday)
+    expect(nxt.toPlainDate().toString()).toBe("2025-07-14");
+    expect(nxt.hour).toBe(0);
+    expect(nxt.timeZoneId).toBe("UTC");
+  });
+
+  test("previous() returns the prior 2nd Monday", () => {
+    const before = new Date("2025-07-13T12:00:00.000Z");
+    const prev = rule.previous(before);
+    expect(prev).not.toBeNull();
+    if (!prev) throw new Error("prev is undefined");
+    // Should be June 9, 2025 (the DTSTART)
+    expect(prev.toPlainDate().toString()).toBe("2025-06-09");
+    expect(prev.hour).toBe(0);
+    expect(prev.timeZoneId).toBe("UTC");
+  });
+});
