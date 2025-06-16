@@ -930,6 +930,22 @@ describe("Regression - next() and previous() with BYDAY rule", () => {
   });
 });
 
+describe("BYDAY with SECONDLY frequency", () => {
+  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=SECONDLY;COUNT=30;WKST=MO;BYDAY=MO`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() enumerates seconds only on the matching weekday", () => {
+    const dates = rule.all();
+    expect(dates).toHaveLength(30);
+    // first occurrence should be the following Monday at the same time
+    expect(dates[0]!.toPlainDate().toString()).toBe("2025-01-06");
+    expect(dates[0]!.hour).toBe(12);
+    // every occurrence should be on Monday
+    expect(dates.every((d) => d.dayOfWeek === 1)).toBe(true);
+    // last one should be 29 seconds after the first
+    expect(dates[dates.length - 1]!.second).toBe(29);
+  });
+});
 describe("Regression - SECONDLY freq with BYDAY", () => {
   const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=SECONDLY;COUNT=30;BYDAY=MO`.trim();
   const rule = new RRuleTemporal({ rruleString: ics });

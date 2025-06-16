@@ -404,6 +404,31 @@ export class RRuleTemporal {
       }
     }
 
+    // For sub-weekly frequencies, BYDAY is allowed but iterating second by second
+    // until the first matching weekday can be extremely slow.  If all BYDAY tokens
+    // are simple two-letter weekdays, jump directly to the earliest matching
+    // weekday on or after the DTSTART.
+    if (
+      ["DAILY", "HOURLY", "MINUTELY", "SECONDLY"].includes(this.opts.freq) &&
+      this.opts.byDay?.length &&
+      this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
+    ) {
+      const dayMap: Record<string, number> = {
+        MO: 1,
+        TU: 2,
+        WE: 3,
+        TH: 4,
+        FR: 5,
+        SA: 6,
+        SU: 7,
+      };
+      const deltas = this.opts.byDay.map(
+        (tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7
+      );
+      const delta = Math.min(...deltas);
+      zdt = zdt.add({ days: delta });
+    }
+
     // then your existing BYHOUR/BYMINUTE override logic:
     const { byHour, byMinute } = this.opts;
     if (byHour || byMinute) {
