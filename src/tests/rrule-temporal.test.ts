@@ -965,3 +965,32 @@ describe("Regression - SECONDLY freq with BYDAY", () => {
     });
   });
 });
+
+describe("Regression - HOURLY freq with BYDAY and single BYHOUR", () => {
+  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=HOURLY;BYDAY=MO;BYHOUR=12;COUNT=3`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() emits Mondays only without looping", () => {
+    const dates = rule.all();
+    expect(dates.map((d) => d.toString())).toEqual([
+      "2025-01-06T12:00:00+00:00[UTC]",
+      "2025-01-13T12:00:00+00:00[UTC]",
+      "2025-01-20T12:00:00+00:00[UTC]",
+    ]);
+  });
+});
+
+describe("Regression - MINUTELY freq with BYDAY and single BYMINUTE", () => {
+  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=MINUTELY;BYDAY=MO;BYMINUTE=15;COUNT=4`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() advances to the next hour each time", () => {
+    const dates = rule.all();
+    expect(dates.map((d) => d.toString())).toEqual([
+      "2025-01-06T12:15:00+00:00[UTC]",
+      "2025-01-06T13:15:00+00:00[UTC]",
+      "2025-01-06T14:15:00+00:00[UTC]",
+      "2025-01-06T15:15:00+00:00[UTC]",
+    ]);
+  });
+});

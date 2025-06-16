@@ -347,7 +347,40 @@ export class RRuleTemporal {
   private nextCandidateSameDate(
     zdt: Temporal.ZonedDateTime
   ): Temporal.ZonedDateTime {
-    const { byHour, byMinute } = this.opts;
+    const { freq, interval = 1, byHour, byMinute } = this.opts;
+
+    // Special case: HOURLY frequency with a single BYHOUR token would
+    // otherwise keep returning the same time (e.g. always 12:00).  When
+    // BYDAY filters are also present this results in an infinite loop.
+    if (freq === "HOURLY" && byHour && byHour.length === 1) {
+      return this.applyTimeOverride(zdt.add({ days: interval }));
+    }
+
+    // MINUTELY frequency with a single BYMINUTE value would also repeat
+    // the same time. Move forward a full hour before reapplying overrides.
+    if (freq === "MINUTELY" && byMinute && byMinute.length === 1) {
+      return this.applyTimeOverride(zdt.add({ hours: interval }));
+    }
+
+    // SECONDLY frequency with a single BYMINUTE value should emit every
+    // second within that minute. When the minute rolls over, jump to the
+    // next hour and reset seconds.
+    if (freq === "SECONDLY" && byMinute && byMinute.length === 1) {
+      const next = zdt.add({ seconds: interval });
+      if (next.minute === byMinute[0]) return next;
+      return this
+        .applyTimeOverride(zdt.add({ hours: interval }))
+        .with({ second: 0 });
+    }
+
+    if (byMinute && byMinute.length > 1) {
+      const idx = byMinute.indexOf(zdt.minute);
+      if (idx !== -1 && idx < byMinute.length - 1) {
+        // next minute within the same hour
+        return zdt.with({ minute: byMinute[idx + 1] });
+      }
+    }
+
     if (byHour && byHour.length > 1) {
       const idx = byHour.indexOf(zdt.hour);
       if (idx !== -1 && idx < byHour.length - 1) {
@@ -358,7 +391,7 @@ export class RRuleTemporal {
         });
       }
     }
-    // we were already at the last BYHOUR -> advance the date
+    // we were already at the last BYHOUR/BYMINUTE -> advance the date
     return this.applyTimeOverride(this.rawAdvance(zdt));
   }
 
