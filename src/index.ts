@@ -375,8 +375,11 @@ export class RRuleTemporal {
   private computeFirst(): Temporal.ZonedDateTime {
     let zdt = this.originalDtstart;
 
-    // If it's WEEKLY with BYDAY, advance zdt to the first matching weekday ≥ dtstart
-    if (this.opts.freq === "WEEKLY" && this.opts.byDay?.length) {
+    // If BYDAY is present, advance zdt to the first matching weekday ≥ DTSTART
+    // For WEEKLY freq this keeps existing behavior, but it also helps when
+    // FREQ is smaller than a week (e.g. HOURLY or SECONDLY) so we don't
+    // iterate one unit at a time until the desired weekday is reached.
+    if (this.opts.byDay?.length) {
       const dayMap: Record<string, number> = {
         MO: 1,
         TU: 2,

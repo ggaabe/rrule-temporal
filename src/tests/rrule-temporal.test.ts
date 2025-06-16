@@ -946,3 +946,22 @@ describe("BYDAY with SECONDLY frequency", () => {
     expect(dates[dates.length - 1]!.second).toBe(29);
   });
 });
+describe("Regression - SECONDLY freq with BYDAY", () => {
+  const ics = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=SECONDLY;COUNT=30;BYDAY=MO`.trim();
+  const rule = new RRuleTemporal({ rruleString: ics });
+
+  test("all() starts on the first matching Monday", () => {
+    const dates = rule.all();
+    expect(dates).toHaveLength(30);
+    const first = dates[0];
+    if (!first) throw new Error("first is undefined");
+    expect(first.toString()).toBe("2025-01-06T12:00:00+00:00[UTC]");
+    // ensure every occurrence is on Monday and consecutive seconds
+    dates.forEach((d, i) => {
+      expect(d.dayOfWeek).toBe(1);
+      expect(d.toPlainTime().toString()).toBe(
+        `12:00:${String(i).padStart(2, "0")}`
+      );
+    });
+  });
+});
