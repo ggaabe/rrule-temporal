@@ -107,7 +107,12 @@ export default function App() {
       setDtDate(toDateInput(opts.dtstart));
       setDtTime(toTimeInput(opts.dtstart));
       setByDay(opts.byDay ?? []);
-      setByHour(opts.byHour ?? [opts.dtstart.hour]);
+      setByHour(
+        opts.byHour ??
+          (["MINUTELY", "SECONDLY"].includes(opts.freq)
+            ? []
+            : [opts.dtstart.hour])
+      );
     } catch {
       /* ignore parse failure */
     }
@@ -134,7 +139,12 @@ export default function App() {
         dtstart,
         tzid,
         byDay: byDay.length ? byDay : undefined,
-        byHour: byHour.length ? [...byHour].sort((a, b) => a - b) : undefined,
+        byHour:
+          ["MINUTELY", "SECONDLY"].includes(freq)
+            ? undefined
+            : byHour.length
+            ? [...byHour].sort((a, b) => a - b)
+            : undefined,
       });
       setIcs(rule.toString());
     } catch {
