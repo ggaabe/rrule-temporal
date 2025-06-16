@@ -386,9 +386,19 @@ export class RRuleTemporal {
         SA: 6,
         SU: 7,
       };
-      const targetDow = dayMap[this.opts.byDay[0]!]!;
-      const delta = (targetDow - zdt.dayOfWeek + 7) % 7;
-      zdt = zdt.add({ days: delta });
+
+      // Find the soonest matching weekday on or after the DTSTART
+      const deltas = this.opts.byDay
+        .map((tok) => {
+          const wdTok = tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1];
+          return wdTok ? (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7 : null;
+        })
+        .filter((d): d is number => d !== null);
+
+      if (deltas.length) {
+        const delta = Math.min(...deltas);
+        zdt = zdt.add({ days: delta });
+      }
     }
 
     // then your existing BYHOUR/BYMINUTE override logic:
@@ -922,36 +932,20 @@ export class RRuleTemporal {
         ? Temporal.Instant.from(after.toISOString())
         : after.toInstant();
 
-    let current = this.computeFirst();
-    let matchCount = 0;
-
-    while (true) {
-      const inst = current.toInstant();
-
-      // if this satisfies constraints, check if it's beyond 'after'
-      if (this.matchesAll(current)) {
-        const ok = inc
-          ? Temporal.Instant.compare(inst, afterInst) >= 0
-          : Temporal.Instant.compare(inst, afterInst) > 0;
-        if (ok) return current;
-
-        // count it toward COUNT
-        matchCount++;
-        if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-          return null;
-        }
+    let result: Temporal.ZonedDateTime | null = null;
+    this.all((occ) => {
+      const inst = occ.toInstant();
+      const ok = inc
+        ? Temporal.Instant.compare(inst, afterInst) >= 0
+        : Temporal.Instant.compare(inst, afterInst) > 0;
+      if (ok) {
+        result = occ;
+        return false;
       }
+      return true;
+    });
 
-      // stop on UNTIL
-      if (
-        this.opts.until &&
-        Temporal.ZonedDateTime.compare(current, this.opts.until) >= 0
-      ) {
-        return null;
-      }
-
-      current = this.nextCandidateSameDate(current);
-    }
+    return result;
   }
 
   /**
@@ -969,35 +963,16 @@ export class RRuleTemporal {
         ? Temporal.Instant.from(before.toISOString())
         : before.toInstant();
 
-    let current = this.computeFirst();
     let prev: Temporal.ZonedDateTime | null = null;
-
-    while (true) {
-      const inst = current.toInstant();
-
-      // if beyond window, stop
-      if (
-        inc
-          ? Temporal.Instant.compare(inst, beforeInst) > 0
-          : Temporal.Instant.compare(inst, beforeInst) >= 0
-      ) {
-        break;
-      }
-
-      // track it if it matches constraints
-      if (this.matchesAll(current)) {
-        prev = current;
-      }
-
-      if (
-        this.opts.until &&
-        Temporal.ZonedDateTime.compare(current, this.opts.until) >= 0
-      ) {
-        break;
-      }
-
-      current = this.nextCandidateSameDate(current);
-    }
+    this.all((occ) => {
+      const inst = occ.toInstant();
+      const beyond = inc
+        ? Temporal.Instant.compare(inst, beforeInst) > 0
+        : Temporal.Instant.compare(inst, beforeInst) >= 0;
+      if (beyond) return false;
+      prev = occ;
+      return true;
+    });
 
     return prev;
   }

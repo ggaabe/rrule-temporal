@@ -1,6 +1,6 @@
 {
   "name": "rrule-temporal",
-  "version": "0.1.7",
+  "version": "0.2.2",
   "description": "Recurrence rule processing using Temporal PlainDate/PlainDateTime",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "test": "jest"
+    "test": "jest",
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
