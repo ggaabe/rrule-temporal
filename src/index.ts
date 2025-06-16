@@ -375,10 +375,11 @@ export class RRuleTemporal {
   private computeFirst(): Temporal.ZonedDateTime {
     let zdt = this.originalDtstart;
 
-    // If BYDAY is present, advance zdt to the first matching weekday ≥ DTSTART
-    // For WEEKLY freq this keeps existing behavior, but it also helps when
-    // FREQ is smaller than a week (e.g. HOURLY or SECONDLY) so we don't
-    // iterate one unit at a time until the desired weekday is reached.
+    // If BYDAY is present, advance zdt to the first matching weekday ≥ DTSTART.
+    // When the frequency is smaller than a week (e.g. HOURLY or SECONDLY),
+    // iterating one unit at a time until the desired weekday can be extremely
+    // slow.  We instead jump directly to the next matching weekday whenever all
+    // BYDAY tokens are simple two-letter codes (e.g. "MO").
     if (this.opts.byDay?.length) {
       const dayMap: Record<string, number> = {
         MO: 1,
@@ -390,43 +391,26 @@ export class RRuleTemporal {
         SU: 7,
       };
 
-      // Find the soonest matching weekday on or after the DTSTART
-      const deltas = this.opts.byDay
-        .map((tok) => {
-          const wdTok = tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1];
-          return wdTok ? (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7 : null;
-        })
-        .filter((d): d is number => d !== null);
+      let deltas: number[] = [];
+      if (
+        ["DAILY", "HOURLY", "MINUTELY", "SECONDLY"].includes(this.opts.freq) &&
+        this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
+      ) {
+        deltas = this.opts.byDay.map(
+          (tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7
+        );
+      } else {
+        deltas = this.opts.byDay
+          .map((tok) => {
+            const wdTok = tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1];
+            return wdTok ? (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7 : null;
+          })
+          .filter((d): d is number => d !== null);
+      }
 
       if (deltas.length) {
-        const delta = Math.min(...deltas);
-        zdt = zdt.add({ days: delta });
+        zdt = zdt.add({ days: Math.min(...deltas) });
       }
-    }
-
-    // For sub-weekly frequencies, BYDAY is allowed but iterating second by second
-    // until the first matching weekday can be extremely slow.  If all BYDAY tokens
-    // are simple two-letter weekdays, jump directly to the earliest matching
-    // weekday on or after the DTSTART.
-    if (
-      ["DAILY", "HOURLY", "MINUTELY", "SECONDLY"].includes(this.opts.freq) &&
-      this.opts.byDay?.length &&
-      this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
-    ) {
-      const dayMap: Record<string, number> = {
-        MO: 1,
-        TU: 2,
-        WE: 3,
-        TH: 4,
-        FR: 5,
-        SA: 6,
-        SU: 7,
-      };
-      const deltas = this.opts.byDay.map(
-        (tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7
-      );
-      const delta = Math.min(...deltas);
-      zdt = zdt.add({ days: delta });
     }
 
     // then your existing BYHOUR/BYMINUTE override logic:
