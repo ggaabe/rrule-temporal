@@ -81,8 +81,8 @@ export default function App() {
         });
       setErr(null);
       return { ruleString: rule.toString(), ruleText: rule.toText(), rows };
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (e) {
+      setErr((e as Error).message);
       return { ruleString: "", ruleText: "", rows: [] };
     }
   }, [ics]);
@@ -134,21 +134,29 @@ export default function App() {
         timeZone: tzid,
       });
       const rule = new RRuleTemporal({
-        freq: freq as any,
+        freq: freq as
+          | "YEARLY"
+          | "MONTHLY"
+          | "WEEKLY"
+          | "DAILY"
+          | "HOURLY"
+          | "MINUTELY"
+          | "SECONDLY",
         count,
         dtstart,
         tzid,
         byDay: byDay.length ? byDay : undefined,
-        byHour:
-          ["MINUTELY", "SECONDLY"].includes(freq)
-            ? undefined
-            : byHour.length
-            ? [...byHour].sort((a, b) => a - b)
-            : undefined,
+        byHour: ["MINUTELY", "SECONDLY"].includes(freq)
+          ? undefined
+          : byHour.length
+          ? [...byHour].sort((a, b) => a - b)
+          : undefined,
       });
       setIcs(rule.toString());
-    } catch {
+    } catch (e) {
       /* silent */
+      console.log(e);
+      setErr(e as string);
     }
   }, [mode, freq, count, tzid, dtDate, dtTime, byDay, byHour]);
 
