@@ -120,4 +120,7 @@ dist
 .pnp.*
 
 # Compiled output
-dist 
+dist
+
+.idea
+yarn.lock
