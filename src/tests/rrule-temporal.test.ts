@@ -307,10 +307,10 @@ RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR;BYHOUR=0;BYMINUTE=0`.trim();
 
   test("between returns occurrences in window", () => {
     const arrInc = rule.between(start, end, true);
-    console.log(
-      "arrInc: ",
-      arrInc.map((d) => d.toString())
-    );
+    // console.log(
+    //   "arrInc: ",
+    //   arrInc.map((d) => d.toString())
+    // );
     expect(arrInc.map((d) => d.day)).toEqual([
       25, 9, 23, 13, 27, 11, 25, 8, 22, 12, 26, 10, 24, 14, 28, 12, 26, 9, 23,
       13, 27, 13, 27, 10,
@@ -329,10 +329,10 @@ RRULE:FREQ=MONTHLY;BYDAY=2FR,4FR,-1SA;BYHOUR=0;BYMINUTE=0`.trim();
 
   test("between returns occurrences in window", () => {
     const arrInc = rule.between(start, end, true);
-    console.log(
-      "arrInc: ",
-      arrInc.map((d) => d.toString())
-    );
+    // console.log(
+    //   "arrInc: ",
+    //   arrInc.map((d) => d.toString())
+    // );
     expect(arrInc.map((d) => d.day)).toEqual([
       25, 26, 9, 23, 31, 13, 27, 28, 11, 25, 26, 8, 22, 30, 12, 26, 27, 10, 24,
       25, 14, 28, 29, 12, 26, 27, 9, 23, 31, 13, 27, 28, 13, 27, 28, 10,
@@ -505,10 +505,10 @@ RRULE:FREQ=WEEKLY;BYDAY=MO;BYHOUR=0;BYMINUTE=0`.trim();
 
   test("between returns occurrences in window", () => {
     const arrInc = rule.between(start, end, true);
-    console.log(
-      "arrInc: ",
-      arrInc.map((d) => d.toString())
-    );
+    // console.log(
+    //   "arrInc: ",
+    //   arrInc.map((d) => d.toString())
+    // );
     expect(arrInc.map((d) => d.day)).toEqual([
       28, 5, 12, 19, 26, 2, 9, 16, 23, 30, 7, 14, 21, 28, 4, 11, 18, 25, 1, 8,
       15, 22, 29, 6, 13, 20, 27, 3, 10, 17, 24, 1, 8, 15, 22, 29, 5, 12, 19, 26,
