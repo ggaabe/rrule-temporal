@@ -671,7 +671,7 @@ export class RRuleTemporal {
     const { byWeekNo, wkst } = this.opts;
     if (!byWeekNo) return true;
     const dayMap: Record<string, number> = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7 };
-    const startDow = dayMap[wkst || "MO"];
+    const startDow = dayMap[(wkst ?? "MO") as keyof typeof dayMap]!;
     const jan1 = zdt.with({ month: 1, day: 1 });
     const delta = (jan1.dayOfWeek - startDow + 7) % 7;
     const firstWeekStart = jan1.subtract({ days: delta });
@@ -953,7 +953,7 @@ export class RRuleTemporal {
       for (const d of dates) {
         if (
           dedup.length === 0 ||
-          Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]) !== 0
+          Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
         ) {
           dedup.push(d);
         }
@@ -1477,8 +1477,8 @@ export class RRuleTemporal {
       for (const tok of this.opts.byDay) {
         const m = tok.match(/^([+-]?\d{1,2})(MO|TU|WE|TH|FR|SA|SU)$/);
         if (!m) continue;
-        const ord = parseInt(m[1], 10);
-        const wd = dayMap[m[2]];
+        const ord = parseInt(m[1]!, 10);
+        const wd = dayMap[m[2] as keyof typeof dayMap]!;
         let dt: Temporal.ZonedDateTime;
         if (ord > 0) {
           const jan1 = sample.with({ month: 1, day: 1 });
@@ -1523,7 +1523,7 @@ export class RRuleTemporal {
         SA: 6,
         SU: 7,
       };
-      const wkst = dayMap[this.opts.wkst || "MO"];
+      const wkst = dayMap[(this.opts.wkst || "MO") as keyof typeof dayMap]!;
       const jan1 = sample.with({ month: 1, day: 1 });
       const delta = (jan1.dayOfWeek - wkst + 7) % 7;
       const firstWeekStart = jan1.subtract({ days: delta });
@@ -1542,7 +1542,7 @@ export class RRuleTemporal {
         const weekStart = firstWeekStart.add({ weeks: weekIndex });
         for (const tok of tokens) {
           if (!tok) continue;
-          const targetDow = dayMap[tok];
+          const targetDow = dayMap[tok as keyof typeof dayMap]!;
           const inst = weekStart.add({ days: (targetDow - wkst + 7) % 7 });
           if (!this.opts.byMonth || this.opts.byMonth.includes(inst.month)) {
             occs.push(...this.expandByTime(inst));
@@ -1564,7 +1564,7 @@ export class RRuleTemporal {
     const len = sorted.length;
     for (const pos of bySetPos) {
       const idx = pos > 0 ? pos - 1 : len + pos;
-      if (idx >= 0 && idx < len) out.push(sorted[idx]);
+      if (idx >= 0 && idx < len) out.push(sorted[idx]!);
     }
     return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
@@ -1596,7 +1596,7 @@ export class RRuleTemporal {
     for (const d of list) {
       if (
         dedup.length === 0 ||
-        Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]) !== 0
+        Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
       ) {
         dedup.push(d);
       }
