@@ -178,8 +178,7 @@ describe('RRule class methods', () => {
     });
 
     describe('if the specified start date is a occurrence', () => {
-      // fails
-      it.skip('includes only occurrences after the specified date by default', () => {
+      it('includes only occurrences after the specified date by default', () => {
         expect(
           rule
             .between(
@@ -520,7 +519,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   //fails
-  it.skip('Every day in January, for 3 years', () => {
+  it('Every day in January, for 3 years', () => {
     const rule1 = new RRuleTemporal({
       dtstart: DATE_1998_JAN_1_9AM_NEW_YORK,
       tzid: RFC_TEST_TZID,
@@ -828,7 +827,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('Monthly on the first Friday for 10 occurrences', () => {
+  it('Monthly on the first Friday for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -854,7 +853,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('Monthly on the first Friday until December 24, 1997', () => {
+  it('Monthly on the first Friday until December 24, 1997', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -874,7 +873,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('Every other month on the first and last Sunday of the month for 10 occurrences', () => {
+  it('Every other month on the first and last Sunday of the month for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 7, 9),
       tzid: RFC_TEST_TZID,
@@ -903,7 +902,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     `);
   });
 
-  it.skip('Monthly on the second-to-last Monday of the month for 6 months', () => {
+  it('Monthly on the second-to-last Monday of the month for 6 months', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 22, 9),
       tzid: RFC_TEST_TZID,
@@ -970,7 +969,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // fails
-  it.skip('Monthly on the first and last day of the month for 10 occurrences', () => {
+  it('Monthly on the first and last day of the month for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 30, 9),
       tzid: RFC_TEST_TZID,
@@ -1059,7 +1058,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // fails
-  it.skip('Yearly in June and July for 10 occurrences', () => {
+  it('Yearly in June and July for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 6, 10, 9),
       tzid: RFC_TEST_TZID,
@@ -1085,7 +1084,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // fails
-  it.skip('Every other year on January, February, and March for 10 occurrences', () => {
+  it('Every other year on January, February, and March for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 3, 10, 9),
       tzid: RFC_TEST_TZID,
@@ -1112,7 +1111,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('Every third year on the 1st, 100th, and 200th day for 10 occurrences', () => {
+  it('Every third year on the 1st, 100th, and 200th day for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 1, 1, 9),
       tzid: RFC_TEST_TZID,
@@ -1139,7 +1138,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('Every 20th Monday of the year, forever', () => {
+  it('Every 20th Monday of the year, forever', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 5, 19, 9),
       tzid: RFC_TEST_TZID,
@@ -1157,7 +1156,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('Monday of week number 20 (where the default start of the week is Monday), forever', () => {
+  it('Monday of week number 20 (where the default start of the week is Monday), forever', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 5, 12, 9),
       tzid: RFC_TEST_TZID,
@@ -1210,7 +1209,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // fails
-  it.skip('Every Thursday, but only during June, July, and August, forever', () => {
+  it('Every Thursday, but only during June, July, and August, forever', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 6, 5, 9), // 10 or 9 am?
       tzid: RFC_TEST_TZID,
@@ -1364,7 +1363,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months', () => {
+  it('The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 4, 9),
       tzid: RFC_TEST_TZID,
@@ -1384,7 +1383,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // not supported
-  it.skip('The second-to-last weekday of the month', () => {
+  it('The second-to-last weekday of the month', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 29, 9),
       tzid: RFC_TEST_TZID,
@@ -1468,7 +1467,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 
   // fails
-  it.skip('Every 20 minutes from 9:00 AM to 4:40 PM every day', () => {
+  it('Every 20 minutes from 9:00 AM to 4:40 PM every day', () => {
     const rule1 = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -1530,7 +1529,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   });
 });
   // not supported
-  it.skip('An example where the days generated makes a difference because of WKST', () => {
+  it('An example where the days generated makes a difference because of WKST', () => {
     const rule1 = new RRuleTemporal({
       dtstart: zdt(1997, 8, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -1632,7 +1631,7 @@ describe('Additional smoke tests', () => {
 
   describe('byDay', () => {
     // fails
-    it.skip('accounts for timezone when determining day of the week', () => {
+    it('accounts for timezone when determining day of the week', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2023_JAN_6_11PM,
         freq: "WEEKLY",
@@ -1684,7 +1683,7 @@ describe('Additional smoke tests', () => {
       `);
     });
     // fails
-    it.skip('ignores invalid byDay values', () => {
+    it('ignores invalid byDay values', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "WEEKLY",
@@ -1740,7 +1739,7 @@ describe('Additional smoke tests', () => {
 
   describe('byMonth', () => {
     // fails
-    it.skip('ignores invalid byMonth values', () => {
+    it('ignores invalid byMonth values', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "YEARLY",
@@ -1771,7 +1770,7 @@ describe('Additional smoke tests', () => {
 
   describe('byHour, byMinute, bySecond', () => {
     // not supported
-    it.skip('works with daily frequency', () => {
+    it('works with daily frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "DAILY",
@@ -1802,7 +1801,7 @@ describe('Additional smoke tests', () => {
       `);
     });
     // not supported
-    it.skip('works with hourly frequency', () => {
+    it('works with hourly frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "HOURLY",
@@ -1832,7 +1831,7 @@ describe('Additional smoke tests', () => {
       `);
     });
     // not supported
-    it.skip('works with minutely frequency', () => {
+    it('works with minutely frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "HOURLY",
@@ -1861,7 +1860,7 @@ describe('Additional smoke tests', () => {
       `);
     });
     // not supported
-    it.skip('works with secondly frequency', () => {
+    it('works with secondly frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "SECONDLY",
@@ -1893,7 +1892,7 @@ describe('Additional smoke tests', () => {
 
   describe('byYearDay', () => {
     // not supported
-    it.skip('respects leap years', () => {
+    it('respects leap years', () => {
       const rule3 = new RRuleTemporal({
         dtstart: DATE_2020,
         freq: "YEARLY",
@@ -1919,7 +1918,7 @@ describe('Additional smoke tests', () => {
       `);
     });
     // not supported
-    it.skip('ignores invalid byYearDay values', () => {
+    it('ignores invalid byYearDay values', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2020,
         freq: "YEARLY",
@@ -1947,7 +1946,7 @@ describe('Additional smoke tests', () => {
 
   describe('rDate', () => {
     // not supported
-    it.skip("includes RDates in the occurrences list even if they don't match the RRule", () => {
+    it("includes RDates in the occurrences list even if they don't match the RRule", () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "MONTHLY",
@@ -1977,7 +1976,7 @@ describe('Additional smoke tests', () => {
       `);
     });
     // not supported
-    it.skip('does not yield RDates twice if they already match the RRule', () => {
+    it('does not yield RDates twice if they already match the RRule', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "MONTHLY",
@@ -2010,7 +2009,7 @@ describe('Additional smoke tests', () => {
 
   describe('strict', () => {
     // need to update test?
-    it.skip("when omitted, yields dtstart as an occurrence even if it doesn't match the RRule", () => {
+    it("when omitted, yields dtstart as an occurrence even if it doesn't match the RRule", () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: "MONTHLY",
@@ -2099,7 +2098,7 @@ describe('Error handling', () => {
     );
   });
   // fails
-  it.skip('throws an error on an invalid until', () => {
+  it('throws an error on an invalid until', () => {
     const testFn = () =>
       new RRuleTemporal({
         dtstart: DATE_2020,
@@ -2114,7 +2113,7 @@ describe('Error handling', () => {
   });
 
   // fails
-  it.skip('throws an error on an interval of 0', () => {
+  it('throws an error on an interval of 0', () => {
     const testFn = () =>
       new RRuleTemporal({
         dtstart: DATE_2020,
