@@ -392,7 +392,36 @@ export class RRuleTemporal {
       }
     }
     // we were already at the last BYHOUR/BYMINUTE -> advance the date
-    return this.applyTimeOverride(this.rawAdvance(zdt));
+
+    let next = this.applyTimeOverride(this.rawAdvance(zdt));
+
+    // If BYDAY consists solely of simple weekday tokens and the frequency is
+    // more frequent than daily, jump directly to the next matching weekday to
+    // avoid stepping hour-by-hour (or worse).
+    if (
+      this.opts.byDay?.length &&
+      ["HOURLY", "MINUTELY", "SECONDLY"].includes(freq) &&
+      this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
+    ) {
+      const dayMap: Record<string, number> = {
+        MO: 1,
+        TU: 2,
+        WE: 3,
+        TH: 4,
+        FR: 5,
+        SA: 6,
+        SU: 7,
+      };
+      const deltas = this.opts.byDay.map(
+        (tok) => (dayMap[tok]! - next.dayOfWeek + 7) % 7
+      );
+      const delta = Math.min(...deltas);
+      if (delta) {
+        next = this.applyTimeOverride(next.add({ days: delta }));
+      }
+    }
+
+    return next;
   }
 
   private applyTimeOverride(
