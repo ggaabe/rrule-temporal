@@ -51,16 +51,25 @@ const DATE_2020 = zdt(2020,1,1,0,'UTC');
 const DATE_2023_JAN_6_11PM = zdt(2023,1,6,23,'UTC');
 
 const limit = (n: number) => (_: any, i: number) => i < n;
+
+
+const format = (tz:string) => (d: Temporal.ZonedDateTime | null)=>{
+  if(d) {
+    return new Date(d.withTimeZone(tz).epochMilliseconds).toString();
+  }
+}
+
 const formatUTC = (d: Temporal.ZonedDateTime | null) => {
   if (d) {
     return new Date(d.withTimeZone('UTC').epochMilliseconds).toUTCString();
   }
 }
-const formatISO = (d: Temporal.ZonedDateTime | null) => {
+const formatISO =  (d: Temporal.ZonedDateTime | null) => {
   if (d) {
     return new Date(d.withTimeZone('UTC').epochMilliseconds).toISOString();
   }
 }
+
 
 
 describe('RRule class methods', () => {
@@ -2139,5 +2148,65 @@ describe('Error handling', () => {
     };
 
     expect(testFn).toThrowErrorMatchingInlineSnapshot(`"all() requires iterator when no COUNT/UNTIL"`);
+  });
+});
+
+describe('DST timezones and repeat', () => {
+  it('should respect DST changes', function (){
+    const tz = 'Australia/Sydney';
+    const rule = new RRuleTemporal({
+      dtstart: zdt(2024,3,12,22,tz),
+      freq: "MONTHLY",
+      interval: 1,
+      tzid: tz,
+    })
+    expect(rule.all(limit(20)).map(format(tz))).toMatchInlineSnapshot(`
+      [
+        "Tue Mar 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "Fri Apr 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Sun May 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Wed Jun 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Fri Jul 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Mon Aug 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Thu Sep 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Sat Oct 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "Tue Nov 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "Thu Dec 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "Sun Jan 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "Wed Feb 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "Wed Mar 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "Sat Apr 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Mon May 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Thu Jun 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Sat Jul 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Tue Aug 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Fri Sep 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
+        "Sun Oct 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+      ]
+    `)
+    expect(rule.all(limit(20)).map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2024-03-12T11:00:00.000Z",
+        "2024-04-12T12:00:00.000Z",
+        "2024-05-12T12:00:00.000Z",
+        "2024-06-12T12:00:00.000Z",
+        "2024-07-12T12:00:00.000Z",
+        "2024-08-12T12:00:00.000Z",
+        "2024-09-12T12:00:00.000Z",
+        "2024-10-12T11:00:00.000Z",
+        "2024-11-12T11:00:00.000Z",
+        "2024-12-12T11:00:00.000Z",
+        "2025-01-12T11:00:00.000Z",
+        "2025-02-12T11:00:00.000Z",
+        "2025-03-12T11:00:00.000Z",
+        "2025-04-12T12:00:00.000Z",
+        "2025-05-12T12:00:00.000Z",
+        "2025-06-12T12:00:00.000Z",
+        "2025-07-12T12:00:00.000Z",
+        "2025-08-12T12:00:00.000Z",
+        "2025-09-12T12:00:00.000Z",
+        "2025-10-12T11:00:00.000Z",
+      ]
+    `);
   });
 });
