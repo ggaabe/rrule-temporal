@@ -113,8 +113,9 @@ export default function App() {
             ? []
             : [opts.dtstart.hour])
       );
-    } catch {
+    } catch (e) {
       /* ignore parse failure */
+      console.log(e);
     }
   }, [mode, ics]);
 
