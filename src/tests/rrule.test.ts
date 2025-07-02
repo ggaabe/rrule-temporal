@@ -833,7 +833,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       dtstart: zdt(1997, 9, 5, 9),
       tzid: RFC_TEST_TZID,
       freq: "MONTHLY",
-      byDay: [[1, "FR"]], // not supported
+      byDay: [[1, "FR"]],
       count: 10,
     });
 
