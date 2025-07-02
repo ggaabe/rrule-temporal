@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsup",
     "test": "jest",
-    "prepare": "npm run build"
+    "build:prepare": "npm run build"
   },
   "repository": {
     "type": "git",
