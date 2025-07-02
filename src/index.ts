@@ -623,7 +623,7 @@ export class RRuleTemporal {
         dt = dt.add({ days: 1 });
       }
 
-      // pick the “ord-th” entry (supports negative ord)
+      // pick the "ord-th" entry (supports negative ord)
       const idx = ord > 0 ? ord - 1 : candidates.length + ord;
       if (candidates[idx] === zdt.day) return true;
     }
@@ -672,6 +672,7 @@ export class RRuleTemporal {
     if (!byWeekNo) return true;
     const dayMap: Record<string, number> = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7 };
     const startDow = dayMap[wkst || "MO"];
+    if (startDow === undefined) return true; // Fallback if invalid wkst
     const jan1 = zdt.with({ month: 1, day: 1 });
     const delta = (jan1.dayOfWeek - startDow + 7) % 7;
     const firstWeekStart = jan1.subtract({ days: delta });
@@ -744,7 +745,7 @@ export class RRuleTemporal {
       return dates;
     }
 
-    // --- 2) WEEKLY + BYDAY (or default to DTSTART’s weekday) ---
+    // --- 2) WEEKLY + BYDAY (or default to DTSTART's weekday) ---
     if (this.opts.freq === "WEEKLY") {
       const start = this.originalDtstart;
       // Build the list of target weekdays (1=Mon..7=Sun)
@@ -757,7 +758,7 @@ export class RRuleTemporal {
         SA: 6,
         SU: 7,
       };
-      // If no BYDAY, default to DTSTART’s weekday token
+      // If no BYDAY, default to DTSTART's weekday token
       const tokens = this.opts.byDay
         ? [...this.opts.byDay]
         : [Object.entries(dayMap).find(([, d]) => d === start.dayOfWeek)![0]];
@@ -766,7 +767,7 @@ export class RRuleTemporal {
         .filter((d): d is number => d !== undefined)
         .sort((a, b) => a - b);
 
-      // Find the very first weekCursor: the earliest of this week’s matching days ≥ start
+      // Find the very first weekCursor: the earliest of this week's matching days ≥ start
       const firstWeekDates = dows.map((dw) => {
         const delta = (dw - start.dayOfWeek + 7) % 7;
         return start.add({ days: delta });
@@ -777,7 +778,7 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       outer_week: while (true) {
-        // Generate this week’s occurrences
+        // Generate this week's occurrences
         const baseDow = weekCursor.dayOfWeek;
         const occs = dows
           .flatMap((dw) => {
@@ -941,7 +942,7 @@ export class RRuleTemporal {
       current = this.nextCandidateSameDate(current);
     }
 
-    if (this.opts.rDate) {
+    if (this.opts.rDate && this.opts.rDate.length > 0) {
       const extras = this.opts.rDate.map((d) =>
         d instanceof Temporal.ZonedDateTime
           ? d
@@ -1476,9 +1477,10 @@ export class RRuleTemporal {
       };
       for (const tok of this.opts.byDay) {
         const m = tok.match(/^([+-]?\d{1,2})(MO|TU|WE|TH|FR|SA|SU)$/);
-        if (!m) continue;
+        if (!m || !m[2]) continue;
         const ord = parseInt(m[1], 10);
         const wd = dayMap[m[2]];
+        if (wd === undefined) continue;
         let dt: Temporal.ZonedDateTime;
         if (ord > 0) {
           const jan1 = sample.with({ month: 1, day: 1 });
@@ -1524,6 +1526,7 @@ export class RRuleTemporal {
         SU: 7,
       };
       const wkst = dayMap[this.opts.wkst || "MO"];
+      if (wkst === undefined) return occs; // Skip if invalid wkst
       const jan1 = sample.with({ month: 1, day: 1 });
       const delta = (jan1.dayOfWeek - wkst + 7) % 7;
       const firstWeekStart = jan1.subtract({ days: delta });
@@ -1543,6 +1546,7 @@ export class RRuleTemporal {
         for (const tok of tokens) {
           if (!tok) continue;
           const targetDow = dayMap[tok];
+          if (targetDow === undefined || wkst === undefined) continue;
           const inst = weekStart.add({ days: (targetDow - wkst + 7) % 7 });
           if (!this.opts.byMonth || this.opts.byMonth.includes(inst.month)) {
             occs.push(...this.expandByTime(inst));
@@ -1575,7 +1579,7 @@ export class RRuleTemporal {
     endInst: Temporal.Instant,
     inc: boolean
   ): Temporal.ZonedDateTime[] {
-    if (!this.opts.rDate) return list;
+    if (!this.opts.rDate || this.opts.rDate.length === 0) return list;
     const extras = this.opts.rDate.map((d) =>
       d instanceof Temporal.ZonedDateTime
         ? d
