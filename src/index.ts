@@ -787,17 +787,23 @@ export class RRuleTemporal {
         const delta = (dw - start.dayOfWeek + 7) % 7;
         return start.add({ days: delta });
       });
-      let weekCursor = firstWeekDates.reduce((a, b) =>
+      let firstOccurrence = firstWeekDates.reduce((a, b) =>
         Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b
       );
+      
+      // Get the week start day (default to Monday if not specified)
+      const wkstDay = dayMap[this.opts.wkst || 'MO'];
+      
+      // Align weekCursor to the week start that contains the first occurrence
+      const firstOccWeekOffset = (firstOccurrence.dayOfWeek - wkstDay + 7) % 7;
+      let weekCursor = firstOccurrence.subtract({ days: firstOccWeekOffset });
       let matchCount = 0;
 
       outer_week: while (true) {
         // Generate this week’s occurrences
-        const baseDow = weekCursor.dayOfWeek;
         const occs = dows
           .flatMap((dw) => {
-            const delta = dw - baseDow;
+            const delta = (dw - wkstDay + 7) % 7;
             const sameDate = weekCursor.add({ days: delta });
             return this.expandByTime(sameDate);
           })
