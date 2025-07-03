@@ -811,7 +811,7 @@ export class RRuleTemporal {
       return dates;
     }
 
-    // --- 3) YEARLY + BYMONTH (one per year, rotating) ---
+    // --- 3) YEARLY + BYMONTH (all specified months per year) ---
     if (
       this.opts.freq === "YEARLY" &&
       this.opts.byMonth &&
@@ -820,33 +820,36 @@ export class RRuleTemporal {
     ) {
       const start = this.originalDtstart;
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
-      let i = 0;
+      let yearOffset = 0;
+      let matchCount = 0;
 
       while (true) {
-        const year = start.year + i * this.opts.interval!;
-        const month = months[i % months.length];
-        let occ = start.with({ year, month });
-        occ = this.applyTimeOverride(occ);
+        const year = start.year + yearOffset * this.opts.interval!;
+        
+        for (const month of months) {
+          let occ = start.with({ year, month });
+          occ = this.applyTimeOverride(occ);
 
-        if (i === 0 && Temporal.ZonedDateTime.compare(occ, start) < 0) {
-          i++;
-          continue;
-        }
-        if (
-          this.opts.until &&
-          Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-        ) {
-          break;
-        }
-        if (this.opts.count !== undefined && i >= this.opts.count) {
-          break;
-        }
-        if (iterator && !iterator(occ, i)) {
-          break;
-        }
+          if (Temporal.ZonedDateTime.compare(occ, start) < 0) {
+            continue;
+          }
+          if (
+            this.opts.until &&
+            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
+          ) {
+            return dates;
+          }
+          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
+            return dates;
+          }
+          if (iterator && !iterator(occ, matchCount)) {
+            return dates;
+          }
 
-        dates.push(occ);
-        i++;
+          dates.push(occ);
+          matchCount++;
+        }
+        yearOffset++;
       }
       return dates;
     }
@@ -1024,29 +1027,31 @@ export class RRuleTemporal {
     ) {
       const start = this.originalDtstart;
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
-      let i = 0;
+      let yearOffset = 0;
 
       outer: while (true) {
-        const year = start.year + i * this.opts.interval!;
-        const month = months[i % months.length];
-        let occ = start.with({ year, month });
-        occ = this.applyTimeOverride(occ);
-        const inst = occ.toInstant();
+        const year = start.year + yearOffset * this.opts.interval!;
+        
+        for (const month of months) {
+          let occ = start.with({ year, month });
+          occ = this.applyTimeOverride(occ);
+          const inst = occ.toInstant();
 
-        if (
-          inc
-            ? Temporal.Instant.compare(inst, endInst) > 0
-            : Temporal.Instant.compare(inst, endInst) >= 0
-        ) {
-          break;
+          if (
+            inc
+              ? Temporal.Instant.compare(inst, endInst) > 0
+              : Temporal.Instant.compare(inst, endInst) >= 0
+          ) {
+            break outer;
+          }
+          const startOk = inc
+            ? Temporal.Instant.compare(inst, startInst) >= 0
+            : Temporal.Instant.compare(inst, startInst) > 0;
+          if (startOk) {
+            results.push(occ);
+          }
         }
-        const startOk = inc
-          ? Temporal.Instant.compare(inst, startInst) >= 0
-          : Temporal.Instant.compare(inst, startInst) > 0;
-        if (startOk) {
-          results.push(occ);
-        }
-        i++;
+        yearOffset++;
       }
       return this.mergeRDates(results, startInst, endInst, inc);
     }
