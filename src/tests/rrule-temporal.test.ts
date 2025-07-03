@@ -372,14 +372,14 @@ describe("RRuleTemporal - BYMONTH with YEARLY freq (manual opts)", () => {
     dtstart,
   });
 
-  test("all() emits Jan '25, Jun '26, Dec '27, Jan '28", () => {
+  test("all() emits Jan '25, Jun '25, Dec '25, Jan '26", () => {
     const dates = rule.all();
     expect(dates).toHaveLength(4);
     expect(dates.map((d) => ({ year: d.year, month: d.month }))).toEqual([
       { year: 2025, month: 1 },
-      { year: 2026, month: 6 },
-      { year: 2027, month: 12 },
-      { year: 2028, month: 1 },
+      { year: 2025, month: 6 },
+      { year: 2025, month: 12 },
+      { year: 2026, month: 1 },
     ]);
     for (const d of dates) {
       expect(d.hour).toBe(9);
