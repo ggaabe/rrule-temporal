@@ -1814,34 +1814,34 @@ describe('Additional smoke tests', () => {
         ]
       `);
     });
-    it.skip('ignores invalid byYearDay values', () => {
+    it('ignores invalid byYearDay values', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2020,
         freq: 'YEARLY',
-        byYearDay: [0, -1],
+        byYearDay: [0, -1], // 0 is not a valid day
         interval: 1,
         tzid: 'UTC',
       });
 
       expect(rule.all(limit(10)).map(formatISO)).toMatchInlineSnapshot(`
         [
-          "2020-01-01T00:00:00.000Z",
-          "2021-01-01T00:00:00.000Z",
-          "2022-01-01T00:00:00.000Z",
-          "2023-01-01T00:00:00.000Z",
-          "2024-01-01T00:00:00.000Z",
-          "2025-01-01T00:00:00.000Z",
-          "2026-01-01T00:00:00.000Z",
-          "2027-01-01T00:00:00.000Z",
-          "2028-01-01T00:00:00.000Z",
-          "2029-01-01T00:00:00.000Z",
+          "2020-12-31T00:00:00.000Z",
+          "2021-12-31T00:00:00.000Z",
+          "2022-12-31T00:00:00.000Z",
+          "2023-12-31T00:00:00.000Z",
+          "2024-12-31T00:00:00.000Z",
+          "2025-12-31T00:00:00.000Z",
+          "2026-12-31T00:00:00.000Z",
+          "2027-12-31T00:00:00.000Z",
+          "2028-12-31T00:00:00.000Z",
+          "2029-12-31T00:00:00.000Z",
         ]
       `);
     });
   });
 
   describe('rDate', () => {
-    it.skip("includes RDates in the occurrences list even if they don't match the RRule", () => {
+    it("includes RDates in the occurrences list even if they don't match the RRule", () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: 'MONTHLY',
@@ -1862,7 +1862,7 @@ describe('Additional smoke tests', () => {
   "2020-07-18T00:00:00.000Z",
   "2020-08-19T00:00:00.000Z",
   "2020-10-19T00:00:00.000Z",
-  "2020-12-19T00:00:00.000Z",  
+  "2020-12-19T00:00:00.000Z",
 ]
 `);
     });

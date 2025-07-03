@@ -750,17 +750,63 @@ export class RRuleTemporal {
           ) {
             break outer_month;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_month;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_month;
           }
           dates.push(occ);
           matchCount++;
+          // Apply count limit if there are no rDates to merge, or if we have enough for both rule and rDates
+          if (this.opts.count !== undefined) {
+            if (!this.opts.rDate && matchCount >= this.opts.count) {
+              break outer_month;
+            }
+            // If we have rDates, collect at least count occurrences from the rule so we can merge properly
+            // But also add a safety limit to prevent infinite loops
+            if (this.opts.rDate && matchCount >= this.opts.count * 2) {
+              break outer_month;
+            }
+          }
         }
         monthCursor = monthCursor.add({ months: this.opts.interval! });
       }
+      
+      // Merge rDates and apply count limit to the combined result
+      if (this.opts.rDate) {
+        const extras = this.opts.rDate.map((d) =>
+          d instanceof Temporal.ZonedDateTime
+            ? d
+            : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
+        );
+        dates.push(...extras);
+        dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+        
+        // Deduplicate
+        const dedup: Temporal.ZonedDateTime[] = [];
+        for (const d of dates) {
+          if (
+            dedup.length === 0 ||
+            Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
+          ) {
+            dedup.push(d);
+          }
+        }
+        
+        // Apply count limit to the final combined result
+        if (this.opts.count !== undefined) {
+          let finalCount = 0;
+          const finalDates: Temporal.ZonedDateTime[] = [];
+          for (const d of dedup) {
+            if (finalCount >= this.opts.count) break;
+            if (iterator && !iterator(d, finalCount)) break;
+            finalDates.push(d);
+            finalCount++;
+          }
+          return finalDates;
+        }
+        
+        return dedup;
+      }
+      
       return dates;
     }
 
@@ -821,17 +867,62 @@ export class RRuleTemporal {
           ) {
             break outer_week;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_week;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_week;
           }
           dates.push(occ);
           matchCount++;
+          // Apply count limit if there are no rDates to merge, or if we have enough for both rule and rDates
+          if (this.opts.count !== undefined) {
+            if (!this.opts.rDate && matchCount >= this.opts.count) {
+              break outer_week;
+            }
+            // If we have rDates, collect at least count occurrences from the rule so we can merge properly
+            // But also add a safety limit to prevent infinite loops
+            if (this.opts.rDate && matchCount >= this.opts.count * 2) {
+              break outer_week;
+            }
+          }
         }
 
         weekCursor = weekCursor.add({ weeks: this.opts.interval! });
+      }
+
+      // Merge rDates and apply count limit to the combined result
+      if (this.opts.rDate) {
+        const extras = this.opts.rDate.map((d) =>
+          d instanceof Temporal.ZonedDateTime
+            ? d
+            : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
+        );
+        dates.push(...extras);
+        dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+        
+        // Deduplicate
+        const dedup: Temporal.ZonedDateTime[] = [];
+        for (const d of dates) {
+          if (
+            dedup.length === 0 ||
+            Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
+          ) {
+            dedup.push(d);
+          }
+        }
+        
+        // Apply count limit to the final combined result
+        if (this.opts.count !== undefined) {
+          let finalCount = 0;
+          const finalDates: Temporal.ZonedDateTime[] = [];
+          for (const d of dedup) {
+            if (finalCount >= this.opts.count) break;
+            if (iterator && !iterator(d, finalCount)) break;
+            finalDates.push(d);
+            finalCount++;
+          }
+          return finalDates;
+        }
+        
+        return dedup;
       }
 
       return dates;
@@ -865,18 +956,64 @@ export class RRuleTemporal {
           ) {
             return dates;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            return dates;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             return dates;
           }
 
           dates.push(occ);
           matchCount++;
+          // Apply count limit if there are no rDates to merge, or if we have enough for both rule and rDates
+          if (this.opts.count !== undefined) {
+            if (!this.opts.rDate && matchCount >= this.opts.count) {
+              return dates;
+            }
+            // If we have rDates, collect at least count occurrences from the rule so we can merge properly
+            // But also add a safety limit to prevent infinite loops
+            if (this.opts.rDate && matchCount >= this.opts.count * 2) {
+              return dates;
+            }
+          }
         }
         yearOffset++;
       }
+      
+      // Merge rDates and apply count limit to the combined result
+      if (this.opts.rDate) {
+        const extras = this.opts.rDate.map((d) =>
+          d instanceof Temporal.ZonedDateTime
+            ? d
+            : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
+        );
+        dates.push(...extras);
+        dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+        
+        // Deduplicate
+        const dedup: Temporal.ZonedDateTime[] = [];
+        for (const d of dates) {
+          if (
+            dedup.length === 0 ||
+            Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
+          ) {
+            dedup.push(d);
+          }
+        }
+        
+        // Apply count limit to the final combined result
+        if (this.opts.count !== undefined) {
+          let finalCount = 0;
+          const finalDates: Temporal.ZonedDateTime[] = [];
+          for (const d of dedup) {
+            if (finalCount >= this.opts.count) break;
+            if (iterator && !iterator(d, finalCount)) break;
+            finalDates.push(d);
+            finalCount++;
+          }
+          return finalDates;
+        }
+        
+        return dedup;
+      }
+      
       return dates;
     }
 
@@ -899,17 +1036,63 @@ export class RRuleTemporal {
           ) {
             break outer_year;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_year;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_year;
           }
           dates.push(occ);
           matchCount++;
+          // Apply count limit if there are no rDates to merge, or if we have enough for both rule and rDates
+          if (this.opts.count !== undefined) {
+            if (!this.opts.rDate && matchCount >= this.opts.count) {
+              break outer_year;
+            }
+            // If we have rDates, collect at least count occurrences from the rule so we can merge properly
+            // But also add a safety limit to prevent infinite loops
+            if (this.opts.rDate && matchCount >= this.opts.count * 2) {
+              break outer_year;
+            }
+          }
         }
         yearCursor = yearCursor.add({ years: this.opts.interval! });
       }
+      
+      // Merge rDates and apply count limit to the combined result
+      if (this.opts.rDate) {
+        const extras = this.opts.rDate.map((d) =>
+          d instanceof Temporal.ZonedDateTime
+            ? d
+            : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
+        );
+        dates.push(...extras);
+        dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+        
+        // Deduplicate
+        const dedup: Temporal.ZonedDateTime[] = [];
+        for (const d of dates) {
+          if (
+            dedup.length === 0 ||
+            Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
+          ) {
+            dedup.push(d);
+          }
+        }
+        
+        // Apply count limit to the final combined result
+        if (this.opts.count !== undefined) {
+          let finalCount = 0;
+          const finalDates: Temporal.ZonedDateTime[] = [];
+          for (const d of dedup) {
+            if (finalCount >= this.opts.count) break;
+            if (iterator && !iterator(d, finalCount)) break;
+            finalDates.push(d);
+            finalCount++;
+          }
+          return finalDates;
+        }
+        
+        return dedup;
+      }
+      
       return dates;
     }
 
@@ -932,17 +1115,63 @@ export class RRuleTemporal {
           ) {
             break outer_year2;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_year2;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_year2;
           }
           dates.push(occ);
           matchCount++;
+          // Apply count limit if there are no rDates to merge, or if we have enough for both rule and rDates
+          if (this.opts.count !== undefined) {
+            if (!this.opts.rDate && matchCount >= this.opts.count) {
+              break outer_year2;
+            }
+            // If we have rDates, collect at least count occurrences from the rule so we can merge properly
+            // But also add a safety limit to prevent infinite loops
+            if (this.opts.rDate && matchCount >= this.opts.count * 2) {
+              break outer_year2;
+            }
+          }
         }
         yearCursor = yearCursor.add({ years: this.opts.interval! });
       }
+      
+      // Merge rDates and apply count limit to the combined result
+      if (this.opts.rDate) {
+        const extras = this.opts.rDate.map((d) =>
+          d instanceof Temporal.ZonedDateTime
+            ? d
+            : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
+        );
+        dates.push(...extras);
+        dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+        
+        // Deduplicate
+        const dedup: Temporal.ZonedDateTime[] = [];
+        for (const d of dates) {
+          if (
+            dedup.length === 0 ||
+            Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
+          ) {
+            dedup.push(d);
+          }
+        }
+        
+        // Apply count limit to the final combined result
+        if (this.opts.count !== undefined) {
+          let finalCount = 0;
+          const finalDates: Temporal.ZonedDateTime[] = [];
+          for (const d of dedup) {
+            if (finalCount >= this.opts.count) break;
+            if (iterator && !iterator(d, finalCount)) break;
+            finalDates.push(d);
+            finalCount++;
+          }
+          return finalDates;
+        }
+        
+        return dedup;
+      }
+      
       return dates;
     }
 
@@ -958,18 +1187,27 @@ export class RRuleTemporal {
         break;
       }
       if (this.matchesAll(current)) {
-        if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-          break;
-        }
         if (iterator && !iterator(current, matchCount)) {
           break;
         }
         dates.push(current);
         matchCount++;
+        // Apply count limit if there are no rDates to merge, or if we have enough for both rule and rDates
+        if (this.opts.count !== undefined) {
+          if (!this.opts.rDate && matchCount >= this.opts.count) {
+            break;
+          }
+          // If we have rDates, collect at least count occurrences from the rule so we can merge properly
+          // But also add a safety limit to prevent infinite loops
+          if (this.opts.rDate && matchCount >= this.opts.count * 2) {
+            break;
+          }
+        }
       }
       current = this.nextCandidateSameDate(current);
     }
 
+    // Merge rDates and apply count limit to the combined result
     if (this.opts.rDate) {
       const extras = this.opts.rDate.map((d) =>
         d instanceof Temporal.ZonedDateTime
@@ -978,6 +1216,8 @@ export class RRuleTemporal {
       );
       dates.push(...extras);
       dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+      
+      // Deduplicate
       const dedup: Temporal.ZonedDateTime[] = [];
       for (const d of dates) {
         if (
@@ -987,6 +1227,20 @@ export class RRuleTemporal {
           dedup.push(d);
         }
       }
+      
+      // Apply count limit to the final combined result
+      if (this.opts.count !== undefined) {
+        let finalCount = 0;
+        const finalDates: Temporal.ZonedDateTime[] = [];
+        for (const d of dedup) {
+          if (finalCount >= this.opts.count) break;
+          if (iterator && !iterator(d, finalCount)) break;
+          finalDates.push(d);
+          finalCount++;
+        }
+        return finalDates;
+      }
+      
       return dedup;
     }
     return dates;
