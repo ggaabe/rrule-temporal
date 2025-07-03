@@ -238,19 +238,45 @@ describe('RRule class methods', () => {
   });
 });
 
+type ITestRRule = {
+  rule: RRuleTemporal;
+  rrule: string;
+  snapshot: string;
+  print?: (d: Temporal.ZonedDateTime | null) => string | undefined;
+  between?: (Date | Temporal.ZonedDateTime)[];
+  limit?: number;
+};
+function expectSnapshot({rule, snapshot, between, limit: max, print = formatUTC}: Omit<ITestRRule, 'rrule'>) {
+  if (between && between.length >= 2) {
+    expect(rule.between(between[0]!, between[1]!, true).map(print)).toMatchInlineSnapshot(snapshot);
+  } else if (max) {
+    expect(rule.all(limit(max)).map(print)).toMatchInlineSnapshot(snapshot);
+  } else {
+    expect(rule.all().map(print)).toMatchInlineSnapshot(snapshot);
+  }
+}
+function testWithConstructorAndRRule({rule, rrule, snapshot, between, limit: max, print = formatUTC}: ITestRRule) {
+  it('using constructor', function () {
+    expectSnapshot({rule, snapshot, between, limit: max, print});
+  });
+  it('using rrule', function () {
+    expectSnapshot({rule: new RRuleTemporal({rruleString: rrule}), snapshot, between, limit: max, print});
+  });
+}
+
 describe('iCalendar.org RFC 5545 Examples', () => {
   // Test against the examples specified at https://icalendar.org/iCalendar-RFC-5545/3-8-5-3-occurrence-rule.html
   // This covers the vast majority of RRule functionality and possible edge cases
 
-  test('Daily for 10 occurrences', () => {
+  describe('Daily for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'DAILY',
       count: 10,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;COUNT=10';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Wed, 03 Sep 1997 13:00:00 GMT",
@@ -263,18 +289,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Wed, 10 Sep 1997 13:00:00 GMT",
         "Thu, 11 Sep 1997 13:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Daily until December 24, 1997', () => {
+  describe('Daily until December 24, 1997', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'DAILY',
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;UNTIL=19971224T000000Z';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Wed, 03 Sep 1997 13:00:00 GMT",
@@ -390,20 +417,20 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Mon, 22 Dec 1997 14:00:00 GMT",
         "Tue, 23 Dec 1997 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Every other day, forever', () => {
+  describe('Every other day, forever', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'DAILY',
       interval: 2,
     });
-
-    expect(
-      rule.between(DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1997-12-04T00:00:00.000-05:00'), true).map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;INTERVAL=2';
+    const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1997-12-04T00:00:00.000-05:00')];
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Thu, 04 Sep 1997 13:00:00 GMT",
@@ -453,10 +480,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Mon, 01 Dec 1997 14:00:00 GMT",
         "Wed, 03 Dec 1997 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  test('Every 10 days, 5 occurrences', () => {
+  describe('Every 10 days, 5 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -464,8 +492,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 5,
       interval: 10,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;INTERVAL=10;COUNT=5';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Fri, 12 Sep 1997 13:00:00 GMT",
@@ -473,10 +501,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Thu, 02 Oct 1997 13:00:00 GMT",
         "Sun, 12 Oct 1997 13:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Every day in January, for 3 years', () => {
+  describe('Every day in January, for 3 years', () => {
     const rule1 = new RRuleTemporal({
       dtstart: DATE_1998_JAN_1_9AM_NEW_YORK,
       tzid: RFC_TEST_TZID,
@@ -484,7 +513,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonth: [1],
       until: zdt(2000, 1, 31, 14, 'UTC'),
     });
-
+    const rrule1 =
+      'DTSTART;TZID=America/New_York:19980101T090000\n' + 'RRULE:FREQ=DAILY;UNTIL=20000131T140000Z;BYMONTH=1';
     const rule2 = new RRuleTemporal({
       dtstart: DATE_1998_JAN_1_9AM_NEW_YORK,
       tzid: RFC_TEST_TZID,
@@ -493,7 +523,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonth: [1],
       until: zdt(2000, 1, 31, 14, 'UTC'),
     });
-
+    const rrule2 =
+      'DTSTART;TZID=America/New_York:19980101T090000\n' +
+      'RRULE:FREQ=YEARLY;UNTIL=20000131T140000Z;BYMONTH=1;BYDAY=SU,MO,TU,WE,TH,FR,SA';
     const snapshot = `
 [
   "Thu, 01 Jan 1998 14:00:00 GMT",
@@ -591,19 +623,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   "Mon, 31 Jan 2000 14:00:00 GMT",
 ]
 `;
-    expect(rule1.all().map(formatUTC)).toMatchInlineSnapshot(snapshot);
-    expect(rule2.all().map(formatUTC)).toMatchInlineSnapshot(snapshot);
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot});
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot});
   });
 
-  test('Weekly for 10 occurrences', () => {
+  describe('Weekly for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'WEEKLY',
       count: 10,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;COUNT=10';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Tue, 09 Sep 1997 13:00:00 GMT",
@@ -616,18 +648,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 28 Oct 1997 14:00:00 GMT",
         "Tue, 04 Nov 1997 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Weekly until December 24, 1997', () => {
+  describe('Weekly until December 24, 1997', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'WEEKLY',
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;UNTIL=19971224T000000Z';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Tue, 09 Sep 1997 13:00:00 GMT",
@@ -647,20 +680,20 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 16 Dec 1997 14:00:00 GMT",
         "Tue, 23 Dec 1997 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Every other week, forever', () => {
+  describe('Every other week, forever', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'WEEKLY',
       interval: 2,
     });
-
-    expect(
-      rule.between(DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-02-18T09:00:00.000-05:00'), true).map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;WKST=SU';
+    const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-02-18T09:00:00.000-05:00')];
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Tue, 16 Sep 1997 13:00:00 GMT",
@@ -676,28 +709,31 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 03 Feb 1998 14:00:00 GMT",
         "Tue, 17 Feb 1998 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  test('Weekly on Tuesday and Thursday for five weeks', () => {
+  describe('Weekly on Tuesday and Thursday for five weeks', () => {
     const rule1 = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'WEEKLY',
       until: zdt(1997, 10, 7, 0, 'UTC'),
-      // wkst: "SU",
+      wkst: 'SU',
       byDay: ['TU', 'TH'],
     });
-
+    const rrule1 =
+      'DTSTART;TZID=America/New_York:19970902T090000\n' +
+      'RRULE:FREQ=WEEKLY;UNTIL=19971007T000000Z;WKST=SU;BYDAY=TU,TH';
     const rule2 = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'WEEKLY',
       count: 10,
-      // wkst: "SU",
+      wkst: 'SU',
       byDay: ['TU', 'TH'],
     });
-
+    const rrule2 = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;COUNT=10;WKST=SU;BYDAY=TU,TH';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -712,11 +748,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Thu, 02 Oct 1997 13:00:00 GMT",
       ]
     `;
-    expect(rule1.all().map(formatUTC)).toMatchInlineSnapshot(snapshot);
-    expect(rule2.all().map(formatUTC)).toMatchInlineSnapshot(snapshot);
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot});
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot});
   });
 
-  test('Every other week on Monday, Wednesday, and Friday until December 24, 1997, starting on Monday, September 1, 1997', () => {
+  describe('Every other week on Monday, Wednesday, and Friday until December 24, 1997, starting on Monday, September 1, 1997', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 1, 9),
       tzid: RFC_TEST_TZID,
@@ -725,8 +761,10 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['MO', 'WE', 'FR'],
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970901T090000\n' +
+      'RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=19971224T000000Z;WKST=SU;BYDAY=MO,WE,FR';
+    const snapshot = `
       [
         "Mon, 01 Sep 1997 13:00:00 GMT",
         "Wed, 03 Sep 1997 13:00:00 GMT",
@@ -754,10 +792,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Fri, 12 Dec 1997 14:00:00 GMT",
         "Mon, 22 Dec 1997 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Every other week on Tuesday and Thursday, for 8 occurrences', () => {
+  describe('Every other week on Tuesday and Thursday, for 8 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -766,8 +805,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TU', 'TH'],
       count: 8,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=8;WKST=SU;BYDAY=TU,TH';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Thu, 04 Sep 1997 13:00:00 GMT",
@@ -778,10 +818,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 14 Oct 1997 13:00:00 GMT",
         "Thu, 16 Oct 1997 13:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Monthly on the first Friday for 10 occurrences', () => {
+  describe('Monthly on the first Friday for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -789,7 +830,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['1FR'],
       count: 10,
     });
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970905T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=10;BYDAY=1FR';
+    const snapshot = `
       [
         "Fri, 05 Sep 1997 13:00:00 GMT",
         "Fri, 03 Oct 1997 13:00:00 GMT",
@@ -802,10 +844,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Fri, 01 May 1998 13:00:00 GMT",
         "Fri, 05 Jun 1998 13:00:00 GMT",
       ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Monthly on the first Friday until December 24, 1997', () => {
+  describe('Monthly on the first Friday until December 24, 1997', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -813,17 +856,20 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['1FR'],
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970905T090000\n' + 'RRULE:FREQ=MONTHLY;UNTIL=19971224T000000Z;BYDAY=1FR';
+    const snapshot = `
       [
         "Fri, 05 Sep 1997 13:00:00 GMT",
         "Fri, 03 Oct 1997 13:00:00 GMT",
         "Fri, 07 Nov 1997 14:00:00 GMT",
         "Fri, 05 Dec 1997 14:00:00 GMT",
       ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Every other month on the first and last Sunday of the month for 10 occurrences', () => {
+  describe('Every other month on the first and last Sunday of the month for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 7, 9),
       tzid: RFC_TEST_TZID,
@@ -832,7 +878,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['1SU', '-1SU'],
       count: 10,
     });
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970907T090000\n' + 'RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;BYDAY=1SU,-1SU';
+    const snapshot = `
       [
         "Sun, 07 Sep 1997 13:00:00 GMT",
         "Sun, 28 Sep 1997 13:00:00 GMT",
@@ -845,10 +893,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Sun, 03 May 1998 13:00:00 GMT",
         "Sun, 31 May 1998 13:00:00 GMT",
       ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Monthly on the second-to-last Monday of the month for 6 months', () => {
+  describe('Monthly on the second-to-last Monday of the month for 6 months', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 22, 9),
       tzid: RFC_TEST_TZID,
@@ -856,7 +905,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['-2MO'],
       count: 6,
     });
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970922T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=6;BYDAY=-2MO';
+    const snapshot = `
       [
         "Mon, 22 Sep 1997 13:00:00 GMT",
         "Mon, 20 Oct 1997 13:00:00 GMT",
@@ -865,18 +915,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Mon, 19 Jan 1998 14:00:00 GMT",
         "Mon, 16 Feb 1998 14:00:00 GMT",
       ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Monthly on the third-to-the-last day of the month, forever:', () => {
+  describe('Monthly on the third-to-the-last day of the month, forever:', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 28, 9),
       tzid: RFC_TEST_TZID,
       freq: 'MONTHLY',
       byMonthDay: [-3],
     });
-
-    expect(rule.all(limit(6)).map(formatISO)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970928T090000\n' + 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-3';
+    const snapshot = `
       [
         "1997-09-28T13:00:00.000Z",
         "1997-10-29T14:00:00.000Z",
@@ -885,10 +936,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "1998-01-29T14:00:00.000Z",
         "1998-02-26T14:00:00.000Z",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 6, print: formatISO});
   });
 
-  test('Monthly on the 2nd and 15th of the month for 10 occurrences', () => {
+  describe('Monthly on the 2nd and 15th of the month for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -896,8 +948,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [2, 15],
       count: 10,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=2,15';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Mon, 15 Sep 1997 13:00:00 GMT",
@@ -910,10 +962,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Fri, 02 Jan 1998 14:00:00 GMT",
         "Thu, 15 Jan 1998 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Monthly on the first and last day of the month for 10 occurrences', () => {
+  describe('Monthly on the first and last day of the month for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 30, 9),
       tzid: RFC_TEST_TZID,
@@ -921,8 +974,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [1, -1],
       count: 10,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970930T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=1,-1';
+    const snapshot = `
 [
   "Wed, 01 Oct 1997 13:00:00 GMT",
   "Fri, 31 Oct 1997 14:00:00 GMT",
@@ -935,10 +988,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   "Sun, 01 Feb 1998 14:00:00 GMT",
   "Sat, 28 Feb 1998 14:00:00 GMT",
 ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Every 18 months on the 10th thru 15th of the month for 10 occurrences', () => {
+  describe('Every 18 months on the 10th thru 15th of the month for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 10, 9),
       tzid: RFC_TEST_TZID,
@@ -947,8 +1001,10 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 18,
       count: 10,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970910T090000\n' +
+      'RRULE:FREQ=MONTHLY;INTERVAL=18;COUNT=10;BYMONTHDAY=10,11,12,13,14,15';
+    const snapshot = `
       [
         "Wed, 10 Sep 1997 13:00:00 GMT",
         "Thu, 11 Sep 1997 13:00:00 GMT",
@@ -961,10 +1017,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Fri, 12 Mar 1999 14:00:00 GMT",
         "Sat, 13 Mar 1999 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Every Tuesday, every other month', () => {
+  describe('Every Tuesday, every other month', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -972,10 +1029,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 2,
       byDay: ['TU'],
     });
-
-    expect(
-      rule.between(DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-04-01T09:00:00.000-04:00'), true).map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=TU';
+    const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-04-01T09:00:00.000-04:00')];
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Tue, 09 Sep 1997 13:00:00 GMT",
@@ -996,10 +1052,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 24 Mar 1998 14:00:00 GMT",
         "Tue, 31 Mar 1998 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  it('Yearly in June and July for 10 occurrences', () => {
+  describe('Yearly in June and July for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 6, 10, 9),
       tzid: RFC_TEST_TZID,
@@ -1007,8 +1064,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonth: [6, 7],
       count: 10,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970610T090000\n' + 'RRULE:FREQ=YEARLY;COUNT=10;BYMONTH=6,7';
+    const snapshot = `
       [
         "Tue, 10 Jun 1997 13:00:00 GMT",
         "Thu, 10 Jul 1997 13:00:00 GMT",
@@ -1021,10 +1078,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Sun, 10 Jun 2001 13:00:00 GMT",
         "Tue, 10 Jul 2001 13:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Every other year on January, February, and March for 10 occurrences', () => {
+  describe('Every other year on January, February, and March for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 3, 10, 9),
       tzid: RFC_TEST_TZID,
@@ -1033,8 +1091,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
       byMonth: [1, 2, 3],
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970310T090000\n' + 'RRULE:FREQ=YEARLY;INTERVAL=2;COUNT=10;BYMONTH=1,2,3';
+    const snapshot = `
       [
         "Mon, 10 Mar 1997 14:00:00 GMT",
         "Sun, 10 Jan 1999 14:00:00 GMT",
@@ -1047,10 +1106,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Mon, 10 Feb 2003 14:00:00 GMT",
         "Mon, 10 Mar 2003 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Every third year on the 1st, 100th, and 200th day for 10 occurrences', () => {
+  describe('Every third year on the 1st, 100th, and 200th day for 10 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 1, 1, 9),
       tzid: RFC_TEST_TZID,
@@ -1059,8 +1119,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
       byYearDay: [1, 100, 200],
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970101T090000\n' + 'RRULE:FREQ=YEARLY;INTERVAL=3;COUNT=10;BYYEARDAY=1,100,200';
+    const snapshot = `
       [
         "Wed, 01 Jan 1997 14:00:00 GMT",
         "Thu, 10 Apr 1997 13:00:00 GMT",
@@ -1073,27 +1134,29 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Sat, 19 Jul 2003 13:00:00 GMT",
         "Sun, 01 Jan 2006 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Every 20th Monday of the year, forever', () => {
+  describe('Every 20th Monday of the year, forever', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 5, 19, 9),
       tzid: RFC_TEST_TZID,
       freq: 'YEARLY',
       byDay: ['20MO'],
     });
-
-    expect(rule.all(limit(3)).map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970519T090000\n' + 'RRULE:FREQ=YEARLY;BYDAY=20MO';
+    const snapshot = `
       [
         "Mon, 19 May 1997 13:00:00 GMT",
         "Mon, 18 May 1998 13:00:00 GMT",
         "Mon, 17 May 1999 13:00:00 GMT",
       ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 3});
   });
 
-  it('Monday of week number 20 (where the default start of the week is Monday), forever', () => {
+  describe('Monday of week number 20 (where the default start of the week is Monday), forever', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 5, 12, 9),
       tzid: RFC_TEST_TZID,
@@ -1101,17 +1164,18 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['MO'],
       byWeekNo: [20],
     });
-
-    expect(rule.all(limit(3)).map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970512T090000\n' + 'RRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO';
+    const snapshot = `
 [
   "Mon, 12 May 1997 13:00:00 GMT",
   "Mon, 11 May 1998 13:00:00 GMT",
   "Mon, 10 May 1999 13:00:00 GMT",
 ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 3});
   });
 
-  test('Every Thursday in March, forever:', () => {
+  describe('Every Thursday in March, forever:', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 3, 13, 9),
       tzid: RFC_TEST_TZID,
@@ -1119,12 +1183,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TH'],
       byMonth: [3],
     });
-
-    expect(
-      rule
-        .between(new Date('1997-03-13T09:00:00.000-05:00'), new Date('1999-03-25T09:00:00.000-05:00'), true)
-        .map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970313T090000\n' + 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=TH';
+    const between = [new Date('1997-03-13T09:00:00.000-05:00'), new Date('1999-03-25T09:00:00.000-05:00')];
+    const snapshot = `
       [
         "Thu, 13 Mar 1997 14:00:00 GMT",
         "Thu, 20 Mar 1997 14:00:00 GMT",
@@ -1138,10 +1199,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Thu, 18 Mar 1999 14:00:00 GMT",
         "Thu, 25 Mar 1999 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  it('Every Thursday, but only during June, July, and August, forever', () => {
+  describe('Every Thursday, but only during June, July, and August, forever', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 6, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -1149,12 +1211,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TH'],
       byMonth: [6, 7, 8],
     });
-
-    expect(
-      rule
-        .between(new Date('1997-06-05T09:00:00.000-05:00'), new Date('1999-08-26T09:00:00.000-05:00'), true)
-        .map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970605T090000\n' + 'RRULE:FREQ=YEARLY;BYDAY=TH;BYMONTH=6,7,8';
+    const between = [new Date('1997-06-05T09:00:00.000-05:00'), new Date('1999-08-26T09:00:00.000-05:00')];
+    const snapshot = `
 [
   "Thu, 12 Jun 1997 13:00:00 GMT",
   "Thu, 19 Jun 1997 13:00:00 GMT",
@@ -1195,22 +1254,21 @@ describe('iCalendar.org RFC 5545 Examples', () => {
   "Thu, 19 Aug 1999 13:00:00 GMT",
   "Thu, 26 Aug 1999 13:00:00 GMT",
 ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  test('Every Friday the 13th, forever:', () => {
+  describe('Every Friday the 13th, forever:', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
-      // exDate: [DATE_1997_SEP_02_9AM_NEW_YORK_DST],
       tzid: RFC_TEST_TZID,
       freq: 'MONTHLY',
       byDay: ['FR'],
       byMonthDay: [13],
     });
-
-    expect(
-      rule.between(DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('2000-10-13T09:00:00.000-05:00'), true).map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13';
+    const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('2000-10-13T09:00:00.000-05:00')];
+    const snapshot = `
       [
         "Fri, 13 Feb 1998 14:00:00 GMT",
         "Fri, 13 Mar 1998 14:00:00 GMT",
@@ -1218,10 +1276,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Fri, 13 Aug 1999 13:00:00 GMT",
         "Fri, 13 Oct 2000 13:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  test('The first Saturday that follows the first Sunday of the month, forever', () => {
+  describe('The first Saturday that follows the first Sunday of the month, forever', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 13, 9),
       tzid: RFC_TEST_TZID,
@@ -1229,12 +1288,10 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['SA'],
       byMonthDay: [7, 8, 9, 10, 11, 12, 13],
     });
-
-    expect(
-      rule
-        .between(new Date('1997-09-13T09:00:00.000-04:00'), new Date('1998-06-13T09:00:00.000-04:00'), true)
-        .map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970913T090000\n' + 'RRULE:FREQ=MONTHLY;BYDAY=SA;BYMONTHDAY=7,8,9,10,11,12,13';
+    const between = [new Date('1997-09-13T09:00:00.000-04:00'), new Date('1998-06-13T09:00:00.000-04:00')];
+    const snapshot = `
       [
         "Sat, 13 Sep 1997 13:00:00 GMT",
         "Sat, 11 Oct 1997 13:00:00 GMT",
@@ -1247,10 +1304,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Sat, 09 May 1998 13:00:00 GMT",
         "Sat, 13 Jun 1998 13:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  test('Every 4 years, the first Tuesday after a Monday in November, forever (U.S. Presidential Election day)', () => {
+  describe('Every 4 years, the first Tuesday after a Monday in November, forever (U.S. Presidential Election day)', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1996, 11, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -1260,12 +1318,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TU'],
       byMonthDay: [2, 3, 4, 5, 6, 7, 8],
     });
-
-    expect(
-      rule
-        .between(new Date('1996-11-05T09:00:00.000-05:00'), new Date('2024-11-05T09:00:00.000-05:00'), true)
-        .map(formatUTC),
-    ).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19961105T090000\n' +
+      'RRULE:FREQ=YEARLY;INTERVAL=4;BYMONTH=11;BYDAY=TU;BYMONTHDAY=2,3,4,5,6,7,8';
+    const between = [new Date('1996-11-05T09:00:00.000-05:00'), new Date('2024-11-05T09:00:00.000-05:00')];
+    const snapshot = `
       [
         "Tue, 05 Nov 1996 14:00:00 GMT",
         "Tue, 07 Nov 2000 14:00:00 GMT",
@@ -1276,10 +1333,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 03 Nov 2020 14:00:00 GMT",
         "Tue, 05 Nov 2024 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot, between});
   });
 
-  it('The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months', () => {
+  describe('The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 4, 9),
       tzid: RFC_TEST_TZID,
@@ -1288,17 +1346,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TU', 'WE', 'TH'],
       bySetPos: [3],
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970904T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=3;BYDAY=TU,WE,TH;BYSETPOS=3';
+    const snapshot = `
       [
         "Thu, 04 Sep 1997 13:00:00 GMT",
         "Tue, 07 Oct 1997 13:00:00 GMT",
         "Thu, 06 Nov 1997 14:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('The second last weekday of the month', () => {
+  describe('The second last weekday of the month', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 29, 9),
       tzid: RFC_TEST_TZID,
@@ -1306,8 +1366,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
       bySetPos: [-2],
     });
-
-    expect(rule.all(limit(7)).map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970929T090000\n' + 'RRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-2';
+    const snapshot = `
       [
         "Mon, 29 Sep 1997 13:00:00 GMT",
         "Thu, 30 Oct 1997 14:00:00 GMT",
@@ -1317,29 +1378,32 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Thu, 26 Feb 1998 14:00:00 GMT",
         "Mon, 30 Mar 1998 14:00:00 GMT",
       ]
-`);
+`;
+    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 7});
   });
 
-  test('Every 3 hours from 9:00 AM to 5:00 PM on a specific day', () => {
+  describe('Every 3 hours from 9:00 AM to 5:00 PM on a specific day', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
       freq: 'HOURLY',
       interval: 3,
-      until: zdt(1997, 9, 2, 17),
+      until: zdt(1997, 9, 2, 21, 'UTC'),
     });
-
-    //  ==> (September 2, 1997 EDT) 09:00,12:00,15:00
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    // see https://www.rfc-editor.org/errata/eid3883
+    const rrule =
+      'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=HOURLY;INTERVAL=3;UNTIL=19970902T210000Z';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Tue, 02 Sep 1997 16:00:00 GMT",
         "Tue, 02 Sep 1997 19:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Every 15 minutes for 6 occurrences', () => {
+  describe('Every 15 minutes for 6 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -1347,9 +1411,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 15,
       count: 6,
     });
-
-    // ==> (September 2, 1997 EDT) 09:00,09:15,09:30,09:45,10:00,10:15
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MINUTELY;INTERVAL=15;COUNT=6';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Tue, 02 Sep 1997 13:15:00 GMT",
@@ -1358,10 +1421,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 02 Sep 1997 14:00:00 GMT",
         "Tue, 02 Sep 1997 14:15:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  test('Every hour and a half for 4 occurrences', () => {
+  describe('Every hour and a half for 4 occurrences', () => {
     const rule = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -1369,19 +1433,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 90,
       count: 4,
     });
-
-    // ==> (September 2, 1997 EDT) 09:00,10:30;12:00;13:30
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MINUTELY;INTERVAL=90;COUNT=4';
+    const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
         "Tue, 02 Sep 1997 14:30:00 GMT",
         "Tue, 02 Sep 1997 16:00:00 GMT",
         "Tue, 02 Sep 1997 17:30:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
 
-  it('Every 20 minutes from 9:00 AM to 4:40 PM every day', () => {
+  describe('Every 20 minutes from 9:00 AM to 4:40 PM every day', () => {
     const rule1 = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -1389,7 +1453,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byHour: [9, 10, 11, 12, 13, 14, 15, 16],
       byMinute: [0, 20, 40],
     });
-
+    const rrule1 =
+      'DTSTART;TZID=America/New_York:19970902T090000\n' +
+      'RRULE:FREQ=DAILY;BYHOUR=9,10,11,12,13,14,15,16;BYMINUTE=0,20,40';
     const rule2 = new RRuleTemporal({
       dtstart: DATE_1997_SEP_02_9AM_NEW_YORK_DST,
       tzid: RFC_TEST_TZID,
@@ -1397,7 +1463,9 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 20,
       byHour: [9, 10, 11, 12, 13, 14, 15, 16],
     });
-
+    const rrule2 =
+      'DTSTART;TZID=America/New_York:19970902T090000\n' +
+      'RRULE:FREQ=MINUTELY;INTERVAL=20;BYHOUR=9,10,11,12,13,14,15,16';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -1418,11 +1486,11 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Tue, 02 Sep 1997 18:00:00 GMT",
       ]
     `;
-    expect(rule1.all(limit(16)).map(formatUTC)).toMatchInlineSnapshot(snapshot);
-    expect(rule2.all(limit(16)).map(formatUTC)).toMatchInlineSnapshot(snapshot);
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot, limit: 16});
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot, limit: 16});
   });
 
-  test('An example where an invalid date (i.e. February 30) is ignored', () => {
+  describe('An example where an invalid date (i.e. February 30) is ignored', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(2007, 1, 15, 9),
       tzid: RFC_TEST_TZID,
@@ -1430,8 +1498,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [15, 30],
       count: 5,
     });
-
-    expect(rule.all().map(formatUTC)).toMatchInlineSnapshot(`
+    const rrule = 'DTSTART;TZID=America/New_York:20070115T090000\n' + 'RRULE:FREQ=MONTHLY;BYMONTHDAY=15,30;COUNT=5';
+    const snapshot = `
       [
         "Mon, 15 Jan 2007 14:00:00 GMT",
         "Tue, 30 Jan 2007 14:00:00 GMT",
@@ -1439,47 +1507,51 @@ describe('iCalendar.org RFC 5545 Examples', () => {
         "Thu, 15 Mar 2007 13:00:00 GMT",
         "Fri, 30 Mar 2007 13:00:00 GMT",
       ]
-    `);
+    `;
+    testWithConstructorAndRRule({rule, rrule, snapshot});
   });
-});
-
-it('An example where the days generated makes a difference because of WKST', () => {
-  const rule1 = new RRuleTemporal({
-    dtstart: zdt(1997, 8, 5, 9),
-    tzid: RFC_TEST_TZID,
-    freq: 'WEEKLY',
-    interval: 2,
-    count: 4,
-    byDay: ['TU', 'SU'],
-    wkst: 'MO',
-  });
-
-  expect(rule1.all().map(formatUTC)).toMatchInlineSnapshot(`
+  describe('An example where the days generated makes a difference because of WKST', () => {
+    const rule1 = new RRuleTemporal({
+      dtstart: zdt(1997, 8, 5, 9),
+      tzid: RFC_TEST_TZID,
+      freq: 'WEEKLY',
+      interval: 2,
+      count: 4,
+      byDay: ['TU', 'SU'],
+      wkst: 'MO',
+    });
+    const rrule1 =
+      'DTSTART;TZID=America/New_York:19970805T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=MO';
+    const snapshot1 = `
       [
         "Tue, 05 Aug 1997 13:00:00 GMT",
         "Sun, 10 Aug 1997 13:00:00 GMT",
         "Tue, 19 Aug 1997 13:00:00 GMT",
         "Sun, 24 Aug 1997 13:00:00 GMT",
       ]
-    `);
-  const rule2 = new RRuleTemporal({
-    dtstart: zdt(1997, 8, 5, 9),
-    tzid: RFC_TEST_TZID,
-    freq: 'WEEKLY',
-    interval: 2,
-    count: 4,
-    byDay: ['TU', 'SU'],
-    wkst: 'SU',
-  });
-
-  expect(rule2.all().map(formatUTC)).toMatchInlineSnapshot(`
+    `;
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot: snapshot1});
+    const rule2 = new RRuleTemporal({
+      dtstart: zdt(1997, 8, 5, 9),
+      tzid: RFC_TEST_TZID,
+      freq: 'WEEKLY',
+      interval: 2,
+      count: 4,
+      byDay: ['TU', 'SU'],
+      wkst: 'SU',
+    });
+    const rrule2 =
+      'DTSTART;TZID=America/New_York:19970805T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=SU';
+    const snapshot2 = `
         [
           "Tue, 05 Aug 1997 13:00:00 GMT",
           "Sun, 17 Aug 1997 13:00:00 GMT",
           "Tue, 19 Aug 1997 13:00:00 GMT",
           "Sun, 31 Aug 1997 13:00:00 GMT",
         ]
-      `);
+      `;
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot: snapshot2});
+  });
 });
 
 describe('Additional smoke tests', () => {
