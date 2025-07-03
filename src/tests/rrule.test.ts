@@ -1685,7 +1685,6 @@ describe('Additional smoke tests', () => {
         byHour: [14],
         byMinute: [30],
         bySecond: [0, 15],
-        // exDate: [new Date(DATE_2019_DECEMBER_19)],
       });
       expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
         [
@@ -1706,7 +1705,7 @@ describe('Additional smoke tests', () => {
         ]
       `);
     });
-    it.skip('works with hourly frequency', () => {
+    it('works with hourly frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: 'HOURLY',
@@ -1714,24 +1713,23 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         byMinute: [15, 30],
         bySecond: [30, 0],
-        // exDate: [new Date(DATE_2019_DECEMBER_19)],
       });
       expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
         [
-          "2019-12-19T00:15:30.000Z",
           "2019-12-19T00:15:00.000Z",
-          "2019-12-19T00:30:30.000Z",
+          "2019-12-19T00:15:30.000Z",
           "2019-12-19T00:30:00.000Z",
-          "2019-12-19T01:15:30.000Z",
+          "2019-12-19T00:30:30.000Z",
           "2019-12-19T01:15:00.000Z",
-          "2019-12-19T01:30:30.000Z",
+          "2019-12-19T01:15:30.000Z",
           "2019-12-19T01:30:00.000Z",
-          "2019-12-19T02:15:30.000Z",
+          "2019-12-19T01:30:30.000Z",
           "2019-12-19T02:15:00.000Z",
-          "2019-12-19T02:30:30.000Z",
+          "2019-12-19T02:15:30.000Z",
           "2019-12-19T02:30:00.000Z",
-          "2019-12-19T03:15:30.000Z",
+          "2019-12-19T02:30:30.000Z",
           "2019-12-19T03:15:00.000Z",
+          "2019-12-19T03:15:30.000Z",
         ]
       `);
     });
@@ -1742,7 +1740,6 @@ describe('Additional smoke tests', () => {
         interval: 1,
         tzid: 'UTC',
         bySecond: [10, 30, 58],
-        // exDate: [new Date(DATE_2019_DECEMBER_19)],
       });
       expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
       [
@@ -1770,7 +1767,6 @@ describe('Additional smoke tests', () => {
         interval: 1,
         tzid: 'UTC',
         bySecond: [10, 30, 58],
-        // exDate: [new Date(DATE_2019_DECEMBER_19)],
       });
       expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
         [
@@ -1801,7 +1797,6 @@ describe('Additional smoke tests', () => {
         byYearDay: [92],
         interval: 1,
         tzid: 'UTC',
-        // exDate: [new Date(DATE_2020)],
       });
 
       expect(rule3.all(limit(10)).map(formatISO)).toMatchInlineSnapshot(`

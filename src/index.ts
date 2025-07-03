@@ -356,15 +356,15 @@ export class RRuleTemporal {
       if (opts.byWeekNo.length === 0) delete opts.byWeekNo;
     }
     if (opts.byHour) {
-      opts.byHour = opts.byHour.filter((n) => Number.isInteger(n) && n >= 0 && n <= 23);
+      opts.byHour = opts.byHour.filter((n) => Number.isInteger(n) && n >= 0 && n <= 23).sort((a, b) => a - b);
       if (opts.byHour.length === 0) delete opts.byHour;
     }
     if (opts.byMinute) {
-      opts.byMinute = opts.byMinute.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59);
+      opts.byMinute = opts.byMinute.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59).sort((a, b) => a - b);
       if (opts.byMinute.length === 0) delete opts.byMinute;
     }
     if (opts.bySecond) {
-      opts.bySecond = opts.bySecond.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59);
+      opts.bySecond = opts.bySecond.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59).sort((a, b) => a - b);
       if (opts.bySecond.length === 0) delete opts.bySecond;
     }
     if (opts.bySetPos) {
@@ -478,7 +478,10 @@ export class RRuleTemporal {
       const idx = byMinute.indexOf(zdt.minute);
       if (idx !== -1 && idx < byMinute.length - 1) {
         // next minute within the same hour
-        return zdt.with({ minute: byMinute[idx + 1] });
+        return zdt.with({ 
+          minute: byMinute[idx + 1],
+          second: bySecond ? bySecond[0] : zdt.second
+        });
       }
     }
 
@@ -489,6 +492,7 @@ export class RRuleTemporal {
         return zdt.with({
           hour: byHour[idx + 1],
           minute: byMinute ? byMinute[0] : zdt.minute,
+          second: bySecond ? bySecond[0] : zdt.second,
         });
       }
     }
