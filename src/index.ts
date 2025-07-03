@@ -478,7 +478,7 @@ export class RRuleTemporal {
       const idx = byMinute.indexOf(zdt.minute);
       if (idx !== -1 && idx < byMinute.length - 1) {
         // next minute within the same hour
-        return zdt.with({ 
+        return zdt.with({
           minute: byMinute[idx + 1],
           second: bySecond ? bySecond[0] : zdt.second
         });
@@ -761,7 +761,7 @@ export class RRuleTemporal {
         }
         monthCursor = monthCursor.add({ months: this.opts.interval! });
       }
-      
+
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
@@ -795,10 +795,10 @@ export class RRuleTemporal {
       let firstOccurrence = firstWeekDates.reduce((a, b) =>
         Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b
       );
-      
+
       // Get the week start day (default to Monday if not specified)
-      const wkstDay = dayMap[this.opts.wkst || 'MO'];
-      
+      const wkstDay = dayMap[this.opts.wkst || 'MO'] ?? 1;
+
       // Align weekCursor to the week start that contains the first occurrence
       const firstOccWeekOffset = (firstOccurrence.dayOfWeek - wkstDay + 7) % 7;
       let weekCursor = firstOccurrence.subtract({ days: firstOccWeekOffset });
@@ -852,7 +852,7 @@ export class RRuleTemporal {
 
       while (true) {
         const year = start.year + yearOffset * this.opts.interval!;
-        
+
         for (const month of months) {
           let occ = start.with({ year, month });
           occ = this.applyTimeOverride(occ);
@@ -878,7 +878,7 @@ export class RRuleTemporal {
         }
         yearOffset++;
       }
-      
+
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
@@ -912,7 +912,7 @@ export class RRuleTemporal {
         }
         yearCursor = yearCursor.add({ years: this.opts.interval! });
       }
-      
+
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
@@ -946,7 +946,7 @@ export class RRuleTemporal {
         }
         yearCursor = yearCursor.add({ years: this.opts.interval! });
       }
-      
+
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
@@ -984,7 +984,7 @@ export class RRuleTemporal {
    */
   private mergeAndDeduplicateRDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
     if (!this.opts.rDate) return dates;
-    
+
     const extras = this.opts.rDate.map((d) =>
       d instanceof Temporal.ZonedDateTime
         ? d
@@ -992,7 +992,7 @@ export class RRuleTemporal {
     );
     dates.push(...extras);
     dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
-    
+
     // Deduplicate
     const dedup: Temporal.ZonedDateTime[] = [];
     for (const d of dates) {
@@ -1017,7 +1017,7 @@ export class RRuleTemporal {
     iterator?: (date: Temporal.ZonedDateTime, count: number) => boolean
   ): Temporal.ZonedDateTime[] {
     const merged = this.mergeAndDeduplicateRDates(dates);
-    
+
     // Apply count limit to the final combined result
     if (this.opts.count !== undefined) {
       let finalCount = 0;
@@ -1030,7 +1030,7 @@ export class RRuleTemporal {
       }
       return finalDates;
     }
-    
+
     return merged;
   }
 
@@ -1041,11 +1041,11 @@ export class RRuleTemporal {
    */
   private shouldBreakForCountLimit(matchCount: number): boolean {
     if (this.opts.count === undefined) return false;
-    
+
     if (!this.opts.rDate) {
       return matchCount >= this.opts.count;
     }
-    
+
     // If we have rDates, collect at least count occurrences from the rule so we can merge properly
     // But also add a safety limit to prevent infinite loops
     return matchCount >= this.opts.count * 2;
@@ -1116,7 +1116,7 @@ export class RRuleTemporal {
 
       outer: while (true) {
         const year = start.year + yearOffset * this.opts.interval!;
-        
+
         for (const month of months) {
           let occ = start.with({ year, month });
           occ = this.applyTimeOverride(occ);
@@ -1666,13 +1666,13 @@ export class RRuleTemporal {
     inc: boolean
   ): Temporal.ZonedDateTime[] {
     if (!this.opts.rDate) return list;
-    
+
     const extras = this.opts.rDate.map((d) =>
       d instanceof Temporal.ZonedDateTime
         ? d
         : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
     );
-    
+
     // Filter extras by time window
     for (const z of extras) {
       const inst = z.toInstant();
@@ -1684,7 +1684,7 @@ export class RRuleTemporal {
         : Temporal.Instant.compare(inst, endInst) < 0;
       if (startOk && endOk) list.push(z);
     }
-    
+
     // Sort and deduplicate using the common helper
     list.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
     const dedup: Temporal.ZonedDateTime[] = [];
