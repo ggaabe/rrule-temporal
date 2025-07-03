@@ -44,12 +44,18 @@ const DATE_2019_DECEMBER_19 = zdt(2019, 12, 19, 0, 'UTC');
 const DATE_2020 = zdt(2020, 1, 1, 0, 'UTC');
 const DATE_2023_JAN_6_11PM = zdt(2023, 1, 6, 23, 'UTC');
 
+type IDateTime = Temporal.ZonedDateTime | null;
 const limit = (n: number) => (_: any, i: number) => i < n;
-const toTimezone = (tz: string) => (d: Temporal.ZonedDateTime | null) =>
-  d ? new Date(d.withTimeZone(tz).epochMilliseconds) : null;
-const format = (tz: string) => (d: Temporal.ZonedDateTime | null) => toTimezone(tz)(d)?.toString();
-const formatUTC = (d: Temporal.ZonedDateTime | null) => toTimezone('UTC')(d)?.toUTCString();
-const formatISO = (d: Temporal.ZonedDateTime | null) => toTimezone('UTC')(d)?.toISOString();
+
+const toTimezone = (tz: string) => (d: IDateTime) => (d ? new Date(d.withTimeZone(tz).epochMilliseconds) : null);
+
+const format = (tz: string) => (d: IDateTime) => d?.withTimeZone(tz).toString();
+
+const formatUTC = (d: IDateTime) => toTimezone('UTC')(d)?.toUTCString();
+
+const formatISO = (d: IDateTime) => toTimezone('UTC')(d)?.toISOString();
+
+const parse = (rruleString: string) => new RRuleTemporal({rruleString});
 
 describe('RRule class methods', () => {
   const rule = new RRuleTemporal({
@@ -275,7 +281,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'DAILY',
       count: 10,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;COUNT=10';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;COUNT=10';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -300,7 +306,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'DAILY',
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;UNTIL=19971224T000000Z';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;UNTIL=19971224T000000Z';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -428,7 +434,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'DAILY',
       interval: 2,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;INTERVAL=2';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;INTERVAL=2';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1997-12-04T00:00:00.000-05:00')];
     const snapshot = `
       [
@@ -492,7 +498,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 5,
       interval: 10,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=DAILY;INTERVAL=10;COUNT=5';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;INTERVAL=10;COUNT=5';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -513,8 +519,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonth: [1],
       until: zdt(2000, 1, 31, 14, 'UTC'),
     });
-    const rrule1 =
-      'DTSTART;TZID=America/New_York:19980101T090000\n' + 'RRULE:FREQ=DAILY;UNTIL=20000131T140000Z;BYMONTH=1';
+    const rrule1 = 'DTSTART;TZID=America/New_York:19980101T090000\nRRULE:FREQ=DAILY;UNTIL=20000131T140000Z;BYMONTH=1';
     const rule2 = new RRuleTemporal({
       dtstart: DATE_1998_JAN_1_9AM_NEW_YORK,
       tzid: RFC_TEST_TZID,
@@ -634,7 +639,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'WEEKLY',
       count: 10,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;COUNT=10';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;COUNT=10';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -659,7 +664,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'WEEKLY',
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;UNTIL=19971224T000000Z';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;UNTIL=19971224T000000Z';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -691,7 +696,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'WEEKLY',
       interval: 2,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;WKST=SU';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;WKST=SU';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-02-18T09:00:00.000-05:00')];
     const snapshot = `
       [
@@ -733,7 +738,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       wkst: 'SU',
       byDay: ['TU', 'TH'],
     });
-    const rrule2 = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;COUNT=10;WKST=SU;BYDAY=TU,TH';
+    const rrule2 = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;COUNT=10;WKST=SU;BYDAY=TU,TH';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -806,7 +811,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 8,
     });
     const rrule =
-      'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=8;WKST=SU;BYDAY=TU,TH';
+      'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=8;WKST=SU;BYDAY=TU,TH';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -830,7 +835,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['1FR'],
       count: 10,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970905T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=10;BYDAY=1FR';
+    const rrule = 'DTSTART;TZID=America/New_York:19970905T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYDAY=1FR';
     const snapshot = `
       [
         "Fri, 05 Sep 1997 13:00:00 GMT",
@@ -856,8 +861,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['1FR'],
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
-    const rrule =
-      'DTSTART;TZID=America/New_York:19970905T090000\n' + 'RRULE:FREQ=MONTHLY;UNTIL=19971224T000000Z;BYDAY=1FR';
+    const rrule = 'DTSTART;TZID=America/New_York:19970905T090000\nRRULE:FREQ=MONTHLY;UNTIL=19971224T000000Z;BYDAY=1FR';
     const snapshot = `
       [
         "Fri, 05 Sep 1997 13:00:00 GMT",
@@ -879,7 +883,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
     });
     const rrule =
-      'DTSTART;TZID=America/New_York:19970907T090000\n' + 'RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;BYDAY=1SU,-1SU';
+      'DTSTART;TZID=America/New_York:19970907T090000\nRRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;BYDAY=1SU,-1SU';
     const snapshot = `
       [
         "Sun, 07 Sep 1997 13:00:00 GMT",
@@ -905,7 +909,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['-2MO'],
       count: 6,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970922T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=6;BYDAY=-2MO';
+    const rrule = 'DTSTART;TZID=America/New_York:19970922T090000\nRRULE:FREQ=MONTHLY;COUNT=6;BYDAY=-2MO';
     const snapshot = `
       [
         "Mon, 22 Sep 1997 13:00:00 GMT",
@@ -926,7 +930,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'MONTHLY',
       byMonthDay: [-3],
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970928T090000\n' + 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-3';
+    const rrule = 'DTSTART;TZID=America/New_York:19970928T090000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-3';
     const snapshot = `
       [
         "1997-09-28T13:00:00.000Z",
@@ -948,7 +952,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [2, 15],
       count: 10,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=2,15';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=2,15';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -974,7 +978,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [1, -1],
       count: 10,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970930T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=1,-1';
+    const rrule = 'DTSTART;TZID=America/New_York:19970930T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=1,-1';
     const snapshot = `
 [
   "Wed, 01 Oct 1997 13:00:00 GMT",
@@ -1029,7 +1033,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 2,
       byDay: ['TU'],
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=TU';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=TU';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-04-01T09:00:00.000-04:00')];
     const snapshot = `
       [
@@ -1064,7 +1068,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonth: [6, 7],
       count: 10,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970610T090000\n' + 'RRULE:FREQ=YEARLY;COUNT=10;BYMONTH=6,7';
+    const rrule = 'DTSTART;TZID=America/New_York:19970610T090000\nRRULE:FREQ=YEARLY;COUNT=10;BYMONTH=6,7';
     const snapshot = `
       [
         "Tue, 10 Jun 1997 13:00:00 GMT",
@@ -1091,8 +1095,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
       byMonth: [1, 2, 3],
     });
-    const rrule =
-      'DTSTART;TZID=America/New_York:19970310T090000\n' + 'RRULE:FREQ=YEARLY;INTERVAL=2;COUNT=10;BYMONTH=1,2,3';
+    const rrule = 'DTSTART;TZID=America/New_York:19970310T090000\nRRULE:FREQ=YEARLY;INTERVAL=2;COUNT=10;BYMONTH=1,2,3';
     const snapshot = `
       [
         "Mon, 10 Mar 1997 14:00:00 GMT",
@@ -1120,7 +1123,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byYearDay: [1, 100, 200],
     });
     const rrule =
-      'DTSTART;TZID=America/New_York:19970101T090000\n' + 'RRULE:FREQ=YEARLY;INTERVAL=3;COUNT=10;BYYEARDAY=1,100,200';
+      'DTSTART;TZID=America/New_York:19970101T090000\nRRULE:FREQ=YEARLY;INTERVAL=3;COUNT=10;BYYEARDAY=1,100,200';
     const snapshot = `
       [
         "Wed, 01 Jan 1997 14:00:00 GMT",
@@ -1145,7 +1148,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       freq: 'YEARLY',
       byDay: ['20MO'],
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970519T090000\n' + 'RRULE:FREQ=YEARLY;BYDAY=20MO';
+    const rrule = 'DTSTART;TZID=America/New_York:19970519T090000\nRRULE:FREQ=YEARLY;BYDAY=20MO';
     const snapshot = `
       [
         "Mon, 19 May 1997 13:00:00 GMT",
@@ -1164,7 +1167,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['MO'],
       byWeekNo: [20],
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970512T090000\n' + 'RRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO';
+    const rrule = 'DTSTART;TZID=America/New_York:19970512T090000\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO';
     const snapshot = `
 [
   "Mon, 12 May 1997 13:00:00 GMT",
@@ -1183,7 +1186,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TH'],
       byMonth: [3],
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970313T090000\n' + 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=TH';
+    const rrule = 'DTSTART;TZID=America/New_York:19970313T090000\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=TH';
     const between = [new Date('1997-03-13T09:00:00.000-05:00'), new Date('1999-03-25T09:00:00.000-05:00')];
     const snapshot = `
       [
@@ -1211,7 +1214,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TH'],
       byMonth: [6, 7, 8],
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970605T090000\n' + 'RRULE:FREQ=YEARLY;BYDAY=TH;BYMONTH=6,7,8';
+    const rrule = 'DTSTART;TZID=America/New_York:19970605T090000\nRRULE:FREQ=YEARLY;BYDAY=TH;BYMONTH=6,7,8';
     const between = [new Date('1997-06-05T09:00:00.000-05:00'), new Date('1999-08-26T09:00:00.000-05:00')];
     const snapshot = `
 [
@@ -1266,7 +1269,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['FR'],
       byMonthDay: [13],
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('2000-10-13T09:00:00.000-05:00')];
     const snapshot = `
       [
@@ -1289,7 +1292,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [7, 8, 9, 10, 11, 12, 13],
     });
     const rrule =
-      'DTSTART;TZID=America/New_York:19970913T090000\n' + 'RRULE:FREQ=MONTHLY;BYDAY=SA;BYMONTHDAY=7,8,9,10,11,12,13';
+      'DTSTART;TZID=America/New_York:19970913T090000\nRRULE:FREQ=MONTHLY;BYDAY=SA;BYMONTHDAY=7,8,9,10,11,12,13';
     const between = [new Date('1997-09-13T09:00:00.000-04:00'), new Date('1998-06-13T09:00:00.000-04:00')];
     const snapshot = `
       [
@@ -1346,8 +1349,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TU', 'WE', 'TH'],
       bySetPos: [3],
     });
-    const rrule =
-      'DTSTART;TZID=America/New_York:19970904T090000\n' + 'RRULE:FREQ=MONTHLY;COUNT=3;BYDAY=TU,WE,TH;BYSETPOS=3';
+    const rrule = 'DTSTART;TZID=America/New_York:19970904T090000\nRRULE:FREQ=MONTHLY;COUNT=3;BYDAY=TU,WE,TH;BYSETPOS=3';
     const snapshot = `
       [
         "Thu, 04 Sep 1997 13:00:00 GMT",
@@ -1366,8 +1368,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
       bySetPos: [-2],
     });
-    const rrule =
-      'DTSTART;TZID=America/New_York:19970929T090000\n' + 'RRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-2';
+    const rrule = 'DTSTART;TZID=America/New_York:19970929T090000\nRRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-2';
     const snapshot = `
       [
         "Mon, 29 Sep 1997 13:00:00 GMT",
@@ -1391,8 +1392,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       until: zdt(1997, 9, 2, 21, 'UTC'),
     });
     // see https://www.rfc-editor.org/errata/eid3883
-    const rrule =
-      'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=HOURLY;INTERVAL=3;UNTIL=19970902T210000Z';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=HOURLY;INTERVAL=3;UNTIL=19970902T210000Z';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -1411,7 +1411,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 15,
       count: 6,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MINUTELY;INTERVAL=15;COUNT=6';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MINUTELY;INTERVAL=15;COUNT=6';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -1433,7 +1433,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 90,
       count: 4,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\n' + 'RRULE:FREQ=MINUTELY;INTERVAL=90;COUNT=4';
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MINUTELY;INTERVAL=90;COUNT=4';
     const snapshot = `
       [
         "Tue, 02 Sep 1997 13:00:00 GMT",
@@ -1498,7 +1498,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [15, 30],
       count: 5,
     });
-    const rrule = 'DTSTART;TZID=America/New_York:20070115T090000\n' + 'RRULE:FREQ=MONTHLY;BYMONTHDAY=15,30;COUNT=5';
+    const rrule = 'DTSTART;TZID=America/New_York:20070115T090000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=15,30;COUNT=5';
     const snapshot = `
       [
         "Mon, 15 Jan 2007 14:00:00 GMT",
@@ -1521,7 +1521,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       wkst: 'MO',
     });
     const rrule1 =
-      'DTSTART;TZID=America/New_York:19970805T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=MO';
+      'DTSTART;TZID=America/New_York:19970805T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=MO';
     const snapshot1 = `
       [
         "Tue, 05 Aug 1997 13:00:00 GMT",
@@ -1541,7 +1541,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       wkst: 'SU',
     });
     const rrule2 =
-      'DTSTART;TZID=America/New_York:19970805T090000\n' + 'RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=SU';
+      'DTSTART;TZID=America/New_York:19970805T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=SU';
     const snapshot2 = `
         [
           "Tue, 05 Aug 1997 13:00:00 GMT",
@@ -2105,26 +2105,26 @@ describe('DST timezones and repeat', () => {
     });
     expect(rule.all(limit(20)).map(format(tz))).toMatchInlineSnapshot(`
       [
-        "Tue Mar 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
-        "Fri Apr 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Sun May 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Wed Jun 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Fri Jul 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Mon Aug 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Thu Sep 12 2024 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Sat Oct 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
-        "Tue Nov 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
-        "Thu Dec 12 2024 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
-        "Sun Jan 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
-        "Wed Feb 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
-        "Wed Mar 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
-        "Sat Apr 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Mon May 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Thu Jun 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Sat Jul 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Tue Aug 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Fri Sep 12 2025 22:00:00 GMT+1000 (Australian Eastern Standard Time)",
-        "Sun Oct 12 2025 22:00:00 GMT+1100 (Australian Eastern Daylight Time)",
+        "2024-03-12T22:00:00+11:00[Australia/Sydney]",
+        "2024-04-12T22:00:00+10:00[Australia/Sydney]",
+        "2024-05-12T22:00:00+10:00[Australia/Sydney]",
+        "2024-06-12T22:00:00+10:00[Australia/Sydney]",
+        "2024-07-12T22:00:00+10:00[Australia/Sydney]",
+        "2024-08-12T22:00:00+10:00[Australia/Sydney]",
+        "2024-09-12T22:00:00+10:00[Australia/Sydney]",
+        "2024-10-12T22:00:00+11:00[Australia/Sydney]",
+        "2024-11-12T22:00:00+11:00[Australia/Sydney]",
+        "2024-12-12T22:00:00+11:00[Australia/Sydney]",
+        "2025-01-12T22:00:00+11:00[Australia/Sydney]",
+        "2025-02-12T22:00:00+11:00[Australia/Sydney]",
+        "2025-03-12T22:00:00+11:00[Australia/Sydney]",
+        "2025-04-12T22:00:00+10:00[Australia/Sydney]",
+        "2025-05-12T22:00:00+10:00[Australia/Sydney]",
+        "2025-06-12T22:00:00+10:00[Australia/Sydney]",
+        "2025-07-12T22:00:00+10:00[Australia/Sydney]",
+        "2025-08-12T22:00:00+10:00[Australia/Sydney]",
+        "2025-09-12T22:00:00+10:00[Australia/Sydney]",
+        "2025-10-12T22:00:00+11:00[Australia/Sydney]",
       ]
     `);
     expect(rule.all(limit(20)).map(formatISO)).toMatchInlineSnapshot(`
@@ -2153,3 +2153,121 @@ describe('DST timezones and repeat', () => {
     `);
   });
 });
+
+describe('Tests from rust package', function () {
+  it('every 2 months on the last Monday', function () {
+    const rule = 'DTSTART;TZID=Europe/London:20231030T140000\nRRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1MO';
+    expect(parse(rule).all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2023-10-30T14:00:00.000Z",
+        "2023-12-25T14:00:00.000Z",
+        "2024-02-26T14:00:00.000Z",
+      ]
+    `);
+  });
+  it.skip('Monthly on the 31st of the month', function () {
+    const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=31';
+    // Is this the correct behavior?
+    expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
+        [
+          "1997-10-31T14:00:00.000Z",
+          "1997-12-31T14:00:00.000Z",
+          "1998-01-31T14:00:00.000Z",
+          "1998-03-31T14:00:00.000Z",
+          "1998-05-31T13:00:00.000Z",
+          "1998-07-31T13:00:00.000Z",
+          "1998-08-31T13:00:00.000Z",
+          "1998-10-31T14:00:00.000Z",
+          "1998-12-31T14:00:00.000Z",
+          "1999-01-31T14:00:00.000Z",
+        ]
+    `);
+  });
+  it.skip('Monthly on the 31th-to-last of the month', function () {
+    const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=-31';
+    // Is this the correct behavior?
+    expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
+        [
+          "1997-10-01T13:00:00.000Z",
+          "1997-12-01T14:00:00.000Z",
+          "1998-01-01T14:00:00.000Z",
+          "1998-03-01T14:00:00.000Z",
+          "1998-05-01T13:00:00.000Z",
+          "1998-07-01T13:00:00.000Z",
+          "1998-08-01T13:00:00.000Z",
+          "1998-10-01T13:00:00.000Z",
+          "1998-12-01T14:00:00.000Z",
+          "1999-01-01T14:00:00.000Z",
+        ]
+    `);
+  });
+  const FOUR_HOURS_MS = 14400000;
+  it('DST hourly/minutes handling GMT -> BST', function () {
+    const tz = 'Europe/London';
+    const rule = `DTSTART;TZID=${tz}:20240330T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
+    const Y2024_03_31_UTC = 1711843200000;
+    const r = [new Date(Y2024_03_31_UTC - FOUR_HOURS_MS), new Date(Y2024_03_31_UTC + FOUR_HOURS_MS)];
+    const entries = parse(rule).between(r[0]!, r[1]!);
+
+    // change over at 1am, have gaps
+    expect(entries.map(format(tz))).toMatchInlineSnapshot(`
+      [
+        "2024-03-31T00:00:00+00:00[Europe/London]",
+        "2024-03-31T00:30:00+00:00[Europe/London]",
+        "2024-03-31T02:00:00+01:00[Europe/London]",
+        "2024-03-31T02:30:00+01:00[Europe/London]",
+        "2024-03-31T03:00:00+01:00[Europe/London]",
+        "2024-03-31T03:30:00+01:00[Europe/London]",
+        "2024-03-31T04:00:00+01:00[Europe/London]",
+        "2024-03-31T04:30:00+01:00[Europe/London]",
+      ]
+    `);
+    expect(entries.map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2024-03-31T00:00:00.000Z",
+        "2024-03-31T00:30:00.000Z",
+        "2024-03-31T01:00:00.000Z",
+        "2024-03-31T01:30:00.000Z",
+        "2024-03-31T02:00:00.000Z",
+        "2024-03-31T02:30:00.000Z",
+        "2024-03-31T03:00:00.000Z",
+        "2024-03-31T03:30:00.000Z",
+      ]
+    `);
+  });
+  it('DST hourly/minutes handling BST -> GMT', function () {
+    const tz = 'Europe/London';
+    const rule = `DTSTART;TZID=${tz}:20241026T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
+    const Y2024_10_27_UTC = 1729987200000;
+    const r = [new Date(Y2024_10_27_UTC - FOUR_HOURS_MS), new Date(Y2024_10_27_UTC + FOUR_HOURS_MS)];
+    const entries = parse(rule).between(r[0]!, r[1]!);
+    // should have no gaps
+    expect(entries.map(format(tz))).toMatchInlineSnapshot(`
+      [
+        "2024-10-27T00:00:00+01:00[Europe/London]",
+        "2024-10-27T00:30:00+01:00[Europe/London]",
+        "2024-10-27T01:00:00+01:00[Europe/London]",
+        "2024-10-27T01:30:00+01:00[Europe/London]",
+        "2024-10-27T02:00:00+00:00[Europe/London]",
+        "2024-10-27T02:30:00+00:00[Europe/London]",
+        "2024-10-27T03:00:00+00:00[Europe/London]",
+        "2024-10-27T03:30:00+00:00[Europe/London]",
+      ]
+    `);
+    // change over at 2am
+    expect(entries.map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2024-10-26T23:00:00.000Z",
+        "2024-10-26T23:30:00.000Z",
+        "2024-10-27T00:00:00.000Z",
+        "2024-10-27T00:30:00.000Z",
+        "2024-10-27T02:00:00.000Z",
+        "2024-10-27T02:30:00.000Z",
+        "2024-10-27T03:00:00.000Z",
+        "2024-10-27T03:30:00.000Z",
+      ]
+    `);
+  });
+});
+
+// test https://github.com/fmeringdal/rust-rrule/issues/119
