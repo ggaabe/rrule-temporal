@@ -434,6 +434,22 @@ export class RRuleTemporal {
       return this.applyTimeOverride(zdt.add({ hours: interval }));
     }
 
+    // MINUTELY frequency with BYHOUR constraint but no BYMINUTE - advance by interval minutes
+    // and check if we're still in an allowed hour, otherwise find the next allowed hour
+    if (freq === "MINUTELY" && byHour && byHour.length > 1 && !byMinute && interval > 1) {
+      const next = zdt.add({ minutes: interval });
+      if (byHour.includes(next.hour)) {
+        return next;
+      }
+      // Find next allowed hour
+      const nextHour = byHour.find(h => h > zdt.hour) || byHour[0];
+      if (nextHour && nextHour > zdt.hour) {
+        return zdt.with({ hour: nextHour, minute: 0 });
+      }
+      // Move to next day and use first allowed hour
+      return this.applyTimeOverride(zdt.add({ days: 1 }));
+    }
+
     if (freq === "SECONDLY" && bySecond && bySecond.length === 1) {
       return this
         .applyTimeOverride(zdt.add({ minutes: interval }))

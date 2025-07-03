@@ -1298,8 +1298,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     `);
   });
 
-  // TODO: need to check this
-  it.failing('The second-to-last weekday of the month', () => {
+  it('The second last weekday of the month', () => {
     const rule = new RRuleTemporal({
       dtstart: zdt(1997, 9, 29, 9),
       tzid: RFC_TEST_TZID,
@@ -1309,15 +1308,15 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
 
     expect(rule.all(limit(7)).map(formatUTC)).toMatchInlineSnapshot(`
-[
-  "Thu, 30 Oct 1997 14:00:00 GMT",
-  "Thu, 27 Nov 1997 14:00:00 GMT",
-  "Tue, 30 Dec 1997 14:00:00 GMT",
-  "Thu, 29 Jan 1998 14:00:00 GMT",
-  "Thu, 26 Feb 1998 14:00:00 GMT",
-  "Fri, 27 Mar 1998 14:00:00 GMT",
-  "Wed, 29 Apr 1998 13:00:00 GMT",
-]
+      [
+        "Mon, 29 Sep 1997 13:00:00 GMT",
+        "Thu, 30 Oct 1997 14:00:00 GMT",
+        "Thu, 27 Nov 1997 14:00:00 GMT",
+        "Tue, 30 Dec 1997 14:00:00 GMT",
+        "Thu, 29 Jan 1998 14:00:00 GMT",
+        "Thu, 26 Feb 1998 14:00:00 GMT",
+        "Mon, 30 Mar 1998 14:00:00 GMT",
+      ]
 `);
   });
 
@@ -1901,7 +1900,7 @@ describe('Additional smoke tests', () => {
   });
 
   describe('strict', () => {
-    // need to update test?
+    // TODO: need to check this, need to update test?
     it.failing("when omitted, yields dtstart as an occurrence even if it doesn't match the RRule", () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
@@ -1935,6 +1934,7 @@ describe('Additional smoke tests', () => {
 `);
     });
 
+    // TODO: dtstart with strict?
     it.failing('when true, only yields dtstart if it actually matches the RRule', () => {
       const rule1 = new RRuleTemporal(
         {
@@ -1980,6 +1980,7 @@ describe('Error handling', () => {
   it('throws an error on an invalid dtstart', () => {
     const testFn = () =>
       new RRuleTemporal({
+        // @ts-ignore
         dtstart: INVALID_DATE,
         freq: 'HOURLY',
         interval: 1,
@@ -1991,6 +1992,7 @@ describe('Error handling', () => {
     const testFn = () =>
       new RRuleTemporal({
         dtstart: DATE_2020,
+        // @ts-ignore
         until: INVALID_DATE,
         freq: 'HOURLY',
         interval: 1,
