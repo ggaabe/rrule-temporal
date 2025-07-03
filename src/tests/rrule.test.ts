@@ -1867,7 +1867,7 @@ describe('Additional smoke tests', () => {
 `);
     });
 
-    it.skip('does not yield RDates twice if they already match the RRule', () => {
+    it('does not yield RDates twice if they already match the RRule', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: 'MONTHLY',
@@ -1888,7 +1888,7 @@ describe('Additional smoke tests', () => {
   "2020-08-19T00:00:00.000Z",
   "2020-10-19T00:00:00.000Z",
   "2020-12-19T00:00:00.000Z",
-  "2021-02-19T00:00:00.000Z",  
+  "2021-02-19T00:00:00.000Z",
 ]
 `);
     });
