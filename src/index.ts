@@ -356,15 +356,15 @@ export class RRuleTemporal {
       if (opts.byWeekNo.length === 0) delete opts.byWeekNo;
     }
     if (opts.byHour) {
-      opts.byHour = opts.byHour.filter((n) => Number.isInteger(n) && n >= 0 && n <= 23);
+      opts.byHour = opts.byHour.filter((n) => Number.isInteger(n) && n >= 0 && n <= 23).sort((a, b) => a - b);
       if (opts.byHour.length === 0) delete opts.byHour;
     }
     if (opts.byMinute) {
-      opts.byMinute = opts.byMinute.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59);
+      opts.byMinute = opts.byMinute.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59).sort((a, b) => a - b);
       if (opts.byMinute.length === 0) delete opts.byMinute;
     }
     if (opts.bySecond) {
-      opts.bySecond = opts.bySecond.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59);
+      opts.bySecond = opts.bySecond.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59).sort((a, b) => a - b);
       if (opts.bySecond.length === 0) delete opts.bySecond;
     }
     if (opts.bySetPos) {
@@ -434,6 +434,22 @@ export class RRuleTemporal {
       return this.applyTimeOverride(zdt.add({ hours: interval }));
     }
 
+    // MINUTELY frequency with BYHOUR constraint but no BYMINUTE - advance by interval minutes
+    // and check if we're still in an allowed hour, otherwise find the next allowed hour
+    if (freq === "MINUTELY" && byHour && byHour.length > 1 && !byMinute && interval > 1) {
+      const next = zdt.add({ minutes: interval });
+      if (byHour.includes(next.hour)) {
+        return next;
+      }
+      // Find next allowed hour
+      const nextHour = byHour.find(h => h > zdt.hour) || byHour[0];
+      if (nextHour && nextHour > zdt.hour) {
+        return zdt.with({ hour: nextHour, minute: 0 });
+      }
+      // Move to next day and use first allowed hour
+      return this.applyTimeOverride(zdt.add({ days: 1 }));
+    }
+
     if (freq === "SECONDLY" && bySecond && bySecond.length === 1) {
       return this
         .applyTimeOverride(zdt.add({ minutes: interval }))
@@ -462,7 +478,10 @@ export class RRuleTemporal {
       const idx = byMinute.indexOf(zdt.minute);
       if (idx !== -1 && idx < byMinute.length - 1) {
         // next minute within the same hour
-        return zdt.with({ minute: byMinute[idx + 1] });
+        return zdt.with({
+          minute: byMinute[idx + 1],
+          second: bySecond ? bySecond[0] : zdt.second
+        });
       }
     }
 
@@ -473,6 +492,7 @@ export class RRuleTemporal {
         return zdt.with({
           hour: byHour[idx + 1],
           minute: byMinute ? byMinute[0] : zdt.minute,
+          second: bySecond ? bySecond[0] : zdt.second,
         });
       }
     }
@@ -730,18 +750,19 @@ export class RRuleTemporal {
           ) {
             break outer_month;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_month;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_month;
           }
           dates.push(occ);
           matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            break outer_month;
+          }
         }
         monthCursor = monthCursor.add({ months: this.opts.interval! });
       }
-      return dates;
+
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
     // --- 2) WEEKLY + BYDAY (or default to DTSTART’s weekday) ---
@@ -771,17 +792,23 @@ export class RRuleTemporal {
         const delta = (dw - start.dayOfWeek + 7) % 7;
         return start.add({ days: delta });
       });
-      let weekCursor = firstWeekDates.reduce((a, b) =>
+      let firstOccurrence = firstWeekDates.reduce((a, b) =>
         Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b
       );
+
+      // Get the week start day (default to Monday if not specified)
+      const wkstDay = dayMap[this.opts.wkst || 'MO'] ?? 1;
+
+      // Align weekCursor to the week start that contains the first occurrence
+      const firstOccWeekOffset = (firstOccurrence.dayOfWeek - wkstDay + 7) % 7;
+      let weekCursor = firstOccurrence.subtract({ days: firstOccWeekOffset });
       let matchCount = 0;
 
       outer_week: while (true) {
         // Generate this week’s occurrences
-        const baseDow = weekCursor.dayOfWeek;
         const occs = dows
           .flatMap((dw) => {
-            const delta = dw - baseDow;
+            const delta = (dw - wkstDay + 7) % 7;
             const sameDate = weekCursor.add({ days: delta });
             return this.expandByTime(sameDate);
           })
@@ -795,20 +822,20 @@ export class RRuleTemporal {
           ) {
             break outer_week;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_week;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_week;
           }
           dates.push(occ);
           matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            break outer_week;
+          }
         }
 
         weekCursor = weekCursor.add({ weeks: this.opts.interval! });
       }
 
-      return dates;
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
     // --- 3) YEARLY + BYMONTH (all specified months per year) ---
@@ -825,7 +852,7 @@ export class RRuleTemporal {
 
       while (true) {
         const year = start.year + yearOffset * this.opts.interval!;
-        
+
         for (const month of months) {
           let occ = start.with({ year, month });
           occ = this.applyTimeOverride(occ);
@@ -839,19 +866,20 @@ export class RRuleTemporal {
           ) {
             return dates;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            return dates;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             return dates;
           }
 
           dates.push(occ);
           matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            return this.applyCountLimitAndMergeRDates(dates, iterator);
+          }
         }
         yearOffset++;
       }
-      return dates;
+
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
     // --- 4) YEARLY + BYDAY/BYMONTHDAY ---
@@ -873,18 +901,19 @@ export class RRuleTemporal {
           ) {
             break outer_year;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_year;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_year;
           }
           dates.push(occ);
           matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            break outer_year;
+          }
         }
         yearCursor = yearCursor.add({ years: this.opts.interval! });
       }
-      return dates;
+
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
     // --- 4b) YEARLY + BYYEARDAY/BYWEEKNO ---
@@ -906,18 +935,19 @@ export class RRuleTemporal {
           ) {
             break outer_year2;
           }
-          if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-            break outer_year2;
-          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_year2;
           }
           dates.push(occ);
           matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            break outer_year2;
+          }
         }
         yearCursor = yearCursor.add({ years: this.opts.interval! });
       }
-      return dates;
+
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
     // --- 5) fallback: step + filter ---
@@ -932,38 +962,93 @@ export class RRuleTemporal {
         break;
       }
       if (this.matchesAll(current)) {
-        if (this.opts.count !== undefined && matchCount >= this.opts.count) {
-          break;
-        }
         if (iterator && !iterator(current, matchCount)) {
           break;
         }
         dates.push(current);
         matchCount++;
+        if (this.shouldBreakForCountLimit(matchCount)) {
+          break;
+        }
       }
       current = this.nextCandidateSameDate(current);
     }
 
-    if (this.opts.rDate) {
-      const extras = this.opts.rDate.map((d) =>
-        d instanceof Temporal.ZonedDateTime
-          ? d
-          : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
-      );
-      dates.push(...extras);
-      dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
-      const dedup: Temporal.ZonedDateTime[] = [];
-      for (const d of dates) {
-        if (
-          dedup.length === 0 ||
-          Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
-        ) {
-          dedup.push(d);
-        }
+    return this.applyCountLimitAndMergeRDates(dates, iterator);
+  }
+
+  /**
+   * Converts rDate entries to ZonedDateTime and merges with existing dates.
+   * @param dates - Array of dates to merge with
+   * @returns Merged and deduplicated array of dates
+   */
+  private mergeAndDeduplicateRDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
+    if (!this.opts.rDate) return dates;
+
+    const extras = this.opts.rDate.map((d) =>
+      d instanceof Temporal.ZonedDateTime
+        ? d
+        : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
+    );
+    dates.push(...extras);
+    dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+
+    // Deduplicate
+    const dedup: Temporal.ZonedDateTime[] = [];
+    for (const d of dates) {
+      if (
+        dedup.length === 0 ||
+        Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
+      ) {
+        dedup.push(d);
       }
-      return dedup;
     }
-    return dates;
+    return dedup;
+  }
+
+  /**
+   * Applies count limit and merges rDates with the rule-generated dates.
+   * @param dates - Array of dates generated by the rule
+   * @param iterator - Optional iterator function
+   * @returns Final array of dates after merging and applying count limit
+   */
+  private applyCountLimitAndMergeRDates(
+    dates: Temporal.ZonedDateTime[],
+    iterator?: (date: Temporal.ZonedDateTime, count: number) => boolean
+  ): Temporal.ZonedDateTime[] {
+    const merged = this.mergeAndDeduplicateRDates(dates);
+
+    // Apply count limit to the final combined result
+    if (this.opts.count !== undefined) {
+      let finalCount = 0;
+      const finalDates: Temporal.ZonedDateTime[] = [];
+      for (const d of merged) {
+        if (finalCount >= this.opts.count) break;
+        if (iterator && !iterator(d, finalCount)) break;
+        finalDates.push(d);
+        finalCount++;
+      }
+      return finalDates;
+    }
+
+    return merged;
+  }
+
+  /**
+   * Checks if the count limit should break the loop based on rDate presence.
+   * @param matchCount - Current number of matches
+   * @returns true if the loop should break
+   */
+  private shouldBreakForCountLimit(matchCount: number): boolean {
+    if (this.opts.count === undefined) return false;
+
+    if (!this.opts.rDate) {
+      return matchCount >= this.opts.count;
+    }
+
+    // If we have rDates, collect at least count occurrences from the rule so we can merge properly
+    // But also add a safety limit to prevent infinite loops
+    return matchCount >= this.opts.count * 2;
   }
 
   /**
@@ -1031,7 +1116,7 @@ export class RRuleTemporal {
 
       outer: while (true) {
         const year = start.year + yearOffset * this.opts.interval!;
-        
+
         for (const month of months) {
           let occ = start.with({ year, month });
           occ = this.applyTimeOverride(occ);
@@ -1581,11 +1666,14 @@ export class RRuleTemporal {
     inc: boolean
   ): Temporal.ZonedDateTime[] {
     if (!this.opts.rDate) return list;
+
     const extras = this.opts.rDate.map((d) =>
       d instanceof Temporal.ZonedDateTime
         ? d
         : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
     );
+
+    // Filter extras by time window
     for (const z of extras) {
       const inst = z.toInstant();
       const startOk = inc
@@ -1596,6 +1684,8 @@ export class RRuleTemporal {
         : Temporal.Instant.compare(inst, endInst) < 0;
       if (startOk && endOk) list.push(z);
     }
+
+    // Sort and deduplicate using the common helper
     list.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
     const dedup: Temporal.ZonedDateTime[] = [];
     for (const d of list) {
