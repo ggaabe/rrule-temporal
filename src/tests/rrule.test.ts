@@ -2276,7 +2276,7 @@ describe('Tests from rust package', function () {
 
 describe('exDate', function () {
   it('Multiple exDate', function () {
-    const rule = 'DTSTART:20201114T000000Z\nRRULE:FREQ=DAILY\nEXDATE;TZID=UTC:20201121T000000,20201128T000000';
+    const rule = 'DTSTART:20201114T000000Z\nRRULE:FREQ=DAILY\nEXDATE;TZID=UTC:20201121T000000,20201128T000000Z';
     const r = [new Date('2020-11-14T00:00:00.000Z'), new Date('2020-11-30T00:00:00.000Z')];
     const entries = parse(rule).between(r[0]!, r[1]!).map(formatISO);
     expect(entries).toMatchInlineSnapshot(`

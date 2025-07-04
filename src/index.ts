@@ -171,10 +171,20 @@ function parseRRuleString(
         const exTzid = exMatch[1] || tzid;
         const dateValues = exMatch[2]!.split(',');
         for (const dateValue of dateValues) {
-          const exIsoDate =
-            `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
-            `T${dateValue.slice(9)}`;
-          exDate.push(Temporal.PlainDateTime.from(exIsoDate).toZonedDateTime(exTzid));
+          // Handle Z suffix like UNTIL does
+          if (/Z$/.test(dateValue)) {
+            const iso =
+              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
+              `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
+            exDate.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
+              exTzid || "UTC"
+            ));
+          } else {
+            const exIsoDate =
+              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
+              `T${dateValue.slice(9)}`;
+            exDate.push(Temporal.PlainDateTime.from(exIsoDate).toZonedDateTime(exTzid));
+          }
         }
       }
     }
