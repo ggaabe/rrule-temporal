@@ -1643,7 +1643,6 @@ describe('Additional smoke tests', () => {
         interval: 1,
         tzid: 'UTC',
         byDay: ['SA'],
-        // exDate: [new Date(DATE_2023_JAN_6_11PM)],
       });
 
       expect(rule2.all(limit(12)).map(formatISO)).toMatchInlineSnapshot(`
@@ -1698,7 +1697,6 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         // @ts-expect-error Expect invalid values
         byDay: ['SA', 'SU', 'MO', 0],
-        // exDate: [new Date(DATE_2019)],
       });
 
       expect(rule2.all(limit(9)).map(formatISO)).toMatchInlineSnapshot(`
@@ -1909,60 +1907,6 @@ describe('Additional smoke tests', () => {
           "2029-12-31T00:00:00.000Z",
         ]
       `);
-    });
-  });
-
-  describe('rDate', () => {
-    it("includes RDates in the occurrences list even if they don't match the RRule", () => {
-      const rule = new RRuleTemporal({
-        dtstart: DATE_2019_DECEMBER_19,
-        freq: 'MONTHLY',
-        interval: 2,
-        tzid: 'UTC',
-        count: 10,
-        rDate: [zdt(2020, 5, 14, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
-      });
-
-      expect(rule.all().map(formatISO)).toMatchInlineSnapshot(`
-[
-  "2019-12-19T00:00:00.000Z",
-  "2020-02-19T00:00:00.000Z",
-  "2020-04-19T00:00:00.000Z",
-  "2020-05-14T00:00:00.000Z",
-  "2020-05-15T00:00:00.000Z",
-  "2020-06-19T00:00:00.000Z",
-  "2020-07-18T00:00:00.000Z",
-  "2020-08-19T00:00:00.000Z",
-  "2020-10-19T00:00:00.000Z",
-  "2020-12-19T00:00:00.000Z",
-]
-`);
-    });
-
-    it('does not yield RDates twice if they already match the RRule', () => {
-      const rule = new RRuleTemporal({
-        dtstart: DATE_2019_DECEMBER_19,
-        freq: 'MONTHLY',
-        interval: 2,
-        tzid: 'UTC',
-        count: 10,
-        rDate: [zdt(2020, 4, 19, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
-      });
-
-      expect(rule.all().map(formatISO)).toMatchInlineSnapshot(`
-[
-  "2019-12-19T00:00:00.000Z",
-  "2020-02-19T00:00:00.000Z",
-  "2020-04-19T00:00:00.000Z",
-  "2020-05-15T00:00:00.000Z",
-  "2020-06-19T00:00:00.000Z",
-  "2020-07-18T00:00:00.000Z",
-  "2020-08-19T00:00:00.000Z",
-  "2020-10-19T00:00:00.000Z",
-  "2020-12-19T00:00:00.000Z",
-  "2021-02-19T00:00:00.000Z",
-]
-`);
     });
   });
 
@@ -2299,4 +2243,57 @@ describe('exDate', function () {
   });
 });
 
+describe('rDate', () => {
+  it("includes RDates in the occurrences list even if they don't match the RRule", () => {
+    const rule = new RRuleTemporal({
+      dtstart: DATE_2019_DECEMBER_19,
+      freq: 'MONTHLY',
+      interval: 2,
+      tzid: 'UTC',
+      count: 10,
+      rDate: [zdt(2020, 5, 14, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
+    });
+
+    expect(rule.all().map(formatISO)).toMatchInlineSnapshot(`
+[
+  "2019-12-19T00:00:00.000Z",
+  "2020-02-19T00:00:00.000Z",
+  "2020-04-19T00:00:00.000Z",
+  "2020-05-14T00:00:00.000Z",
+  "2020-05-15T00:00:00.000Z",
+  "2020-06-19T00:00:00.000Z",
+  "2020-07-18T00:00:00.000Z",
+  "2020-08-19T00:00:00.000Z",
+  "2020-10-19T00:00:00.000Z",
+  "2020-12-19T00:00:00.000Z",
+]
+`);
+  });
+
+  it('does not yield RDates twice if they already match the RRule', () => {
+    const rule = new RRuleTemporal({
+      dtstart: DATE_2019_DECEMBER_19,
+      freq: 'MONTHLY',
+      interval: 2,
+      tzid: 'UTC',
+      count: 10,
+      rDate: [zdt(2020, 4, 19, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
+    });
+
+    expect(rule.all().map(formatISO)).toMatchInlineSnapshot(`
+[
+  "2019-12-19T00:00:00.000Z",
+  "2020-02-19T00:00:00.000Z",
+  "2020-04-19T00:00:00.000Z",
+  "2020-05-15T00:00:00.000Z",
+  "2020-06-19T00:00:00.000Z",
+  "2020-07-18T00:00:00.000Z",
+  "2020-08-19T00:00:00.000Z",
+  "2020-10-19T00:00:00.000Z",
+  "2020-12-19T00:00:00.000Z",
+  "2021-02-19T00:00:00.000Z",
+]
+`);
+  });
+});
 // test https://github.com/fmeringdal/rust-rrule/issues/119
