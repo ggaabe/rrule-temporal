@@ -2165,10 +2165,14 @@ describe('Tests from rust package', function () {
       ]
     `);
   });
-  it.skip('Monthly on the 31st of the month', function () {
-    const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=31';
-    // Is this the correct behavior?
-    expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
+  describe('Monthly on 31st or -31st of the month', function () {
+    // Recurrence rules may generate recurrence instances with an invalid date (e.g., February 30)
+    // or nonexistent local time (e.g., 1:30 AM on a day where the local time is moved forward by an
+    // hour at 1:00 AM). Such recurrence instances MUST be ignored and MUST NOT be counted as
+    // part of the recurrence set.
+    it('Monthly on the 31st of the month', function () {
+      const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=31';
+      expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
         [
           "1997-10-31T14:00:00.000Z",
           "1997-12-31T14:00:00.000Z",
@@ -2182,11 +2186,10 @@ describe('Tests from rust package', function () {
           "1999-01-31T14:00:00.000Z",
         ]
     `);
-  });
-  it.skip('Monthly on the 31th-to-last of the month', function () {
-    const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=-31';
-    // Is this the correct behavior?
-    expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
+    });
+    it('Monthly on the 31th-to-last of the month', function () {
+      const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=-31';
+      expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
         [
           "1997-10-01T13:00:00.000Z",
           "1997-12-01T14:00:00.000Z",
@@ -2200,6 +2203,7 @@ describe('Tests from rust package', function () {
           "1999-01-01T14:00:00.000Z",
         ]
     `);
+    });
   });
   const FOUR_HOURS_MS = 14400000;
   it('DST hourly/minutes handling GMT -> BST', function () {

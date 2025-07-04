@@ -1483,7 +1483,11 @@ export class RRuleTemporal {
         .filter((d) => d >= 1 && d <= lastDay);
     }
 
-    if (!byDay && byMonthDayHits.length) {
+    if (!byDay && byMonthDay && byMonthDay.length > 0) {
+      if (byMonthDayHits.length === 0) {
+        // No valid days found for this month, return empty array
+        return [];
+      }
       const dates = byMonthDayHits.map((d) => sample.with({ day: d }));
       return dates
         .flatMap((z) => this.expandByTime(z))
@@ -1539,7 +1543,11 @@ export class RRuleTemporal {
     }
     // Combine with BYMONTHDAY if present
     let finalDays = byDayHits;
-    if (byMonthDayHits.length) {
+    if (byMonthDay && byMonthDay.length > 0) {
+      if (byMonthDayHits.length === 0) {
+        // No valid days found for BYMONTHDAY, return empty array
+        return [];
+      }
       finalDays = finalDays.filter((d) => byMonthDayHits.includes(d));
     }
 
