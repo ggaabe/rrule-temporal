@@ -1857,6 +1857,17 @@ describe('Additional smoke tests', () => {
         ]
       `);
     });
+
+    it('Property names are are case-insensitive', function () {
+      const rule = 'dtstart:19970902T090000Z\nrrule:freq=yearly;count=3';
+      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "1997-09-02T09:00:00.000Z",
+        "1998-09-02T09:00:00.000Z",
+        "1999-09-02T09:00:00.000Z",
+      ]
+      `);
+    });
   });
 
   describe('byYearDay', () => {

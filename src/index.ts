@@ -179,15 +179,15 @@ function parseRRuleString(
   let exDate: Temporal.ZonedDateTime[] = [];
   let rDate: Temporal.ZonedDateTime[] = [];
 
-  if (/^DTSTART/m.test(input)) {
+  if (/^DTSTART/mi.test(input)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
     const lines = input.split(/\r?\n/);
     const dtLine = lines[0];
-    const rrLine = lines.find(line => line.startsWith('RRULE:'));
-    const exLines = lines.filter(line => line.startsWith('EXDATE'));
-    const rLines = lines.filter(line => line.startsWith('RDATE'));
+    const rrLine = lines.find(line => line.match(/^RRULE:/i));
+    const exLines = lines.filter(line => line.match(/^EXDATE/i));
+    const rLines = lines.filter(line => line.match(/^RDATE/i));
 
-    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/);
+    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/i);
     if (!m) throw new Error("Invalid DTSTART in ICS snippet");
     tzid = m[1] || tzid;
     const isoDate =
@@ -198,7 +198,7 @@ function parseRRuleString(
 
     // Parse EXDATE lines
     for (const exLine of exLines) {
-      const exMatch = exLine.match(/EXDATE(?:;TZID=([^:]+))?:(.+)/);
+      const exMatch = exLine.match(/EXDATE(?:;TZID=([^:]+))?:(.+)/i);
       if (exMatch) {
         const exTzid = exMatch[1] || tzid;
         const dateValues = exMatch[2]!.split(',');
@@ -208,7 +208,7 @@ function parseRRuleString(
 
     // Parse RDATE lines
     for (const rLine of rLines) {
-      const rMatch = rLine.match(/RDATE(?:;TZID=([^:]+))?:(.+)/);
+      const rMatch = rLine.match(/RDATE(?:;TZID=([^:]+))?:(.+)/i);
       if (rMatch) {
         const rTzid = rMatch[1] || tzid;
         const dateValues = rMatch[2]!.split(',');
@@ -221,11 +221,11 @@ function parseRRuleString(
       throw new Error("dtstart required when parsing RRULE alone");
     dtstart = fallbackDtstart;
     tzid = fallbackDtstart.timeZoneId;
-    rruleLine = input.replace(/^RRULE:/, "RRULE:");
+    rruleLine = input.replace(/^RRULE:/i, "RRULE:");
   }
 
   // Parse RRULE
-  const parts = rruleLine ? rruleLine.replace(/^RRULE:/, "").split(";") : [];
+  const parts = rruleLine ? rruleLine.replace(/^RRULE:/i, "").split(";") : [];
   const opts = { 
     dtstart, 
     tzid, 
@@ -234,9 +234,10 @@ function parseRRuleString(
   } as ManualOpts;
   for (const part of parts) {
     const [key, val] = part.split("=");
-    switch (key) {
+    if (!key) continue;
+    switch (key.toUpperCase()) {
       case "FREQ":
-        opts.freq = val as Freq;
+        opts.freq = val!.toUpperCase() as Freq;
         break;
       case "INTERVAL":
         opts.interval = parseInt(val!, 10);
