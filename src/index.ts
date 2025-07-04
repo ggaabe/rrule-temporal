@@ -137,6 +137,35 @@ interface IcsOpts extends BaseOpts {
 export type RRuleOptions = ManualOpts | IcsOpts;
 
 /**
+ * Parse date values from EXDATE or RDATE lines
+ */
+function parseDateValues(
+  dateValues: string[],
+  tzid: string
+): Temporal.ZonedDateTime[] {
+  const dates: Temporal.ZonedDateTime[] = [];
+  
+  for (const dateValue of dateValues) {
+    // Handle Z suffix like UNTIL does
+    if (/Z$/.test(dateValue)) {
+      const iso =
+        `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
+        `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
+      dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
+        tzid || "UTC"
+      ));
+    } else {
+      const isoDate =
+        `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
+        `T${dateValue.slice(9)}`;
+      dates.push(Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid));
+    }
+  }
+  
+  return dates;
+}
+
+/**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts
  */
 function parseRRuleString(
@@ -172,22 +201,7 @@ function parseRRuleString(
       if (exMatch) {
         const exTzid = exMatch[1] || tzid;
         const dateValues = exMatch[2]!.split(',');
-        for (const dateValue of dateValues) {
-          // Handle Z suffix like UNTIL does
-          if (/Z$/.test(dateValue)) {
-            const iso =
-              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
-              `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
-            exDate.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
-              exTzid || "UTC"
-            ));
-          } else {
-            const exIsoDate =
-              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
-              `T${dateValue.slice(9)}`;
-            exDate.push(Temporal.PlainDateTime.from(exIsoDate).toZonedDateTime(exTzid));
-          }
-        }
+        exDate.push(...parseDateValues(dateValues, exTzid));
       }
     }
 
@@ -197,22 +211,7 @@ function parseRRuleString(
       if (rMatch) {
         const rTzid = rMatch[1] || tzid;
         const dateValues = rMatch[2]!.split(',');
-        for (const dateValue of dateValues) {
-          // Handle Z suffix like UNTIL does
-          if (/Z$/.test(dateValue)) {
-            const iso =
-              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
-              `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
-            rDate.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
-              rTzid || "UTC"
-            ));
-          } else {
-            const rIsoDate =
-              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
-              `T${dateValue.slice(9)}`;
-            rDate.push(Temporal.PlainDateTime.from(rIsoDate).toZonedDateTime(rTzid));
-          }
-        }
+        rDate.push(...parseDateValues(dateValues, rTzid));
       }
     }
   } else {
