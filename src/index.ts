@@ -147,13 +147,15 @@ function parseRRuleString(
   let tzid: string = "UTC";
   let rruleLine: string;
   let exDate: Temporal.ZonedDateTime[] = [];
+  let rDate: Temporal.ZonedDateTime[] = [];
 
   if (/^DTSTART/m.test(input)) {
-    // ICS snippet: split DTSTART, RRULE, and EXDATE
+    // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
     const lines = input.split(/\r?\n/);
     const dtLine = lines[0];
     const rrLine = lines.find(line => line.startsWith('RRULE:'));
     const exLines = lines.filter(line => line.startsWith('EXDATE'));
+    const rLines = lines.filter(line => line.startsWith('RDATE'));
 
     const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/);
     if (!m) throw new Error("Invalid DTSTART in ICS snippet");
@@ -188,6 +190,31 @@ function parseRRuleString(
         }
       }
     }
+
+    // Parse RDATE lines
+    for (const rLine of rLines) {
+      const rMatch = rLine.match(/RDATE(?:;TZID=([^:]+))?:(.+)/);
+      if (rMatch) {
+        const rTzid = rMatch[1] || tzid;
+        const dateValues = rMatch[2]!.split(',');
+        for (const dateValue of dateValues) {
+          // Handle Z suffix like UNTIL does
+          if (/Z$/.test(dateValue)) {
+            const iso =
+              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
+              `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
+            rDate.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
+              rTzid || "UTC"
+            ));
+          } else {
+            const rIsoDate =
+              `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
+              `T${dateValue.slice(9)}`;
+            rDate.push(Temporal.PlainDateTime.from(rIsoDate).toZonedDateTime(rTzid));
+          }
+        }
+      }
+    }
   } else {
     // Only RRULE line; require fallback
     if (!fallbackDtstart)
@@ -198,8 +225,13 @@ function parseRRuleString(
   }
 
   // Parse RRULE
-  const parts = rruleLine.replace(/^RRULE:/, "").split(";");
-  const opts = { dtstart, tzid, exDate: exDate.length > 0 ? exDate : undefined } as ManualOpts;
+  const parts = rruleLine ? rruleLine.replace(/^RRULE:/, "").split(";") : [];
+  const opts = { 
+    dtstart, 
+    tzid, 
+    exDate: exDate.length > 0 ? exDate : undefined,
+    rDate: rDate.length > 0 ? rDate : undefined
+  } as ManualOpts;
   for (const part of parts) {
     const [key, val] = part.split("=");
     switch (key) {
@@ -1041,7 +1073,7 @@ export class RRuleTemporal {
     if (!this.opts.exDate || this.opts.exDate.length === 0) return dates;
 
     return dates.filter(date => {
-      return !this.opts.exDate!.some(exDate => 
+      return !this.opts.exDate!.some(exDate =>
         Temporal.ZonedDateTime.compare(date, exDate) === 0
       );
     });
@@ -1088,9 +1120,12 @@ export class RRuleTemporal {
       return matchCount >= this.opts.count;
     }
 
-    // If we have rDates, collect at least count occurrences from the rule so we can merge properly
-    // But also add a safety limit to prevent infinite loops
-    return matchCount >= this.opts.count * 2;
+    // If we have rDates, generate enough rule occurrences to reach the count limit
+    // when combined with rDates. Add a reasonable safety margin.
+    const rDateCount = this.opts.rDate.length;
+    const targetRuleCount = Math.max(this.opts.count - rDateCount, 0);
+    const safetyMargin = Math.min(targetRuleCount, 10);
+    return matchCount >= targetRuleCount + safetyMargin;
   }
 
   /**

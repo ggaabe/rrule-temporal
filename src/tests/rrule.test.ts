@@ -2295,5 +2295,26 @@ describe('rDate', () => {
 ]
 `);
   });
+
+  it('parses rDate value', function () {
+    const rule =
+      'DTSTART:19970713T000000Z\nRRULE:FREQ=WEEKLY;COUNT=10\n' +
+      'RDATE:19970714T000000Z\n' +
+      'RDATE;TZID=America/New_York:19970715T000000';
+    expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "1997-07-13T00:00:00.000Z",
+        "1997-07-14T00:00:00.000Z",
+        "1997-07-15T04:00:00.000Z",
+        "1997-07-20T00:00:00.000Z",
+        "1997-07-27T00:00:00.000Z",
+        "1997-08-03T00:00:00.000Z",
+        "1997-08-10T00:00:00.000Z",
+        "1997-08-17T00:00:00.000Z",
+        "1997-08-24T00:00:00.000Z",
+        "1997-08-31T00:00:00.000Z",
+      ]
+    `);
+  });
 });
 // test https://github.com/fmeringdal/rust-rrule/issues/119
