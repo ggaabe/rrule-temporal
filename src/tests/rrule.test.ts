@@ -2036,6 +2036,12 @@ describe('Error handling', () => {
 
     expect(testFn).toThrowErrorMatchingInlineSnapshot(`"all() requires iterator when no COUNT/UNTIL"`);
   });
+
+  it('Can return max-1 entries', function () {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
+    const rule = new RRuleTemporal({freq: 'DAILY', dtstart, maxIterations: 1000});
+    expect(rule.all(limit(999))).toHaveLength(999);
+  });
 });
 
 describe('DST timezones and repeat', () => {
