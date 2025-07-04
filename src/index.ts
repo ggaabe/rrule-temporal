@@ -127,7 +127,8 @@ interface ManualOpts extends BaseOpts {
   byWeekNo?: number[];
   bySetPos?: number[];
   wkst?: string;
-  rDate?: (Date | Temporal.ZonedDateTime)[];
+  rDate?: Temporal.ZonedDateTime[];
+  exDate?: Temporal.ZonedDateTime[];
   dtstart: Temporal.ZonedDateTime;
 }
 interface IcsOpts extends BaseOpts {
@@ -985,12 +986,7 @@ export class RRuleTemporal {
   private mergeAndDeduplicateRDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
     if (!this.opts.rDate) return dates;
 
-    const extras = this.opts.rDate.map((d) =>
-      d instanceof Temporal.ZonedDateTime
-        ? d
-        : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
-    );
-    dates.push(...extras);
+    dates.push(...this.opts.rDate);
     dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
 
     // Deduplicate
@@ -1667,14 +1663,8 @@ export class RRuleTemporal {
   ): Temporal.ZonedDateTime[] {
     if (!this.opts.rDate) return list;
 
-    const extras = this.opts.rDate.map((d) =>
-      d instanceof Temporal.ZonedDateTime
-        ? d
-        : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
-    );
-
     // Filter extras by time window
-    for (const z of extras) {
+    for (const z of this.opts.rDate) {
       const inst = z.toInstant();
       const startOk = inc
         ? Temporal.Instant.compare(inst, startInst) >= 0
