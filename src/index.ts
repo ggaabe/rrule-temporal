@@ -111,6 +111,7 @@ type Freq =
 // Extended ManualOpts to include BYDAY and BYMONTH
 interface BaseOpts {
   tzid?: string;
+  maxIterations?: number;
 }
 interface ManualOpts extends BaseOpts {
   freq: Freq;
@@ -368,6 +369,7 @@ export class RRuleTemporal {
   private tzid: string;
   private originalDtstart: Temporal.ZonedDateTime;
   private opts: ManualOpts;
+  private maxIterations: number;
 
   constructor(params: { rruleString: string } | ManualOpts) {
     let manual: ManualOpts;
@@ -393,6 +395,7 @@ export class RRuleTemporal {
       throw new Error("Manual until must be a ZonedDateTime");
     }
     this.opts = this.sanitizeOpts(manual);
+    this.maxIterations = manual.maxIterations ?? 10000;
   }
 
   private sanitizeOpts(opts: ManualOpts): ManualOpts {
@@ -783,6 +786,7 @@ export class RRuleTemporal {
       throw new Error("all() requires iterator when no COUNT/UNTIL");
     }
     const dates: Temporal.ZonedDateTime[] = [];
+    let iterationCount = 0;
 
     // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
     if (
@@ -794,6 +798,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       outer_month: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = this.generateMonthlyOccurrences(monthCursor);
         // Skip this month entirely if **any** occurrence precedes DTSTART.
         if (
@@ -868,6 +876,10 @@ export class RRuleTemporal {
 
       outer_week: while (true) {
         // Generate this week’s occurrences
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = dows
           .flatMap((dw) => {
             const delta = (dw - wkstDay + 7) % 7;
@@ -913,6 +925,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const year = start.year + yearOffset * this.opts.interval!;
 
         for (const month of months) {
@@ -954,6 +970,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       outer_year: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
@@ -988,6 +1008,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       outer_year2: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
@@ -1017,6 +1041,10 @@ export class RRuleTemporal {
     let matchCount = 0;
 
     while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+      
       if (
         this.opts.until &&
         Temporal.ZonedDateTime.compare(current, this.opts.until) > 0
@@ -1148,6 +1176,7 @@ export class RRuleTemporal {
         ? Temporal.Instant.from(before.toISOString())
         : before.toInstant();
     const results: Temporal.ZonedDateTime[] = [];
+    let iterationCount = 0;
 
     // 1) MONTHLY + BYDAY/BYMONTHDAY
     if (
@@ -1157,6 +1186,10 @@ export class RRuleTemporal {
       let monthCursor = this.computeFirst().with({ day: 1 });
 
       outer: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateMonthlyOccurrences(monthCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1191,6 +1224,10 @@ export class RRuleTemporal {
       let yearOffset = 0;
 
       outer: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const year = start.year + yearOffset * this.opts.interval!;
 
         for (const month of months) {
@@ -1226,6 +1263,10 @@ export class RRuleTemporal {
       let yearCursor = start.with({ month: 1, day: 1 });
 
       outer_year: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1256,6 +1297,10 @@ export class RRuleTemporal {
       let yearCursor = start.with({ month: 1, day: 1 });
 
       outer_year2: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1292,6 +1337,10 @@ export class RRuleTemporal {
       const results: Temporal.ZonedDateTime[] = [];
 
       outer: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateWeeklyOccurrences(weekCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1319,6 +1368,10 @@ export class RRuleTemporal {
     // 3) fallback
     let current = this.computeFirst();
     while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+      }
+      
       const inst = current.toInstant();
       if (inc) {
         if (Temporal.Instant.compare(inst, endInst) > 0) break;
