@@ -146,10 +146,15 @@ function parseRRuleString(
   let dtstart: Temporal.ZonedDateTime;
   let tzid: string = "UTC";
   let rruleLine: string;
+  let exDate: Temporal.ZonedDateTime[] = [];
 
   if (/^DTSTART/m.test(input)) {
-    // ICS snippet: split DTSTART and RRULE
-    const [dtLine, rrLine] = input.split(/\r?\n/);
+    // ICS snippet: split DTSTART, RRULE, and EXDATE
+    const lines = input.split(/\r?\n/);
+    const dtLine = lines[0];
+    const rrLine = lines.find(line => line.startsWith('RRULE:'));
+    const exLines = lines.filter(line => line.startsWith('EXDATE'));
+
     const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/);
     if (!m) throw new Error("Invalid DTSTART in ICS snippet");
     tzid = m[1] || tzid;
@@ -158,6 +163,21 @@ function parseRRuleString(
       `T${m[2]!.slice(9)}`;
     dtstart = Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid);
     rruleLine = rrLine!;
+
+    // Parse EXDATE lines
+    for (const exLine of exLines) {
+      const exMatch = exLine.match(/EXDATE(?:;TZID=([^:]+))?:(.+)/);
+      if (exMatch) {
+        const exTzid = exMatch[1] || tzid;
+        const dateValues = exMatch[2]!.split(',');
+        for (const dateValue of dateValues) {
+          const exIsoDate =
+            `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
+            `T${dateValue.slice(9)}`;
+          exDate.push(Temporal.PlainDateTime.from(exIsoDate).toZonedDateTime(exTzid));
+        }
+      }
+    }
   } else {
     // Only RRULE line; require fallback
     if (!fallbackDtstart)
@@ -169,7 +189,7 @@ function parseRRuleString(
 
   // Parse RRULE
   const parts = rruleLine.replace(/^RRULE:/, "").split(";");
-  const opts = { dtstart, tzid } as ManualOpts;
+  const opts = { dtstart, tzid, exDate: exDate.length > 0 ? exDate : undefined } as ManualOpts;
   for (const part of parts) {
     const [key, val] = part.split("=");
     switch (key) {

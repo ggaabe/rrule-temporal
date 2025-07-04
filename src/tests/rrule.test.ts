@@ -2274,4 +2274,29 @@ describe('Tests from rust package', function () {
   });
 });
 
+describe('exDate', function () {
+  it('Multiple exDate', function () {
+    const rule = 'DTSTART:20201114T000000Z\nRRULE:FREQ=DAILY\nEXDATE;TZID=UTC:20201121T000000,20201128T000000';
+    const r = [new Date('2020-11-14T00:00:00.000Z'), new Date('2020-11-30T00:00:00.000Z')];
+    const entries = parse(rule).between(r[0]!, r[1]!).map(formatISO);
+    expect(entries).toMatchInlineSnapshot(`
+      [
+        "2020-11-15T00:00:00.000Z",
+        "2020-11-16T00:00:00.000Z",
+        "2020-11-17T00:00:00.000Z",
+        "2020-11-18T00:00:00.000Z",
+        "2020-11-19T00:00:00.000Z",
+        "2020-11-20T00:00:00.000Z",
+        "2020-11-22T00:00:00.000Z",
+        "2020-11-23T00:00:00.000Z",
+        "2020-11-24T00:00:00.000Z",
+        "2020-11-25T00:00:00.000Z",
+        "2020-11-26T00:00:00.000Z",
+        "2020-11-27T00:00:00.000Z",
+        "2020-11-29T00:00:00.000Z",
+      ]
+    `);
+  });
+});
+
 // test https://github.com/fmeringdal/rust-rrule/issues/119
