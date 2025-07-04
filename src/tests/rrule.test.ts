@@ -1868,6 +1868,16 @@ describe('Additional smoke tests', () => {
       ]
       `);
     });
+    it('Unfold strings before processing', function () {
+      const rule = 'dtstart:19970902T090000Z\nrrule:FREQ=YEA\n RLY;COUNT=3\n';
+      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "1997-09-02T09:00:00.000Z",
+        "1998-09-02T09:00:00.000Z",
+        "1999-09-02T09:00:00.000Z",
+      ]
+      `);
+    });
   });
 
   describe('byYearDay', () => {

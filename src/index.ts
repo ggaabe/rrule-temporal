@@ -138,6 +138,16 @@ interface IcsOpts extends BaseOpts {
 export type RRuleOptions = ManualOpts | IcsOpts;
 
 /**
+ * Unfold lines according to RFC 5545 specification.
+ * Lines can be folded by inserting CRLF followed by a single linear white-space character.
+ * This function removes such folding by removing CRLF and the immediately following space/tab.
+ */
+function unfoldLine(foldedLine: string): string {
+  // Remove CRLF followed by a single space or tab
+  return foldedLine.replace(/\r?\n[ \t]/g, '');
+}
+
+/**
  * Parse date values from EXDATE or RDATE lines
  */
 function parseDateValues(
@@ -173,15 +183,18 @@ function parseRRuleString(
   input: string,
   fallbackDtstart?: Temporal.ZonedDateTime
 ): ManualOpts {
+  // Unfold the input according to RFC 5545 specification
+  const unfoldedInput = unfoldLine(input);
+  
   let dtstart: Temporal.ZonedDateTime;
   let tzid: string = "UTC";
   let rruleLine: string;
   let exDate: Temporal.ZonedDateTime[] = [];
   let rDate: Temporal.ZonedDateTime[] = [];
 
-  if (/^DTSTART/mi.test(input)) {
+  if (/^DTSTART/mi.test(unfoldedInput)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
-    const lines = input.split(/\r?\n/);
+    const lines = unfoldedInput.split(/\r?\n/);
     const dtLine = lines[0];
     const rrLine = lines.find(line => line.match(/^RRULE:/i));
     const exLines = lines.filter(line => line.match(/^EXDATE/i));
@@ -221,7 +234,7 @@ function parseRRuleString(
       throw new Error("dtstart required when parsing RRULE alone");
     dtstart = fallbackDtstart;
     tzid = fallbackDtstart.timeZoneId;
-    rruleLine = input.replace(/^RRULE:/i, "RRULE:");
+    rruleLine = unfoldedInput.replace(/^RRULE:/i, "RRULE:");
   }
 
   // Parse RRULE
