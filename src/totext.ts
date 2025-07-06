@@ -110,7 +110,7 @@ export function toText(
   const rule = typeof input === "string" ? new RRuleTemporal({ rruleString: input }) : input;
   const opts = rule.options();
   const lang = (locale ?? Intl.DateTimeFormat().resolvedOptions().locale).split("-")[0];
-  const data = LOCALES[lang] || en;
+  const data = LOCALES[lang!] || en;
   const {
     freq,
     interval = 1,
