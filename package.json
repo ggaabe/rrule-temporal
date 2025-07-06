@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "test": "jest",
+    "test": "jest --coverage=false",
+    "coverage": "jest",
     "format": "./node_modules/.bin/prettier --write 'src/tests/rrule.test.ts'",
     "prepare": "npm run build"
   },

@@ -125,3 +125,4 @@ dist
 .idea
 yarn.lock
 .claude
+.coverage
