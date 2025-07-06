@@ -84,11 +84,16 @@ function formatByDayToken(tok: string | number, locale: LocaleData): string {
   return `${ordinal(ord)} ${name}`;
 }
 
-function formatTime(hour: number, minute = 0): string {
+function formatTime(hour: number, minute = 0, second = 0): string {
   const hr12 = ((hour + 11) % 12) + 1;
   const ampm = hour < 12 ? "AM" : "PM";
+  const mm = String(minute).padStart(2, "0");
+  const ss = String(second).padStart(2, "0");
+  if (second) {
+    return `${hr12}:${mm}:${ss} ${ampm}`;
+  }
   if (minute) {
-    return `${hr12}:${String(minute).padStart(2, "0")} ${ampm}`;
+    return `${hr12}:${mm} ${ampm}`;
   }
   return `${hr12} ${ampm}`;
 }
@@ -119,8 +124,15 @@ export function toText(
     byDay,
     byHour,
     byMinute,
+    bySecond,
     byMonth,
     byMonthDay,
+    byYearDay,
+    byWeekNo,
+    bySetPos,
+    wkst,
+    rDate,
+    exDate,
   } = opts;
 
   const parts: string[] = ["every"];
@@ -171,11 +183,30 @@ export function toText(
     parts.push("on the", list(byMonthDay, (d) => ordinal(d as number)), "day of the month");
   }
 
+  if (byYearDay) {
+    parts.push("on the", list(byYearDay, (d) => ordinal(d as number)), "day of the year");
+  }
+
+  if (byWeekNo) {
+    parts.push("in week", list(byWeekNo, (n) => n.toString()));
+  }
+
   if (byHour) {
     const minutes = byMinute ?? [0];
-    const times = byHour.flatMap((h) => minutes.map((m) => formatTime(h, m)));
+    const seconds = bySecond ?? [0];
+    const times = byHour.flatMap((h) =>
+      minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s)))
+    );
     parts.push("at", list(times));
     parts.push(tzAbbreviation(opts.dtstart));
+  }
+
+  if (!byHour && byMinute) {
+    parts.push("at minute", list(byMinute));
+  }
+
+  if (!byHour && !byMinute && bySecond) {
+    parts.push("at second", list(bySecond));
   }
 
   if (until) {
@@ -183,6 +214,23 @@ export function toText(
     parts.push("until", `${monthName} ${until.day}, ${until.year}`);
   } else if (count !== undefined) {
     parts.push("for", count.toString(), count === 1 ? "time" : "times");
+  }
+
+  if (bySetPos) {
+    parts.push("on the", list(bySetPos, (n) => ordinal(n as number)), "instance");
+  }
+
+  if (wkst) {
+    const wkName = formatByDayToken(wkst, data);
+    parts.push("week starts on", wkName);
+  }
+
+  if (rDate && rDate.length) {
+    parts.push("with", `${rDate.length}`, rDate.length === 1 ? "additional date" : "additional dates");
+  }
+
+  if (exDate && exDate.length) {
+    parts.push("excluding", `${exDate.length}`, exDate.length === 1 ? "date" : "dates");
   }
 
   return parts.join(" ");

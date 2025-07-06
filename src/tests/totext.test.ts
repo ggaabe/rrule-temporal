@@ -51,6 +51,17 @@ describe("RRuleTemporal.toText", () => {
     expect(toText(rule)).toBe("every day at 5:30 PM CST");
   });
 
+  test("daily with seconds", () => {
+    const rule = new RRuleTemporal({
+      freq: "DAILY",
+      byHour: [6],
+      byMinute: [15],
+      bySecond: [45],
+      dtstart: zdt(2025, 1, 1, 0, "UTC"),
+    });
+    expect(toText(rule)).toBe("every day at 6:15:45 AM UTC");
+  });
+
   test("weekdays shortcut", () => {
     const rule = new RRuleTemporal({
       freq: "WEEKLY",
@@ -80,5 +91,48 @@ describe("RRuleTemporal.toText", () => {
     });
     expect(toText(rule)).toBe("every week until November 10, 2012");
 
+  });
+
+  test("yearly byyearday", () => {
+    const rule = new RRuleTemporal({
+      freq: "YEARLY",
+      byYearDay: [100],
+      dtstart: zdt(2025, 1, 1, 0, "UTC"),
+    });
+    expect(toText(rule)).toBe("every year on the 100th day of the year");
+  });
+
+  test("yearly byweekno", () => {
+    const rule = new RRuleTemporal({
+      freq: "YEARLY",
+      byWeekNo: [20],
+      dtstart: zdt(2025, 1, 1, 0, "UTC"),
+    });
+    expect(toText(rule)).toBe("every year in week 20");
+  });
+
+  test("monthly with bysetpos", () => {
+    const rule = new RRuleTemporal({
+      freq: "MONTHLY",
+      byDay: ["MO", "WE"],
+      bySetPos: [2],
+      dtstart: zdt(2025, 1, 1, 0, "UTC"),
+    });
+    expect(toText(rule)).toBe(
+      "every month on Monday and Wednesday on the 2nd instance"
+    );
+  });
+
+  test("rDate and exDate counts", () => {
+    const rDate = [zdt(2025, 2, 10, 0, "UTC")];
+    const exDate = [zdt(2025, 3, 10, 0, "UTC"), zdt(2025, 4, 10, 0, "UTC")];
+    const rule = new RRuleTemporal({
+      freq: "MONTHLY",
+      count: 1,
+      rDate,
+      exDate,
+      dtstart: zdt(2025, 1, 1, 0, "UTC"),
+    });
+    expect(toText(rule)).toBe("every month for 1 time with 1 additional date excluding 2 dates");
   });
 });

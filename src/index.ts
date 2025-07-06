@@ -23,28 +23,57 @@ type Freq =
 // }
 
 // Extended ManualOpts to include BYDAY and BYMONTH
+/**
+ * Shared options for all rule constructors.
+ *
+ * @property tzid - Time zone identifier as defined in RFC&nbsp;5545 §3.2.19.
+ * @property maxIterations - Safety cap when generating occurrences.
+ * @property includeDtstart - Include DTSTART even if it does not match the rule.
+ */
 interface BaseOpts {
   tzid?: string;
   maxIterations?: number;
   includeDtstart?: boolean;
 }
+
+/**
+ * Manual rule definition following the recurrence rule parts defined in
+ * RFC&nbsp;5545 §3.3.10.
+ */
 interface ManualOpts extends BaseOpts {
+  /** FREQ: recurrence frequency */
   freq: Freq;
+  /** INTERVAL between each occurrence of {@link freq} */
   interval?: number;
+  /** COUNT: total number of occurrences */
   count?: number;
+  /** UNTIL: last possible occurrence */
   until?: Temporal.ZonedDateTime;
+  /** BYHOUR: hours to include (0-23) */
   byHour?: number[];
+  /** BYMINUTE: minutes to include (0-59) */
   byMinute?: number[];
+  /** BYSECOND: seconds to include (0-59) */
   bySecond?: number[];
-  byDay?: string[]; // e.g. ["MO","WE","FR"]
-  byMonth?: number[]; // e.g. [1,4,7]
-  byMonthDay?: number[]; // e.g. [1,15,-1]
+  /** BYDAY: list of weekdays e.g. ["MO","WE","FR"] */
+  byDay?: string[];
+  /** BYMONTH: months of the year (1-12) */
+  byMonth?: number[];
+  /** BYMONTHDAY: days of the month (1..31 or negative from end) */
+  byMonthDay?: number[];
+  /** BYYEARDAY: days of the year (1..366 or negative from end) */
   byYearDay?: number[];
+  /** BYWEEKNO: ISO week numbers (1..53 or negative from end) */
   byWeekNo?: number[];
+  /** BYSETPOS: select n-th occurrence(s) after other filters */
   bySetPos?: number[];
+  /** WKST: weekday on which the week starts ("MO".."SU") */
   wkst?: string;
+  /** RDATE: additional dates to include */
   rDate?: Temporal.ZonedDateTime[];
+  /** EXDATE: exception dates to exclude */
   exDate?: Temporal.ZonedDateTime[];
+  /** DTSTART: first occurrence */
   dtstart: Temporal.ZonedDateTime;
 }
 interface IcsOpts extends BaseOpts {
