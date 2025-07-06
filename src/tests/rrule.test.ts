@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import {RRuleTemporal} from '../index';
+import {RRuleOptions, RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
 
 function zdt(y: number, m: number, d: number, h: number = 0, tz = 'America/New_York') {
@@ -55,7 +55,8 @@ const formatUTC = (d: IDateTime) => toTimezone('UTC')(d)?.toUTCString();
 
 const formatISO = (d: IDateTime) => toTimezone('UTC')(d)?.toISOString();
 
-const parse = (rruleString: string) => new RRuleTemporal({rruleString});
+type Opts = Pick<RRuleOptions, 'maxIterations' | 'includeDtstart'>;
+const parse = (rruleString: string, opts?: Opts) => new RRuleTemporal({rruleString, ...opts});
 
 describe('RRule class methods', () => {
   const rule = new RRuleTemporal({
@@ -1930,82 +1931,6 @@ describe('Additional smoke tests', () => {
       `);
     });
   });
-
-  describe('strict', () => {
-    // TODO: need to check this, need to update test?
-    it.skip("when omitted, yields dtstart as an occurrence even if it doesn't match the RRule", () => {
-      const rule = new RRuleTemporal({
-        dtstart: DATE_2019_DECEMBER_19,
-        freq: 'MONTHLY',
-        interval: 1,
-        tzid: 'UTC',
-        byMonth: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-      });
-
-      expect(rule.all(limit(18)).map(formatISO)).toMatchInlineSnapshot(`
-[
-  "2020-01-19T00:00:00.000Z",
-  "2020-02-19T00:00:00.000Z",
-  "2020-03-19T00:00:00.000Z",
-  "2020-04-19T00:00:00.000Z",
-  "2020-05-19T00:00:00.000Z",
-  "2020-06-19T00:00:00.000Z",
-  "2020-07-19T00:00:00.000Z",
-  "2020-08-19T00:00:00.000Z",
-  "2020-09-19T00:00:00.000Z",
-  "2020-10-19T00:00:00.000Z",
-  "2020-11-19T00:00:00.000Z",
-  "2021-01-19T00:00:00.000Z",
-  "2021-02-19T00:00:00.000Z",
-  "2021-03-19T00:00:00.000Z",
-  "2021-04-19T00:00:00.000Z",
-  "2021-05-19T00:00:00.000Z",
-  "2021-06-19T00:00:00.000Z",
-  "2021-07-19T00:00:00.000Z",
-]
-`);
-    });
-
-    // TODO: dtstart with strict?
-    it.skip('when true, only yields dtstart if it actually matches the RRule', () => {
-      const rule1 = new RRuleTemporal(
-        {
-          dtstart: DATE_2019_DECEMBER_19,
-          freq: 'MONTHLY',
-          interval: 1,
-          tzid: 'UTC',
-          byMonth: [1, 2, 3],
-        },
-        // { strict: true }
-      );
-
-      const rule2 = new RRuleTemporal(
-        {
-          dtstart: DATE_2019_DECEMBER_19,
-          freq: 'MONTHLY',
-          interval: 1,
-          tzid: 'UTC',
-          byMonth: [1, 2, 3, 12],
-        },
-        // { strict: false }
-      );
-
-      expect(rule1.all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2020-01-19T00:00:00.000Z",
-          "2020-02-19T00:00:00.000Z",
-          "2020-03-19T00:00:00.000Z",
-        ]
-      `);
-      expect(rule2.all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2019-12-19T00:00:00.000Z",
-          "2020-01-19T00:00:00.000Z",
-          "2020-02-19T00:00:00.000Z",
-        ]
-      `);
-    });
-  });
 });
 
 describe('Error handling', () => {
@@ -2062,6 +1987,19 @@ describe('Error handling', () => {
     const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
     const rule = new RRuleTemporal({freq: 'DAILY', dtstart, maxIterations: 1000});
     expect(rule.all(limit(999))).toHaveLength(999);
+  });
+
+  it('Support custom max iterations for rrule string', function () {
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;';
+    expect(() => {
+      parse(rrule, {maxIterations: 1000}).all(() => true); // Iterator that never stops
+    }).toThrow('Maximum iterations (1000) exceeded in all()');
+  });
+  it('Max iterations=10000 default for rrule string', function () {
+    const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;';
+    expect(() => {
+      parse(rrule).all(() => true); // Iterator that never stops
+    }).toThrow('Maximum iterations (10000) exceeded in all()');
   });
 });
 
@@ -2125,6 +2063,7 @@ describe('DST timezones and repeat', () => {
   });
 });
 
+// tests and issues from https://github.com/fmeringdal/rust-rrule
 describe('Tests from rust package', function () {
   it('every 2 months on the last Monday', function () {
     const rule = 'DTSTART;TZID=Europe/London:20231030T140000\nRRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1MO';
@@ -2143,7 +2082,7 @@ describe('Tests from rust package', function () {
     // part of the recurrence set.
     it('Monthly on the 31st of the month', function () {
       const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=31';
-      expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
+      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
         [
           "1997-10-31T14:00:00.000Z",
           "1997-12-31T14:00:00.000Z",
@@ -2160,7 +2099,7 @@ describe('Tests from rust package', function () {
     });
     it('Monthly on the 31th-to-last of the month', function () {
       const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=-31';
-      expect(parse(rule).all(limit(16)).map(formatISO)).toMatchInlineSnapshot(`
+      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
         [
           "1997-10-01T13:00:00.000Z",
           "1997-12-01T14:00:00.000Z",
@@ -2344,4 +2283,86 @@ describe('rDate', () => {
     `);
   });
 });
-// test https://github.com/fmeringdal/rust-rrule/issues/119
+
+describe('includeDtstart option', () => {
+  it("when includeDtstart is true, yields dtstart as an occurrence even if it doesn't match the RRule", () => {
+    const rule = new RRuleTemporal({
+      dtstart: DATE_2019_DECEMBER_19,
+      freq: 'MONTHLY',
+      interval: 1,
+      tzid: 'UTC',
+      byMonth: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      includeDtstart: true,
+    });
+
+    expect(rule.all(limit(5)).map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2019-12-19T00:00:00.000Z",
+        "2020-01-19T00:00:00.000Z",
+        "2020-02-19T00:00:00.000Z",
+        "2020-03-19T00:00:00.000Z",
+        "2020-04-19T00:00:00.000Z",
+      ]
+`);
+  });
+
+  it('when false (default), only yields dtstart if it actually matches the RRule', () => {
+    const config = {
+      dtstart: DATE_2019_DECEMBER_19,
+      freq: 'MONTHLY' as const,
+      interval: 1,
+      tzid: 'UTC',
+      byMonth: [1, 2, 3],
+    };
+    const rule1 = new RRuleTemporal({...config}); // default includeDtstart: false
+    const rule2 = new RRuleTemporal({...config, includeDtstart: true});
+    expect(rule1.all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2020-01-19T00:00:00.000Z",
+        "2020-02-19T00:00:00.000Z",
+        "2020-03-19T00:00:00.000Z",
+      ]
+      `);
+    expect(rule2.all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2019-12-19T00:00:00.000Z",
+        "2020-01-19T00:00:00.000Z",
+        "2020-02-19T00:00:00.000Z",
+      ]
+      `);
+  });
+  it('includeDtstart=true with rrule string, respects COUNT', function () {
+    const rule = 'DTSTART;TZID=Europe/Berlin:20240530T200000\nRRULE:FREQ=WEEKLY;COUNT=3;INTERVAL=1;BYDAY=WE';
+    expect(parse(rule, {includeDtstart: true}).all().map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2024-05-30T18:00:00.000Z",
+        "2024-06-05T18:00:00.000Z",
+        "2024-06-12T18:00:00.000Z",
+      ]
+    `);
+  });
+  it('includeDtstart=false with rrule string', function () {
+    const rule = 'DTSTART;TZID=Europe/Berlin:20240530T200000\nRRULE:FREQ=WEEKLY;COUNT=3;INTERVAL=1;BYDAY=WE';
+    expect(parse(rule, {includeDtstart: false}).all().map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2024-06-05T18:00:00.000Z",
+        "2024-06-12T18:00:00.000Z",
+        "2024-06-19T18:00:00.000Z",
+      ]
+    `);
+  });
+  // from https://github.com/fmeringdal/rust-rrule/issues/119
+  it('includeDtstart=true and dtstart is synchronized should not duplicate', function () {
+    const rule =
+      'DTSTART;TZID=Europe/Berlin:20240530T200000\n' +
+      'RDATE;TZID=Europe/Berlin:20240530T200000\n' +
+      'RRULE:FREQ=DAILY;COUNT=3';
+    expect(parse(rule, {includeDtstart: true}).all().map(formatISO)).toMatchInlineSnapshot(`
+      [
+        "2024-05-30T18:00:00.000Z",
+        "2024-05-31T18:00:00.000Z",
+        "2024-06-01T18:00:00.000Z",
+      ]
+  `);
+  });
+});
