@@ -36,7 +36,7 @@ const config: Config = {
   coverageProvider: "v8",
 
   // A list of reporter names that Jest uses when writing coverage reports
-  coverageReporters: ['html', 'text-summary'],
+  coverageReporters: ['html-spa', 'text-summary'],
   //   "json",
   //   "text",
   //   "lcov",
