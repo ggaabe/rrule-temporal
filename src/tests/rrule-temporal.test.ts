@@ -1,22 +1,6 @@
 import { RRuleTemporal } from "../index";
 import { Temporal } from "@js-temporal/polyfill";
-
-function zdt(
-  y: number,
-  m: number,
-  d: number,
-  h: number,
-  tz = "America/New_York"
-) {
-  return Temporal.ZonedDateTime.from({
-    year: y,
-    month: m,
-    day: d,
-    hour: h,
-    minute: 0,
-    timeZone: tz,
-  });
-}
+import { zdt} from "./helpers";
 
 describe("RRuleTemporal - ICS snippet parsing", () => {
   const ics = `DTSTART;TZID=America/Chicago:20250320T170000
