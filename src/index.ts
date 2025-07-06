@@ -111,6 +111,7 @@ type Freq =
 // Extended ManualOpts to include BYDAY and BYMONTH
 interface BaseOpts {
   tzid?: string;
+  maxIterations?: number;
 }
 interface ManualOpts extends BaseOpts {
   freq: Freq;
@@ -127,7 +128,8 @@ interface ManualOpts extends BaseOpts {
   byWeekNo?: number[];
   bySetPos?: number[];
   wkst?: string;
-  rDate?: (Date | Temporal.ZonedDateTime)[];
+  rDate?: Temporal.ZonedDateTime[];
+  exDate?: Temporal.ZonedDateTime[];
   dtstart: Temporal.ZonedDateTime;
 }
 interface IcsOpts extends BaseOpts {
@@ -136,20 +138,69 @@ interface IcsOpts extends BaseOpts {
 export type RRuleOptions = ManualOpts | IcsOpts;
 
 /**
+ * Unfold lines according to RFC 5545 specification.
+ * Lines can be folded by inserting CRLF followed by a single linear white-space character.
+ * This function removes such folding by removing CRLF and the immediately following space/tab.
+ */
+function unfoldLine(foldedLine: string): string {
+  // Remove CRLF followed by a single space or tab
+  return foldedLine.replace(/\r?\n[ \t]/g, '');
+}
+
+/**
+ * Parse date values from EXDATE or RDATE lines
+ */
+function parseDateValues(
+  dateValues: string[],
+  tzid: string
+): Temporal.ZonedDateTime[] {
+  const dates: Temporal.ZonedDateTime[] = [];
+  
+  for (const dateValue of dateValues) {
+    // Handle Z suffix like UNTIL does
+    if (/Z$/.test(dateValue)) {
+      const iso =
+        `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
+        `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
+      dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
+        tzid || "UTC"
+      ));
+    } else {
+      const isoDate =
+        `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
+        `T${dateValue.slice(9)}`;
+      dates.push(Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid));
+    }
+  }
+  
+  return dates;
+}
+
+/**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts
  */
 function parseRRuleString(
   input: string,
   fallbackDtstart?: Temporal.ZonedDateTime
 ): ManualOpts {
+  // Unfold the input according to RFC 5545 specification
+  const unfoldedInput = unfoldLine(input);
+  
   let dtstart: Temporal.ZonedDateTime;
   let tzid: string = "UTC";
   let rruleLine: string;
+  let exDate: Temporal.ZonedDateTime[] = [];
+  let rDate: Temporal.ZonedDateTime[] = [];
 
-  if (/^DTSTART/m.test(input)) {
-    // ICS snippet: split DTSTART and RRULE
-    const [dtLine, rrLine] = input.split(/\r?\n/);
-    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/);
+  if (/^DTSTART/mi.test(unfoldedInput)) {
+    // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
+    const lines = unfoldedInput.split(/\r?\n/);
+    const dtLine = lines[0];
+    const rrLine = lines.find(line => line.match(/^RRULE:/i));
+    const exLines = lines.filter(line => line.match(/^EXDATE/i));
+    const rLines = lines.filter(line => line.match(/^RDATE/i));
+
+    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/i);
     if (!m) throw new Error("Invalid DTSTART in ICS snippet");
     tzid = m[1] || tzid;
     const isoDate =
@@ -157,23 +208,49 @@ function parseRRuleString(
       `T${m[2]!.slice(9)}`;
     dtstart = Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid);
     rruleLine = rrLine!;
+
+    // Parse EXDATE lines
+    for (const exLine of exLines) {
+      const exMatch = exLine.match(/EXDATE(?:;TZID=([^:]+))?:(.+)/i);
+      if (exMatch) {
+        const exTzid = exMatch[1] || tzid;
+        const dateValues = exMatch[2]!.split(',');
+        exDate.push(...parseDateValues(dateValues, exTzid));
+      }
+    }
+
+    // Parse RDATE lines
+    for (const rLine of rLines) {
+      const rMatch = rLine.match(/RDATE(?:;TZID=([^:]+))?:(.+)/i);
+      if (rMatch) {
+        const rTzid = rMatch[1] || tzid;
+        const dateValues = rMatch[2]!.split(',');
+        rDate.push(...parseDateValues(dateValues, rTzid));
+      }
+    }
   } else {
     // Only RRULE line; require fallback
     if (!fallbackDtstart)
       throw new Error("dtstart required when parsing RRULE alone");
     dtstart = fallbackDtstart;
     tzid = fallbackDtstart.timeZoneId;
-    rruleLine = input.replace(/^RRULE:/, "RRULE:");
+    rruleLine = unfoldedInput.replace(/^RRULE:/i, "RRULE:");
   }
 
   // Parse RRULE
-  const parts = rruleLine.replace(/^RRULE:/, "").split(";");
-  const opts = { dtstart, tzid } as ManualOpts;
+  const parts = rruleLine ? rruleLine.replace(/^RRULE:/i, "").split(";") : [];
+  const opts = { 
+    dtstart, 
+    tzid, 
+    exDate: exDate.length > 0 ? exDate : undefined,
+    rDate: rDate.length > 0 ? rDate : undefined
+  } as ManualOpts;
   for (const part of parts) {
     const [key, val] = part.split("=");
-    switch (key) {
+    if (!key) continue;
+    switch (key.toUpperCase()) {
       case "FREQ":
-        opts.freq = val as Freq;
+        opts.freq = val!.toUpperCase() as Freq;
         break;
       case "INTERVAL":
         opts.interval = parseInt(val!, 10);
@@ -306,6 +383,7 @@ export class RRuleTemporal {
   private tzid: string;
   private originalDtstart: Temporal.ZonedDateTime;
   private opts: ManualOpts;
+  private maxIterations: number;
 
   constructor(params: { rruleString: string } | ManualOpts) {
     let manual: ManualOpts;
@@ -331,6 +409,7 @@ export class RRuleTemporal {
       throw new Error("Manual until must be a ZonedDateTime");
     }
     this.opts = this.sanitizeOpts(manual);
+    this.maxIterations = manual.maxIterations ?? 10000;
   }
 
   private sanitizeOpts(opts: ManualOpts): ManualOpts {
@@ -721,6 +800,7 @@ export class RRuleTemporal {
       throw new Error("all() requires iterator when no COUNT/UNTIL");
     }
     const dates: Temporal.ZonedDateTime[] = [];
+    let iterationCount = 0;
 
     // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
     if (
@@ -732,6 +812,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       outer_month: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = this.generateMonthlyOccurrences(monthCursor);
         // Skip this month entirely if **any** occurrence precedes DTSTART.
         if (
@@ -806,6 +890,10 @@ export class RRuleTemporal {
 
       outer_week: while (true) {
         // Generate this week’s occurrences
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = dows
           .flatMap((dw) => {
             const delta = (dw - wkstDay + 7) % 7;
@@ -851,6 +939,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const year = start.year + yearOffset * this.opts.interval!;
 
         for (const month of months) {
@@ -892,6 +984,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       outer_year: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
@@ -926,6 +1022,10 @@ export class RRuleTemporal {
       let matchCount = 0;
 
       outer_year2: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
@@ -955,6 +1055,10 @@ export class RRuleTemporal {
     let matchCount = 0;
 
     while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+      
       if (
         this.opts.until &&
         Temporal.ZonedDateTime.compare(current, this.opts.until) > 0
@@ -985,12 +1089,7 @@ export class RRuleTemporal {
   private mergeAndDeduplicateRDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
     if (!this.opts.rDate) return dates;
 
-    const extras = this.opts.rDate.map((d) =>
-      d instanceof Temporal.ZonedDateTime
-        ? d
-        : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
-    );
-    dates.push(...extras);
+    dates.push(...this.opts.rDate);
     dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
 
     // Deduplicate
@@ -1007,6 +1106,21 @@ export class RRuleTemporal {
   }
 
   /**
+   * Excludes exDate entries from the given array of dates.
+   * @param dates - Array of dates to filter
+   * @returns Filtered array with exDate entries removed
+   */
+  private excludeExDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
+    if (!this.opts.exDate || this.opts.exDate.length === 0) return dates;
+
+    return dates.filter(date => {
+      return !this.opts.exDate!.some(exDate =>
+        Temporal.ZonedDateTime.compare(date, exDate) === 0
+      );
+    });
+  }
+
+  /**
    * Applies count limit and merges rDates with the rule-generated dates.
    * @param dates - Array of dates generated by the rule
    * @param iterator - Optional iterator function
@@ -1017,12 +1131,13 @@ export class RRuleTemporal {
     iterator?: (date: Temporal.ZonedDateTime, count: number) => boolean
   ): Temporal.ZonedDateTime[] {
     const merged = this.mergeAndDeduplicateRDates(dates);
+    const excluded = this.excludeExDates(merged);
 
     // Apply count limit to the final combined result
     if (this.opts.count !== undefined) {
       let finalCount = 0;
       const finalDates: Temporal.ZonedDateTime[] = [];
-      for (const d of merged) {
+      for (const d of excluded) {
         if (finalCount >= this.opts.count) break;
         if (iterator && !iterator(d, finalCount)) break;
         finalDates.push(d);
@@ -1031,7 +1146,7 @@ export class RRuleTemporal {
       return finalDates;
     }
 
-    return merged;
+    return excluded;
   }
 
   /**
@@ -1046,9 +1161,12 @@ export class RRuleTemporal {
       return matchCount >= this.opts.count;
     }
 
-    // If we have rDates, collect at least count occurrences from the rule so we can merge properly
-    // But also add a safety limit to prevent infinite loops
-    return matchCount >= this.opts.count * 2;
+    // If we have rDates, generate enough rule occurrences to reach the count limit
+    // when combined with rDates. Add a reasonable safety margin.
+    const rDateCount = this.opts.rDate.length;
+    const targetRuleCount = Math.max(this.opts.count - rDateCount, 0);
+    const safetyMargin = Math.min(targetRuleCount, 10);
+    return matchCount >= targetRuleCount + safetyMargin;
   }
 
   /**
@@ -1072,6 +1190,7 @@ export class RRuleTemporal {
         ? Temporal.Instant.from(before.toISOString())
         : before.toInstant();
     const results: Temporal.ZonedDateTime[] = [];
+    let iterationCount = 0;
 
     // 1) MONTHLY + BYDAY/BYMONTHDAY
     if (
@@ -1081,6 +1200,10 @@ export class RRuleTemporal {
       let monthCursor = this.computeFirst().with({ day: 1 });
 
       outer: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateMonthlyOccurrences(monthCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1115,6 +1238,10 @@ export class RRuleTemporal {
       let yearOffset = 0;
 
       outer: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const year = start.year + yearOffset * this.opts.interval!;
 
         for (const month of months) {
@@ -1150,6 +1277,10 @@ export class RRuleTemporal {
       let yearCursor = start.with({ month: 1, day: 1 });
 
       outer_year: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1180,6 +1311,10 @@ export class RRuleTemporal {
       let yearCursor = start.with({ month: 1, day: 1 });
 
       outer_year2: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1216,6 +1351,10 @@ export class RRuleTemporal {
       const results: Temporal.ZonedDateTime[] = [];
 
       outer: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+        }
+        
         const occs = this.generateWeeklyOccurrences(weekCursor);
         for (const occ of occs) {
           const inst = occ.toInstant();
@@ -1243,6 +1382,10 @@ export class RRuleTemporal {
     // 3) fallback
     let current = this.computeFirst();
     while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in between()`);
+      }
+      
       const inst = current.toInstant();
       if (inc) {
         if (Temporal.Instant.compare(inst, endInst) > 0) break;
@@ -1471,7 +1614,11 @@ export class RRuleTemporal {
         .filter((d) => d >= 1 && d <= lastDay);
     }
 
-    if (!byDay && byMonthDayHits.length) {
+    if (!byDay && byMonthDay && byMonthDay.length > 0) {
+      if (byMonthDayHits.length === 0) {
+        // No valid days found for this month, return empty array
+        return [];
+      }
       const dates = byMonthDayHits.map((d) => sample.with({ day: d }));
       return dates
         .flatMap((z) => this.expandByTime(z))
@@ -1527,7 +1674,11 @@ export class RRuleTemporal {
     }
     // Combine with BYMONTHDAY if present
     let finalDays = byDayHits;
-    if (byMonthDayHits.length) {
+    if (byMonthDay && byMonthDay.length > 0) {
+      if (byMonthDayHits.length === 0) {
+        // No valid days found for BYMONTHDAY, return empty array
+        return [];
+      }
       finalDays = finalDays.filter((d) => byMonthDayHits.includes(d));
     }
 
@@ -1665,16 +1816,10 @@ export class RRuleTemporal {
     endInst: Temporal.Instant,
     inc: boolean
   ): Temporal.ZonedDateTime[] {
-    if (!this.opts.rDate) return list;
-
-    const extras = this.opts.rDate.map((d) =>
-      d instanceof Temporal.ZonedDateTime
-        ? d
-        : Temporal.Instant.from(d.toISOString()).toZonedDateTimeISO(this.tzid)
-    );
+    if (!this.opts.rDate) return this.excludeExDates(list);
 
     // Filter extras by time window
-    for (const z of extras) {
+    for (const z of this.opts.rDate) {
       const inst = z.toInstant();
       const startOk = inc
         ? Temporal.Instant.compare(inst, startInst) >= 0
@@ -1696,6 +1841,6 @@ export class RRuleTemporal {
         dedup.push(d);
       }
     }
-    return dedup;
+    return this.excludeExDates(dedup);
   }
 }
