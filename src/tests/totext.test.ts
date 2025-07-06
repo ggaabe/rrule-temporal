@@ -1,4 +1,5 @@
-import { RRuleTemporal, DateFormatter } from "../index";
+import { RRuleTemporal } from "../index";
+import { toText } from "../totext";
 import { Temporal } from "@js-temporal/polyfill";
 
 function zdt(y: number, m: number, d: number, h: number, tz = "UTC") {
@@ -18,7 +19,7 @@ describe("RRuleTemporal.toText", () => {
       freq: "DAILY",
       dtstart: zdt(2025, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every day");
+    expect(toText(rule)).toBe("every day");
   });
 
   test("daily with hours", () => {
@@ -27,7 +28,7 @@ describe("RRuleTemporal.toText", () => {
       byHour: [10, 12, 17],
       dtstart: zdt(2025, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every day at 10 AM, 12 PM and 5 PM UTC");
+    expect(toText(rule)).toBe("every day at 10 AM, 12 PM and 5 PM UTC");
   });
 
   test("weekly with byday and hours", () => {
@@ -37,7 +38,7 @@ describe("RRuleTemporal.toText", () => {
       byHour: [10, 12, 17],
       dtstart: zdt(2025, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every week on Sunday at 10 AM, 12 PM and 5 PM UTC");
+    expect(toText(rule)).toBe("every week on Sunday at 10 AM, 12 PM and 5 PM UTC");
   });
 
   test("daily with hour and minute", () => {
@@ -47,7 +48,7 @@ describe("RRuleTemporal.toText", () => {
       byMinute: [30],
       dtstart: zdt(2025, 1, 1, 0, "America/Chicago"),
     });
-    expect(rule.toText()).toBe("every day at 5:30 PM CST");
+    expect(toText(rule)).toBe("every day at 5:30 PM CST");
   });
 
   test("weekdays shortcut", () => {
@@ -56,7 +57,7 @@ describe("RRuleTemporal.toText", () => {
       byDay: ["MO", "TU", "WE", "TH", "FR"],
       dtstart: zdt(2025, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every weekday");
+    expect(toText(rule)).toBe("every weekday");
   });
 
   test("minutely interval", () => {
@@ -65,7 +66,7 @@ describe("RRuleTemporal.toText", () => {
       interval: 2,
       dtstart: zdt(2025, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every 2 minutes");
+    expect(toText(rule)).toBe("every 2 minutes");
   });
 
   test("until formatted", () => {
@@ -77,9 +78,7 @@ describe("RRuleTemporal.toText", () => {
       until,
       dtstart: zdt(2012, 1, 1, 0),
     });
-    expect(rule.toText()).toBe("every week until November 10, 2012");
+    expect(toText(rule)).toBe("every week until November 10, 2012");
 
-    const fmt: DateFormatter = (y, m, d) => `${d}. ${m}, ${y}`;
-    expect(rule.toText(fmt)).toBe("every week until 10. November, 2012");
   });
 });

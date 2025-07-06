@@ -1,4 +1,5 @@
 import { RRuleTemporal } from "../index";
+import { toText } from "../totext";
 import { Temporal } from "@js-temporal/polyfill";
 
 function make(ruleStr: string): RRuleTemporal {
@@ -54,6 +55,6 @@ describe("toText", () => {
 
   test.each(cases)("%s", (text, ruleStr) => {
     const rule = make(ruleStr);
-    expect(rule.toText().toLowerCase()).toBe(text.toLowerCase());
+    expect(toText(rule).toLowerCase()).toBe(text.toLowerCase());
   });
 });

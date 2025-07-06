@@ -9,6 +9,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./totext": {
+      "types": "./dist/totext.d.ts",
+      "import": "./dist/totext.js",
+      "require": "./dist/totext.cjs"
     }
   },
   "scripts": {

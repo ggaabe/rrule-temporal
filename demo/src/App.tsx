@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Temporal } from "@js-temporal/polyfill";
 import { RRuleTemporal } from "rrule-temporal";
+import { toText } from "rrule-temporal/totext";
 
 const defaultICS = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=WEEKLY;BYHOUR=12;COUNT=30`;
 
@@ -80,7 +81,7 @@ export default function App() {
           };
         });
       setErr(null);
-      return { ruleString: rule.toString(), ruleText: rule.toText(), rows };
+      return { ruleString: rule.toString(), ruleText: toText(rule), rows };
     } catch (e) {
       setErr((e as Error).message);
       return { ruleString: "", ruleText: "", rows: [] };

@@ -1,4 +1,5 @@
 import { RRuleTemporal } from "../index";
+import { toText } from "../totext";
 import { Temporal } from "@js-temporal/polyfill";
 import { zdt} from "./helpers";
 
@@ -881,7 +882,7 @@ describe("RRuleTemporal - BYMONTHDAY", () => {
       byMonthDay: [1, 15],
       dtstart,
     });
-    expect(rule.toText()).toBe(
+    expect(toText(rule)).toBe(
       "every month on the 1st and 15th day of the month"
     );
   });
