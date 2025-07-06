@@ -1,6 +1,15 @@
 import {RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
-import {format, formatISO, limit, parse, zdt} from './helpers';
+import {
+  assertAllDates,
+  assertAllDatesWithFormat,
+  assertBetweenDates,
+  format,
+  formatISO,
+  limit,
+  parse,
+  zdt,
+} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 const DATE_2019 = zdt(2019, 1, 1, 0, 'UTC');
@@ -13,55 +22,50 @@ describe('Additional smoke tests', () => {
   // integration tests to make sure invalid inputs get ignored gracefully
 
   describe('secondly frequency', () => {
-    it.skip('Every second', () => {
+    it('Every second', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2023_JAN_6_11PM,
         freq: 'SECONDLY',
         interval: 1,
         tzid: 'UTC',
       });
-
-      expect(rule.all(limit(12)).map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2023-01-06T23:00:00.000Z",
-        "2023-01-06T23:00:01.000Z",
-        "2023-01-06T23:00:02.000Z",
-        "2023-01-06T23:00:03.000Z",
-        "2023-01-06T23:00:04.000Z",
-        "2023-01-06T23:00:05.000Z",
-        "2023-01-06T23:00:06.000Z",
-        "2023-01-06T23:00:07.000Z",
-        "2023-01-06T23:00:08.000Z",
-        "2023-01-06T23:00:09.000Z",
-        "2023-01-06T23:00:10.000Z",
-        "2023-01-06T23:00:11.000Z",
-      ]
-  `);
+      assertAllDates(rule, [
+        '2023-01-06T23:00:00.000Z',
+        '2023-01-06T23:00:01.000Z',
+        '2023-01-06T23:00:02.000Z',
+        '2023-01-06T23:00:03.000Z',
+        '2023-01-06T23:00:04.000Z',
+        '2023-01-06T23:00:05.000Z',
+        '2023-01-06T23:00:06.000Z',
+        '2023-01-06T23:00:07.000Z',
+        '2023-01-06T23:00:08.000Z',
+        '2023-01-06T23:00:09.000Z',
+        '2023-01-06T23:00:10.000Z',
+        '2023-01-06T23:00:11.000Z',
+      ]);
     });
-    it.skip('Every 15 seconds', () => {
+
+    it('Every 15 seconds', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2023_JAN_6_11PM,
         freq: 'SECONDLY',
         interval: 15,
         tzid: 'UTC',
       });
-
-      expect(rule.all(limit(12)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2023-01-06T23:00:00.000Z",
-          "2023-01-06T23:00:15.000Z",
-          "2023-01-06T23:00:30.000Z",
-          "2023-01-06T23:00:45.000Z",
-          "2023-01-06T23:01:00.000Z",
-          "2023-01-06T23:01:15.000Z",
-          "2023-01-06T23:01:30.000Z",
-          "2023-01-06T23:01:45.000Z",
-          "2023-01-06T23:02:00.000Z",
-          "2023-01-06T23:02:15.000Z",
-          "2023-01-06T23:02:30.000Z",
-          "2023-01-06T23:02:45.000Z",
-        ]
-      `);
+      assertAllDates(rule, [
+        '2023-01-06T23:00:00.000Z',
+        '2023-01-06T23:00:15.000Z',
+        '2023-01-06T23:00:30.000Z',
+        '2023-01-06T23:00:45.000Z',
+        '2023-01-06T23:01:00.000Z',
+        '2023-01-06T23:01:15.000Z',
+        '2023-01-06T23:01:30.000Z',
+        '2023-01-06T23:01:45.000Z',
+        '2023-01-06T23:02:00.000Z',
+        '2023-01-06T23:02:15.000Z',
+        '2023-01-06T23:02:30.000Z',
+        '2023-01-06T23:02:45.000Z',
+      ]);
     });
   });
 
@@ -74,22 +78,20 @@ describe('Additional smoke tests', () => {
         tzid: 'Europe/Madrid',
         byDay: ['SA'],
       });
-      expect(rule.all(limit(12)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2023-01-07T23:00:00.000Z",
-          "2023-01-14T23:00:00.000Z",
-          "2023-01-21T23:00:00.000Z",
-          "2023-01-28T23:00:00.000Z",
-          "2023-02-04T23:00:00.000Z",
-          "2023-02-11T23:00:00.000Z",
-          "2023-02-18T23:00:00.000Z",
-          "2023-02-25T23:00:00.000Z",
-          "2023-03-04T23:00:00.000Z",
-          "2023-03-11T23:00:00.000Z",
-          "2023-03-18T23:00:00.000Z",
-          "2023-03-25T23:00:00.000Z",
-        ]
-        `);
+      assertAllDates(rule, [
+        '2023-01-07T23:00:00.000Z',
+        '2023-01-14T23:00:00.000Z',
+        '2023-01-21T23:00:00.000Z',
+        '2023-01-28T23:00:00.000Z',
+        '2023-02-04T23:00:00.000Z',
+        '2023-02-11T23:00:00.000Z',
+        '2023-02-18T23:00:00.000Z',
+        '2023-02-25T23:00:00.000Z',
+        '2023-03-04T23:00:00.000Z',
+        '2023-03-11T23:00:00.000Z',
+        '2023-03-18T23:00:00.000Z',
+        '2023-03-25T23:00:00.000Z',
+      ]);
 
       const rule2 = new RRuleTemporal({
         dtstart: DATE_2023_JAN_6_11PM,
@@ -98,24 +100,22 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         byDay: ['SA'],
       });
-
-      expect(rule2.all(limit(12)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2023-01-07T23:00:00.000Z",
-          "2023-01-14T23:00:00.000Z",
-          "2023-01-21T23:00:00.000Z",
-          "2023-01-28T23:00:00.000Z",
-          "2023-02-04T23:00:00.000Z",
-          "2023-02-11T23:00:00.000Z",
-          "2023-02-18T23:00:00.000Z",
-          "2023-02-25T23:00:00.000Z",
-          "2023-03-04T23:00:00.000Z",
-          "2023-03-11T23:00:00.000Z",
-          "2023-03-18T23:00:00.000Z",
-          "2023-03-25T23:00:00.000Z",
-        ]
-      `);
+      assertAllDates(rule2, [
+        '2023-01-07T23:00:00.000Z',
+        '2023-01-14T23:00:00.000Z',
+        '2023-01-21T23:00:00.000Z',
+        '2023-01-28T23:00:00.000Z',
+        '2023-02-04T23:00:00.000Z',
+        '2023-02-11T23:00:00.000Z',
+        '2023-02-18T23:00:00.000Z',
+        '2023-02-25T23:00:00.000Z',
+        '2023-03-04T23:00:00.000Z',
+        '2023-03-11T23:00:00.000Z',
+        '2023-03-18T23:00:00.000Z',
+        '2023-03-25T23:00:00.000Z',
+      ]);
     });
+
     it('ignores invalid byDay values', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
@@ -125,24 +125,22 @@ describe('Additional smoke tests', () => {
         // @ts-expect-error Expect invalid values
         byDay: ['TH', 0, -2],
       });
-      expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2019-12-19T00:00:00.000Z",
-          "2019-12-26T00:00:00.000Z",
-          "2020-01-02T00:00:00.000Z",
-          "2020-01-09T00:00:00.000Z",
-          "2020-01-16T00:00:00.000Z",
-          "2020-01-23T00:00:00.000Z",
-          "2020-01-30T00:00:00.000Z",
-          "2020-02-06T00:00:00.000Z",
-          "2020-02-13T00:00:00.000Z",
-          "2020-02-20T00:00:00.000Z",
-          "2020-02-27T00:00:00.000Z",
-          "2020-03-05T00:00:00.000Z",
-          "2020-03-12T00:00:00.000Z",
-          "2020-03-19T00:00:00.000Z",
-        ]
-      `);
+      assertAllDates(rule, [
+        '2019-12-19T00:00:00.000Z',
+        '2019-12-26T00:00:00.000Z',
+        '2020-01-02T00:00:00.000Z',
+        '2020-01-09T00:00:00.000Z',
+        '2020-01-16T00:00:00.000Z',
+        '2020-01-23T00:00:00.000Z',
+        '2020-01-30T00:00:00.000Z',
+        '2020-02-06T00:00:00.000Z',
+        '2020-02-13T00:00:00.000Z',
+        '2020-02-20T00:00:00.000Z',
+        '2020-02-27T00:00:00.000Z',
+        '2020-03-05T00:00:00.000Z',
+        '2020-03-12T00:00:00.000Z',
+        '2020-03-19T00:00:00.000Z',
+      ]);
 
       const rule2 = new RRuleTemporal({
         dtstart: DATE_2019,
@@ -153,19 +151,17 @@ describe('Additional smoke tests', () => {
         byDay: ['SA', 'SU', 'MO', 0],
       });
 
-      expect(rule2.all(limit(9)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2019-01-05T00:00:00.000Z",
-          "2019-01-06T00:00:00.000Z",
-          "2019-01-07T00:00:00.000Z",
-          "2019-01-12T00:00:00.000Z",
-          "2019-01-13T00:00:00.000Z",
-          "2019-01-14T00:00:00.000Z",
-          "2019-01-19T00:00:00.000Z",
-          "2019-01-20T00:00:00.000Z",
-          "2019-01-21T00:00:00.000Z",
-        ]
-      `);
+      assertAllDates(rule2, [
+        '2019-01-05T00:00:00.000Z',
+        '2019-01-06T00:00:00.000Z',
+        '2019-01-07T00:00:00.000Z',
+        '2019-01-12T00:00:00.000Z',
+        '2019-01-13T00:00:00.000Z',
+        '2019-01-14T00:00:00.000Z',
+        '2019-01-19T00:00:00.000Z',
+        '2019-01-20T00:00:00.000Z',
+        '2019-01-21T00:00:00.000Z',
+      ]);
     });
   });
 
@@ -178,24 +174,22 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         byMonth: [0],
       });
-      expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2019-12-19T00:00:00.000Z",
-          "2020-12-19T00:00:00.000Z",
-          "2021-12-19T00:00:00.000Z",
-          "2022-12-19T00:00:00.000Z",
-          "2023-12-19T00:00:00.000Z",
-          "2024-12-19T00:00:00.000Z",
-          "2025-12-19T00:00:00.000Z",
-          "2026-12-19T00:00:00.000Z",
-          "2027-12-19T00:00:00.000Z",
-          "2028-12-19T00:00:00.000Z",
-          "2029-12-19T00:00:00.000Z",
-          "2030-12-19T00:00:00.000Z",
-          "2031-12-19T00:00:00.000Z",
-          "2032-12-19T00:00:00.000Z",
-        ]
-      `);
+      assertAllDates(rule, [
+        '2019-12-19T00:00:00.000Z',
+        '2020-12-19T00:00:00.000Z',
+        '2021-12-19T00:00:00.000Z',
+        '2022-12-19T00:00:00.000Z',
+        '2023-12-19T00:00:00.000Z',
+        '2024-12-19T00:00:00.000Z',
+        '2025-12-19T00:00:00.000Z',
+        '2026-12-19T00:00:00.000Z',
+        '2027-12-19T00:00:00.000Z',
+        '2028-12-19T00:00:00.000Z',
+        '2029-12-19T00:00:00.000Z',
+        '2030-12-19T00:00:00.000Z',
+        '2031-12-19T00:00:00.000Z',
+        '2032-12-19T00:00:00.000Z',
+      ]);
     });
   });
 
@@ -210,25 +204,24 @@ describe('Additional smoke tests', () => {
         byMinute: [30],
         bySecond: [0, 15],
       });
-      expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2019-12-19T14:30:00.000Z",
-          "2019-12-19T14:30:15.000Z",
-          "2019-12-20T14:30:00.000Z",
-          "2019-12-20T14:30:15.000Z",
-          "2019-12-21T14:30:00.000Z",
-          "2019-12-21T14:30:15.000Z",
-          "2019-12-22T14:30:00.000Z",
-          "2019-12-22T14:30:15.000Z",
-          "2019-12-23T14:30:00.000Z",
-          "2019-12-23T14:30:15.000Z",
-          "2019-12-24T14:30:00.000Z",
-          "2019-12-24T14:30:15.000Z",
-          "2019-12-25T14:30:00.000Z",
-          "2019-12-25T14:30:15.000Z",
-        ]
-      `);
+      assertAllDates(rule, [
+        '2019-12-19T14:30:00.000Z',
+        '2019-12-19T14:30:15.000Z',
+        '2019-12-20T14:30:00.000Z',
+        '2019-12-20T14:30:15.000Z',
+        '2019-12-21T14:30:00.000Z',
+        '2019-12-21T14:30:15.000Z',
+        '2019-12-22T14:30:00.000Z',
+        '2019-12-22T14:30:15.000Z',
+        '2019-12-23T14:30:00.000Z',
+        '2019-12-23T14:30:15.000Z',
+        '2019-12-24T14:30:00.000Z',
+        '2019-12-24T14:30:15.000Z',
+        '2019-12-25T14:30:00.000Z',
+        '2019-12-25T14:30:15.000Z',
+      ]);
     });
+
     it('works with hourly frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
@@ -238,25 +231,24 @@ describe('Additional smoke tests', () => {
         byMinute: [15, 30],
         bySecond: [30, 0],
       });
-      expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2019-12-19T00:15:00.000Z",
-          "2019-12-19T00:15:30.000Z",
-          "2019-12-19T00:30:00.000Z",
-          "2019-12-19T00:30:30.000Z",
-          "2019-12-19T01:15:00.000Z",
-          "2019-12-19T01:15:30.000Z",
-          "2019-12-19T01:30:00.000Z",
-          "2019-12-19T01:30:30.000Z",
-          "2019-12-19T02:15:00.000Z",
-          "2019-12-19T02:15:30.000Z",
-          "2019-12-19T02:30:00.000Z",
-          "2019-12-19T02:30:30.000Z",
-          "2019-12-19T03:15:00.000Z",
-          "2019-12-19T03:15:30.000Z",
-        ]
-      `);
+      assertAllDates(rule, [
+        '2019-12-19T00:15:00.000Z',
+        '2019-12-19T00:15:30.000Z',
+        '2019-12-19T00:30:00.000Z',
+        '2019-12-19T00:30:30.000Z',
+        '2019-12-19T01:15:00.000Z',
+        '2019-12-19T01:15:30.000Z',
+        '2019-12-19T01:30:00.000Z',
+        '2019-12-19T01:30:30.000Z',
+        '2019-12-19T02:15:00.000Z',
+        '2019-12-19T02:15:30.000Z',
+        '2019-12-19T02:30:00.000Z',
+        '2019-12-19T02:30:30.000Z',
+        '2019-12-19T03:15:00.000Z',
+        '2019-12-19T03:15:30.000Z',
+      ]);
     });
+
     it('works with minutely frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
@@ -265,25 +257,24 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         bySecond: [10, 30, 58],
       });
-      expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2019-12-19T00:00:10.000Z",
-        "2019-12-19T00:00:30.000Z",
-        "2019-12-19T00:00:58.000Z",
-        "2019-12-19T00:01:10.000Z",
-        "2019-12-19T00:01:30.000Z",
-        "2019-12-19T00:01:58.000Z",
-        "2019-12-19T00:02:10.000Z",
-        "2019-12-19T00:02:30.000Z",
-        "2019-12-19T00:02:58.000Z",
-        "2019-12-19T00:03:10.000Z",
-        "2019-12-19T00:03:30.000Z",
-        "2019-12-19T00:03:58.000Z",
-        "2019-12-19T00:04:10.000Z",
-        "2019-12-19T00:04:30.000Z",
-      ]
-    `);
+      assertAllDates(rule, [
+        '2019-12-19T00:00:10.000Z',
+        '2019-12-19T00:00:30.000Z',
+        '2019-12-19T00:00:58.000Z',
+        '2019-12-19T00:01:10.000Z',
+        '2019-12-19T00:01:30.000Z',
+        '2019-12-19T00:01:58.000Z',
+        '2019-12-19T00:02:10.000Z',
+        '2019-12-19T00:02:30.000Z',
+        '2019-12-19T00:02:58.000Z',
+        '2019-12-19T00:03:10.000Z',
+        '2019-12-19T00:03:30.000Z',
+        '2019-12-19T00:03:58.000Z',
+        '2019-12-19T00:04:10.000Z',
+        '2019-12-19T00:04:30.000Z',
+      ]);
     });
+
     it('works with secondly frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
@@ -292,45 +283,32 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         bySecond: [10, 30, 58],
       });
-      expect(rule.all(limit(14)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2019-12-19T00:00:10.000Z",
-          "2019-12-19T00:00:30.000Z",
-          "2019-12-19T00:00:58.000Z",
-          "2019-12-19T00:00:10.000Z",
-          "2019-12-19T00:00:30.000Z",
-          "2019-12-19T00:00:58.000Z",
-          "2019-12-19T00:00:10.000Z",
-          "2019-12-19T00:00:30.000Z",
-          "2019-12-19T00:00:58.000Z",
-          "2019-12-19T00:00:10.000Z",
-          "2019-12-19T00:00:30.000Z",
-          "2019-12-19T00:00:58.000Z",
-          "2019-12-19T00:00:10.000Z",
-          "2019-12-19T00:00:30.000Z",
-        ]
-      `);
+      assertAllDates(rule, [
+        '2019-12-19T00:00:10.000Z',
+        '2019-12-19T00:00:30.000Z',
+        '2019-12-19T00:00:58.000Z',
+        '2019-12-19T00:00:10.000Z',
+        '2019-12-19T00:00:30.000Z',
+        '2019-12-19T00:00:58.000Z',
+        '2019-12-19T00:00:10.000Z',
+        '2019-12-19T00:00:30.000Z',
+        '2019-12-19T00:00:58.000Z',
+        '2019-12-19T00:00:10.000Z',
+        '2019-12-19T00:00:30.000Z',
+        '2019-12-19T00:00:58.000Z',
+        '2019-12-19T00:00:10.000Z',
+        '2019-12-19T00:00:30.000Z',
+      ]);
     });
 
     it('Property names are are case-insensitive', function () {
       const rule = 'dtstart:19970902T090000Z\nrrule:freq=yearly;count=3';
-      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "1997-09-02T09:00:00.000Z",
-        "1998-09-02T09:00:00.000Z",
-        "1999-09-02T09:00:00.000Z",
-      ]
-      `);
+      assertAllDates(parse(rule), ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z', '1999-09-02T09:00:00.000Z']);
     });
+
     it('Unfold strings before processing', function () {
       const rule = 'dtstart:19970902T090000Z\nrrule:FREQ=YEA\n RLY;COUNT=3\n';
-      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "1997-09-02T09:00:00.000Z",
-        "1998-09-02T09:00:00.000Z",
-        "1999-09-02T09:00:00.000Z",
-      ]
-      `);
+      assertAllDates(parse(rule), ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z', '1999-09-02T09:00:00.000Z']);
     });
   });
 
@@ -344,21 +322,20 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
       });
 
-      expect(rule3.all(limit(10)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2020-04-01T00:00:00.000Z",
-          "2021-04-02T00:00:00.000Z",
-          "2022-04-02T00:00:00.000Z",
-          "2023-04-02T00:00:00.000Z",
-          "2024-04-01T00:00:00.000Z",
-          "2025-04-02T00:00:00.000Z",
-          "2026-04-02T00:00:00.000Z",
-          "2027-04-02T00:00:00.000Z",
-          "2028-04-01T00:00:00.000Z",
-          "2029-04-02T00:00:00.000Z",
-        ]
-      `);
+      assertAllDates(rule3, [
+        '2020-04-01T00:00:00.000Z',
+        '2021-04-02T00:00:00.000Z',
+        '2022-04-02T00:00:00.000Z',
+        '2023-04-02T00:00:00.000Z',
+        '2024-04-01T00:00:00.000Z',
+        '2025-04-02T00:00:00.000Z',
+        '2026-04-02T00:00:00.000Z',
+        '2027-04-02T00:00:00.000Z',
+        '2028-04-01T00:00:00.000Z',
+        '2029-04-02T00:00:00.000Z',
+      ]);
     });
+
     it('ignores invalid byYearDay values', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2020,
@@ -368,20 +345,18 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
       });
 
-      expect(rule.all(limit(10)).map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "2020-12-31T00:00:00.000Z",
-          "2021-12-31T00:00:00.000Z",
-          "2022-12-31T00:00:00.000Z",
-          "2023-12-31T00:00:00.000Z",
-          "2024-12-31T00:00:00.000Z",
-          "2025-12-31T00:00:00.000Z",
-          "2026-12-31T00:00:00.000Z",
-          "2027-12-31T00:00:00.000Z",
-          "2028-12-31T00:00:00.000Z",
-          "2029-12-31T00:00:00.000Z",
-        ]
-      `);
+      assertAllDates(rule, [
+        '2020-12-31T00:00:00.000Z',
+        '2021-12-31T00:00:00.000Z',
+        '2022-12-31T00:00:00.000Z',
+        '2023-12-31T00:00:00.000Z',
+        '2024-12-31T00:00:00.000Z',
+        '2025-12-31T00:00:00.000Z',
+        '2026-12-31T00:00:00.000Z',
+        '2027-12-31T00:00:00.000Z',
+        '2028-12-31T00:00:00.000Z',
+        '2029-12-31T00:00:00.000Z',
+      ]);
     });
   });
 });
@@ -398,6 +373,7 @@ describe('Error handling', () => {
       });
     expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Manual dtstart must be a ZonedDateTime"`);
   });
+
   it('throws an error on an invalid until', () => {
     const testFn = () =>
       new RRuleTemporal({
@@ -448,6 +424,7 @@ describe('Error handling', () => {
       parse(rrule, {maxIterations: 1000}).all(() => true); // Iterator that never stops
     }).toThrow('Maximum iterations (1000) exceeded in all()');
   });
+
   it('Max iterations=10000 default for rrule string', function () {
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;';
     expect(() => {
@@ -465,54 +442,50 @@ describe('DST timezones and repeat', () => {
       interval: 1,
       tzid: tz,
     });
-    expect(rule.all(limit(20)).map(format(tz))).toMatchInlineSnapshot(`
-      [
-        "2024-03-12T22:00:00+11:00[Australia/Sydney]",
-        "2024-04-12T22:00:00+10:00[Australia/Sydney]",
-        "2024-05-12T22:00:00+10:00[Australia/Sydney]",
-        "2024-06-12T22:00:00+10:00[Australia/Sydney]",
-        "2024-07-12T22:00:00+10:00[Australia/Sydney]",
-        "2024-08-12T22:00:00+10:00[Australia/Sydney]",
-        "2024-09-12T22:00:00+10:00[Australia/Sydney]",
-        "2024-10-12T22:00:00+11:00[Australia/Sydney]",
-        "2024-11-12T22:00:00+11:00[Australia/Sydney]",
-        "2024-12-12T22:00:00+11:00[Australia/Sydney]",
-        "2025-01-12T22:00:00+11:00[Australia/Sydney]",
-        "2025-02-12T22:00:00+11:00[Australia/Sydney]",
-        "2025-03-12T22:00:00+11:00[Australia/Sydney]",
-        "2025-04-12T22:00:00+10:00[Australia/Sydney]",
-        "2025-05-12T22:00:00+10:00[Australia/Sydney]",
-        "2025-06-12T22:00:00+10:00[Australia/Sydney]",
-        "2025-07-12T22:00:00+10:00[Australia/Sydney]",
-        "2025-08-12T22:00:00+10:00[Australia/Sydney]",
-        "2025-09-12T22:00:00+10:00[Australia/Sydney]",
-        "2025-10-12T22:00:00+11:00[Australia/Sydney]",
-      ]
-    `);
-    expect(rule.all(limit(20)).map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2024-03-12T11:00:00.000Z",
-        "2024-04-12T12:00:00.000Z",
-        "2024-05-12T12:00:00.000Z",
-        "2024-06-12T12:00:00.000Z",
-        "2024-07-12T12:00:00.000Z",
-        "2024-08-12T12:00:00.000Z",
-        "2024-09-12T12:00:00.000Z",
-        "2024-10-12T11:00:00.000Z",
-        "2024-11-12T11:00:00.000Z",
-        "2024-12-12T11:00:00.000Z",
-        "2025-01-12T11:00:00.000Z",
-        "2025-02-12T11:00:00.000Z",
-        "2025-03-12T11:00:00.000Z",
-        "2025-04-12T12:00:00.000Z",
-        "2025-05-12T12:00:00.000Z",
-        "2025-06-12T12:00:00.000Z",
-        "2025-07-12T12:00:00.000Z",
-        "2025-08-12T12:00:00.000Z",
-        "2025-09-12T12:00:00.000Z",
-        "2025-10-12T11:00:00.000Z",
-      ]
-    `);
+    assertAllDatesWithFormat(rule, format(tz), [
+      '2024-03-12T22:00:00+11:00[Australia/Sydney]',
+      '2024-04-12T22:00:00+10:00[Australia/Sydney]',
+      '2024-05-12T22:00:00+10:00[Australia/Sydney]',
+      '2024-06-12T22:00:00+10:00[Australia/Sydney]',
+      '2024-07-12T22:00:00+10:00[Australia/Sydney]',
+      '2024-08-12T22:00:00+10:00[Australia/Sydney]',
+      '2024-09-12T22:00:00+10:00[Australia/Sydney]',
+      '2024-10-12T22:00:00+11:00[Australia/Sydney]',
+      '2024-11-12T22:00:00+11:00[Australia/Sydney]',
+      '2024-12-12T22:00:00+11:00[Australia/Sydney]',
+      '2025-01-12T22:00:00+11:00[Australia/Sydney]',
+      '2025-02-12T22:00:00+11:00[Australia/Sydney]',
+      '2025-03-12T22:00:00+11:00[Australia/Sydney]',
+      '2025-04-12T22:00:00+10:00[Australia/Sydney]',
+      '2025-05-12T22:00:00+10:00[Australia/Sydney]',
+      '2025-06-12T22:00:00+10:00[Australia/Sydney]',
+      '2025-07-12T22:00:00+10:00[Australia/Sydney]',
+      '2025-08-12T22:00:00+10:00[Australia/Sydney]',
+      '2025-09-12T22:00:00+10:00[Australia/Sydney]',
+      '2025-10-12T22:00:00+11:00[Australia/Sydney]',
+    ]);
+    assertAllDates(rule, [
+      '2024-03-12T11:00:00.000Z',
+      '2024-04-12T12:00:00.000Z',
+      '2024-05-12T12:00:00.000Z',
+      '2024-06-12T12:00:00.000Z',
+      '2024-07-12T12:00:00.000Z',
+      '2024-08-12T12:00:00.000Z',
+      '2024-09-12T12:00:00.000Z',
+      '2024-10-12T11:00:00.000Z',
+      '2024-11-12T11:00:00.000Z',
+      '2024-12-12T11:00:00.000Z',
+      '2025-01-12T11:00:00.000Z',
+      '2025-02-12T11:00:00.000Z',
+      '2025-03-12T11:00:00.000Z',
+      '2025-04-12T12:00:00.000Z',
+      '2025-05-12T12:00:00.000Z',
+      '2025-06-12T12:00:00.000Z',
+      '2025-07-12T12:00:00.000Z',
+      '2025-08-12T12:00:00.000Z',
+      '2025-09-12T12:00:00.000Z',
+      '2025-10-12T11:00:00.000Z',
+    ]);
   });
 });
 
@@ -526,16 +499,13 @@ describe('includeDtstart option', () => {
       byMonth: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
       includeDtstart: true,
     });
-
-    expect(rule.all(limit(5)).map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2019-12-19T00:00:00.000Z",
-        "2020-01-19T00:00:00.000Z",
-        "2020-02-19T00:00:00.000Z",
-        "2020-03-19T00:00:00.000Z",
-        "2020-04-19T00:00:00.000Z",
-      ]
-`);
+    assertAllDates(rule, [
+      '2019-12-19T00:00:00.000Z',
+      '2020-01-19T00:00:00.000Z',
+      '2020-02-19T00:00:00.000Z',
+      '2020-03-19T00:00:00.000Z',
+      '2020-04-19T00:00:00.000Z',
+    ]);
   });
 
   it('when false (default), only yields dtstart if it actually matches the RRule', () => {
@@ -548,54 +518,39 @@ describe('includeDtstart option', () => {
     };
     const rule1 = new RRuleTemporal({...config}); // default includeDtstart: false
     const rule2 = new RRuleTemporal({...config, includeDtstart: true});
-    expect(rule1.all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2020-01-19T00:00:00.000Z",
-        "2020-02-19T00:00:00.000Z",
-        "2020-03-19T00:00:00.000Z",
-      ]
-      `);
-    expect(rule2.all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2019-12-19T00:00:00.000Z",
-        "2020-01-19T00:00:00.000Z",
-        "2020-02-19T00:00:00.000Z",
-      ]
-      `);
+    assertAllDates(rule1, ['2020-01-19T00:00:00.000Z', '2020-02-19T00:00:00.000Z', '2020-03-19T00:00:00.000Z']);
+    assertAllDates(rule2, ['2019-12-19T00:00:00.000Z', '2020-01-19T00:00:00.000Z', '2020-02-19T00:00:00.000Z']);
   });
+
   it('includeDtstart=true with rrule string, respects COUNT', function () {
     const rule = 'DTSTART;TZID=Europe/Berlin:20240530T200000\nRRULE:FREQ=WEEKLY;COUNT=3;INTERVAL=1;BYDAY=WE';
-    expect(parse(rule, {includeDtstart: true}).all().map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2024-05-30T18:00:00.000Z",
-        "2024-06-05T18:00:00.000Z",
-        "2024-06-12T18:00:00.000Z",
-      ]
-    `);
+    assertAllDates(parse(rule, {includeDtstart: true}), [
+      '2024-05-30T18:00:00.000Z',
+      '2024-06-05T18:00:00.000Z',
+      '2024-06-12T18:00:00.000Z',
+    ]);
   });
+
   it('includeDtstart=false with rrule string', function () {
     const rule = 'DTSTART;TZID=Europe/Berlin:20240530T200000\nRRULE:FREQ=WEEKLY;COUNT=3;INTERVAL=1;BYDAY=WE';
-    expect(parse(rule, {includeDtstart: false}).all().map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2024-06-05T18:00:00.000Z",
-        "2024-06-12T18:00:00.000Z",
-        "2024-06-19T18:00:00.000Z",
-      ]
-    `);
+    assertAllDates(parse(rule, {includeDtstart: false}), [
+      '2024-06-05T18:00:00.000Z',
+      '2024-06-12T18:00:00.000Z',
+      '2024-06-19T18:00:00.000Z',
+    ]);
   });
+
   // from https://github.com/fmeringdal/rust-rrule/issues/119
   it('includeDtstart=true and dtstart is synchronized should not duplicate', function () {
     const rule =
       'DTSTART;TZID=Europe/Berlin:20240530T200000\n' +
       'RDATE;TZID=Europe/Berlin:20240530T200000\n' +
       'RRULE:FREQ=DAILY;COUNT=3';
-    expect(parse(rule, {includeDtstart: true}).all().map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2024-05-30T18:00:00.000Z",
-        "2024-05-31T18:00:00.000Z",
-        "2024-06-01T18:00:00.000Z",
-      ]
-  `);
+    assertAllDates(parse(rule, {includeDtstart: true}), [
+      '2024-05-30T18:00:00.000Z',
+      '2024-05-31T18:00:00.000Z',
+      '2024-06-01T18:00:00.000Z',
+    ]);
   });
 });
 
@@ -603,14 +558,9 @@ describe('includeDtstart option', () => {
 describe('Tests from rust package', function () {
   it('every 2 months on the last Monday', function () {
     const rule = 'DTSTART;TZID=Europe/London:20231030T140000\nRRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1MO';
-    expect(parse(rule).all(limit(3)).map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2023-10-30T14:00:00.000Z",
-        "2023-12-25T14:00:00.000Z",
-        "2024-02-26T14:00:00.000Z",
-      ]
-    `);
+    assertAllDates(parse(rule), ['2023-10-30T14:00:00.000Z', '2023-12-25T14:00:00.000Z', '2024-02-26T14:00:00.000Z']);
   });
+
   describe('Monthly on 31st or -31st of the month', function () {
     // Recurrence rules may generate recurrence instances with an invalid date (e.g., February 30)
     // or nonexistent local time (e.g., 1:30 AM on a day where the local time is moved forward by an
@@ -618,105 +568,94 @@ describe('Tests from rust package', function () {
     // part of the recurrence set.
     it('Monthly on the 31st of the month', function () {
       const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=31';
-      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "1997-10-31T14:00:00.000Z",
-          "1997-12-31T14:00:00.000Z",
-          "1998-01-31T14:00:00.000Z",
-          "1998-03-31T14:00:00.000Z",
-          "1998-05-31T13:00:00.000Z",
-          "1998-07-31T13:00:00.000Z",
-          "1998-08-31T13:00:00.000Z",
-          "1998-10-31T14:00:00.000Z",
-          "1998-12-31T14:00:00.000Z",
-          "1999-01-31T14:00:00.000Z",
-        ]
-    `);
+      assertAllDates(parse(rule), [
+        '1997-10-31T14:00:00.000Z',
+        '1997-12-31T14:00:00.000Z',
+        '1998-01-31T14:00:00.000Z',
+        '1998-03-31T14:00:00.000Z',
+        '1998-05-31T13:00:00.000Z',
+        '1998-07-31T13:00:00.000Z',
+        '1998-08-31T13:00:00.000Z',
+        '1998-10-31T14:00:00.000Z',
+        '1998-12-31T14:00:00.000Z',
+        '1999-01-31T14:00:00.000Z',
+      ]);
     });
+
     it('Monthly on the 31th-to-last of the month', function () {
       const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=-31';
-      expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
-        [
-          "1997-10-01T13:00:00.000Z",
-          "1997-12-01T14:00:00.000Z",
-          "1998-01-01T14:00:00.000Z",
-          "1998-03-01T14:00:00.000Z",
-          "1998-05-01T13:00:00.000Z",
-          "1998-07-01T13:00:00.000Z",
-          "1998-08-01T13:00:00.000Z",
-          "1998-10-01T13:00:00.000Z",
-          "1998-12-01T14:00:00.000Z",
-          "1999-01-01T14:00:00.000Z",
-        ]
-    `);
+      assertAllDates(parse(rule), [
+        '1997-10-01T13:00:00.000Z',
+        '1997-12-01T14:00:00.000Z',
+        '1998-01-01T14:00:00.000Z',
+        '1998-03-01T14:00:00.000Z',
+        '1998-05-01T13:00:00.000Z',
+        '1998-07-01T13:00:00.000Z',
+        '1998-08-01T13:00:00.000Z',
+        '1998-10-01T13:00:00.000Z',
+        '1998-12-01T14:00:00.000Z',
+        '1999-01-01T14:00:00.000Z',
+      ]);
     });
   });
+
   const FOUR_HOURS_MS = 14400000;
   it('DST hourly/minutes handling GMT -> BST', function () {
     const tz = 'Europe/London';
     const rule = `DTSTART;TZID=${tz}:20240330T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
     const Y2024_03_31_UTC = 1711843200000;
     const r = [new Date(Y2024_03_31_UTC - FOUR_HOURS_MS), new Date(Y2024_03_31_UTC + FOUR_HOURS_MS)];
-    const entries = parse(rule).between(r[0]!, r[1]!);
 
-    // change over at 1am, have gaps
-    expect(entries.map(format(tz))).toMatchInlineSnapshot(`
-      [
-        "2024-03-31T00:00:00+00:00[Europe/London]",
-        "2024-03-31T00:30:00+00:00[Europe/London]",
-        "2024-03-31T02:00:00+01:00[Europe/London]",
-        "2024-03-31T02:30:00+01:00[Europe/London]",
-        "2024-03-31T03:00:00+01:00[Europe/London]",
-        "2024-03-31T03:30:00+01:00[Europe/London]",
-        "2024-03-31T04:00:00+01:00[Europe/London]",
-        "2024-03-31T04:30:00+01:00[Europe/London]",
-      ]
-    `);
-    expect(entries.map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2024-03-31T00:00:00.000Z",
-        "2024-03-31T00:30:00.000Z",
-        "2024-03-31T01:00:00.000Z",
-        "2024-03-31T01:30:00.000Z",
-        "2024-03-31T02:00:00.000Z",
-        "2024-03-31T02:30:00.000Z",
-        "2024-03-31T03:00:00.000Z",
-        "2024-03-31T03:30:00.000Z",
-      ]
-    `);
+    assertBetweenDates(parse(rule), r[0]!, r[1]!, format(tz), [
+      '2024-03-31T00:00:00+00:00[Europe/London]',
+      '2024-03-31T00:30:00+00:00[Europe/London]',
+      // change over at 1am, have gaps
+      '2024-03-31T02:00:00+01:00[Europe/London]',
+      '2024-03-31T02:30:00+01:00[Europe/London]',
+      '2024-03-31T03:00:00+01:00[Europe/London]',
+      '2024-03-31T03:30:00+01:00[Europe/London]',
+      '2024-03-31T04:00:00+01:00[Europe/London]',
+      '2024-03-31T04:30:00+01:00[Europe/London]',
+    ]);
+    assertBetweenDates(parse(rule), r[0]!, r[1]!, formatISO, [
+      '2024-03-31T00:00:00.000Z',
+      '2024-03-31T00:30:00.000Z',
+      '2024-03-31T01:00:00.000Z',
+      '2024-03-31T01:30:00.000Z',
+      '2024-03-31T02:00:00.000Z',
+      '2024-03-31T02:30:00.000Z',
+      '2024-03-31T03:00:00.000Z',
+      '2024-03-31T03:30:00.000Z',
+    ]);
   });
+
   it('DST hourly/minutes handling BST -> GMT', function () {
     const tz = 'Europe/London';
     const rule = `DTSTART;TZID=${tz}:20241026T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
     const Y2024_10_27_UTC = 1729987200000;
     const r = [new Date(Y2024_10_27_UTC - FOUR_HOURS_MS), new Date(Y2024_10_27_UTC + FOUR_HOURS_MS)];
-    const entries = parse(rule).between(r[0]!, r[1]!);
     // should have no gaps
-    expect(entries.map(format(tz))).toMatchInlineSnapshot(`
-      [
-        "2024-10-27T00:00:00+01:00[Europe/London]",
-        "2024-10-27T00:30:00+01:00[Europe/London]",
-        "2024-10-27T01:00:00+01:00[Europe/London]",
-        "2024-10-27T01:30:00+01:00[Europe/London]",
-        "2024-10-27T02:00:00+00:00[Europe/London]",
-        "2024-10-27T02:30:00+00:00[Europe/London]",
-        "2024-10-27T03:00:00+00:00[Europe/London]",
-        "2024-10-27T03:30:00+00:00[Europe/London]",
-      ]
-    `);
-    // change over at 2am
-    expect(entries.map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2024-10-26T23:00:00.000Z",
-        "2024-10-26T23:30:00.000Z",
-        "2024-10-27T00:00:00.000Z",
-        "2024-10-27T00:30:00.000Z",
-        "2024-10-27T02:00:00.000Z",
-        "2024-10-27T02:30:00.000Z",
-        "2024-10-27T03:00:00.000Z",
-        "2024-10-27T03:30:00.000Z",
-      ]
-    `);
+    assertBetweenDates(parse(rule), r[0]!, r[1]!, format(tz), [
+      '2024-10-27T00:00:00+01:00[Europe/London]',
+      '2024-10-27T00:30:00+01:00[Europe/London]',
+      '2024-10-27T01:00:00+01:00[Europe/London]',
+      '2024-10-27T01:30:00+01:00[Europe/London]',
+      '2024-10-27T02:00:00+00:00[Europe/London]',
+      '2024-10-27T02:30:00+00:00[Europe/London]',
+      '2024-10-27T03:00:00+00:00[Europe/London]',
+      '2024-10-27T03:30:00+00:00[Europe/London]',
+    ]);
+    assertBetweenDates(parse(rule), r[0]!, r[1]!, formatISO, [
+      '2024-10-26T23:00:00.000Z',
+      '2024-10-26T23:30:00.000Z',
+      '2024-10-27T00:00:00.000Z',
+      '2024-10-27T00:30:00.000Z',
+      // change over at 2am
+      '2024-10-27T02:00:00.000Z',
+      '2024-10-27T02:30:00.000Z',
+      '2024-10-27T03:00:00.000Z',
+      '2024-10-27T03:30:00.000Z',
+    ]);
   });
 });
 
@@ -724,24 +663,21 @@ describe('exDate', function () {
   it('Multiple exDate', function () {
     const rule = 'DTSTART:20201114T000000Z\nRRULE:FREQ=DAILY\nEXDATE;TZID=UTC:20201121T000000,20201128T000000Z';
     const r = [new Date('2020-11-14T00:00:00.000Z'), new Date('2020-11-30T00:00:00.000Z')];
-    const entries = parse(rule).between(r[0]!, r[1]!).map(formatISO);
-    expect(entries).toMatchInlineSnapshot(`
-      [
-        "2020-11-15T00:00:00.000Z",
-        "2020-11-16T00:00:00.000Z",
-        "2020-11-17T00:00:00.000Z",
-        "2020-11-18T00:00:00.000Z",
-        "2020-11-19T00:00:00.000Z",
-        "2020-11-20T00:00:00.000Z",
-        "2020-11-22T00:00:00.000Z",
-        "2020-11-23T00:00:00.000Z",
-        "2020-11-24T00:00:00.000Z",
-        "2020-11-25T00:00:00.000Z",
-        "2020-11-26T00:00:00.000Z",
-        "2020-11-27T00:00:00.000Z",
-        "2020-11-29T00:00:00.000Z",
-      ]
-    `);
+    assertBetweenDates(parse(rule), r[0]!, r[1]!, formatISO, [
+      '2020-11-15T00:00:00.000Z',
+      '2020-11-16T00:00:00.000Z',
+      '2020-11-17T00:00:00.000Z',
+      '2020-11-18T00:00:00.000Z',
+      '2020-11-19T00:00:00.000Z',
+      '2020-11-20T00:00:00.000Z',
+      '2020-11-22T00:00:00.000Z',
+      '2020-11-23T00:00:00.000Z',
+      '2020-11-24T00:00:00.000Z',
+      '2020-11-25T00:00:00.000Z',
+      '2020-11-26T00:00:00.000Z',
+      '2020-11-27T00:00:00.000Z',
+      '2020-11-29T00:00:00.000Z',
+    ]);
   });
 });
 
@@ -755,21 +691,18 @@ describe('rDate', () => {
       count: 10,
       rDate: [zdt(2020, 5, 14, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
     });
-
-    expect(rule.all().map(formatISO)).toMatchInlineSnapshot(`
-[
-  "2019-12-19T00:00:00.000Z",
-  "2020-02-19T00:00:00.000Z",
-  "2020-04-19T00:00:00.000Z",
-  "2020-05-14T00:00:00.000Z",
-  "2020-05-15T00:00:00.000Z",
-  "2020-06-19T00:00:00.000Z",
-  "2020-07-18T00:00:00.000Z",
-  "2020-08-19T00:00:00.000Z",
-  "2020-10-19T00:00:00.000Z",
-  "2020-12-19T00:00:00.000Z",
-]
-`);
+    assertAllDates(rule, [
+      '2019-12-19T00:00:00.000Z',
+      '2020-02-19T00:00:00.000Z',
+      '2020-04-19T00:00:00.000Z',
+      '2020-05-14T00:00:00.000Z',
+      '2020-05-15T00:00:00.000Z',
+      '2020-06-19T00:00:00.000Z',
+      '2020-07-18T00:00:00.000Z',
+      '2020-08-19T00:00:00.000Z',
+      '2020-10-19T00:00:00.000Z',
+      '2020-12-19T00:00:00.000Z',
+    ]);
   });
 
   it('does not yield RDates twice if they already match the RRule', () => {
@@ -781,21 +714,18 @@ describe('rDate', () => {
       count: 10,
       rDate: [zdt(2020, 4, 19, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
     });
-
-    expect(rule.all().map(formatISO)).toMatchInlineSnapshot(`
-[
-  "2019-12-19T00:00:00.000Z",
-  "2020-02-19T00:00:00.000Z",
-  "2020-04-19T00:00:00.000Z",
-  "2020-05-15T00:00:00.000Z",
-  "2020-06-19T00:00:00.000Z",
-  "2020-07-18T00:00:00.000Z",
-  "2020-08-19T00:00:00.000Z",
-  "2020-10-19T00:00:00.000Z",
-  "2020-12-19T00:00:00.000Z",
-  "2021-02-19T00:00:00.000Z",
-]
-`);
+    assertAllDates(rule, [
+      '2019-12-19T00:00:00.000Z',
+      '2020-02-19T00:00:00.000Z',
+      '2020-04-19T00:00:00.000Z',
+      '2020-05-15T00:00:00.000Z',
+      '2020-06-19T00:00:00.000Z',
+      '2020-07-18T00:00:00.000Z',
+      '2020-08-19T00:00:00.000Z',
+      '2020-10-19T00:00:00.000Z',
+      '2020-12-19T00:00:00.000Z',
+      '2021-02-19T00:00:00.000Z',
+    ]);
   });
 
   it('parses rDate value', function () {
@@ -803,20 +733,18 @@ describe('rDate', () => {
       'DTSTART:19970713T000000Z\nRRULE:FREQ=WEEKLY;COUNT=10\n' +
       'RDATE:19970714T000000Z\n' +
       'RDATE;TZID=America/New_York:19970715T000000';
-    expect(parse(rule).all().map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "1997-07-13T00:00:00.000Z",
-        "1997-07-14T00:00:00.000Z",
-        "1997-07-15T04:00:00.000Z",
-        "1997-07-20T00:00:00.000Z",
-        "1997-07-27T00:00:00.000Z",
-        "1997-08-03T00:00:00.000Z",
-        "1997-08-10T00:00:00.000Z",
-        "1997-08-17T00:00:00.000Z",
-        "1997-08-24T00:00:00.000Z",
-        "1997-08-31T00:00:00.000Z",
-      ]
-    `);
+    assertAllDates(parse(rule), [
+      '1997-07-13T00:00:00.000Z',
+      '1997-07-14T00:00:00.000Z',
+      '1997-07-15T04:00:00.000Z',
+      '1997-07-20T00:00:00.000Z',
+      '1997-07-27T00:00:00.000Z',
+      '1997-08-03T00:00:00.000Z',
+      '1997-08-10T00:00:00.000Z',
+      '1997-08-17T00:00:00.000Z',
+      '1997-08-24T00:00:00.000Z',
+      '1997-08-31T00:00:00.000Z',
+    ]);
   });
 });
 
@@ -860,16 +788,13 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     const ics = `DTSTART;TZID=America/Chicago:20250320T170000
 RRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
     const rule = new RRuleTemporal({rruleString: ics});
-    const dates = rule.all();
-    expect(dates.map(formatISO)).toMatchInlineSnapshot(`
-      [
-        "2025-03-20T22:00:00.000Z",
-        "2025-03-21T22:00:00.000Z",
-        "2025-03-22T22:00:00.000Z",
-        "2025-03-23T22:00:00.000Z",
-        "2025-03-24T22:00:00.000Z",
-      ]
-    `);
+    assertAllDates(rule, [
+      '2025-03-20T22:00:00.000Z',
+      '2025-03-21T22:00:00.000Z',
+      '2025-03-22T22:00:00.000Z',
+      '2025-03-23T22:00:00.000Z',
+      '2025-03-24T22:00:00.000Z',
+    ]);
   });
 });
 
@@ -919,10 +844,15 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
       count: 6,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    console.log(dates.map(formatISO));
-    expect(dates).toHaveLength(6);
-    expect(dates.every((d) => d.hour === 12)).toBe(true);
+    // TODO: should it include 2025-01-01?
+    assertAllDates(rule, [
+      '2025-06-23T12:00:00.000Z',
+      '2025-12-22T12:00:00.000Z',
+      '2025-12-29T12:00:00.000Z',
+      '2026-06-22T12:00:00.000Z',
+      '2026-12-21T12:00:00.000Z',
+      '2026-12-28T12:00:00.000Z',
+    ]);
   });
 
   it.skip('should handle yearly recurrence by negative week number', () => {

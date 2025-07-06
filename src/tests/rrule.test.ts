@@ -19,7 +19,7 @@
 
 import {RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
-import {formatISO, formatUTC, limit, zdt} from './helpers';
+import {assertBetweenDates, formatISO, formatUTC, limit, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 
@@ -120,44 +120,31 @@ describe('RRule class methods', () => {
 
   describe('between', () => {
     it('returns all occurrences between two specified dates', () => {
-      expect(
-        rule
-          .between(new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00'))
-          .map(formatUTC),
-      ).toMatchInlineSnapshot(`
-        [
-          "Sat, 06 Sep 1997 13:00:00 GMT",
-          "Sun, 07 Sep 1997 13:00:00 GMT",
-          "Mon, 08 Sep 1997 13:00:00 GMT",
-          "Tue, 09 Sep 1997 13:00:00 GMT",
-          "Wed, 10 Sep 1997 13:00:00 GMT",
-        ]
-      `);
+      const r = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
+      assertBetweenDates(rule, r[0]!, r[1]!, formatUTC, [
+        'Sat, 06 Sep 1997 13:00:00 GMT',
+        'Sun, 07 Sep 1997 13:00:00 GMT',
+        'Mon, 08 Sep 1997 13:00:00 GMT',
+        'Tue, 09 Sep 1997 13:00:00 GMT',
+        'Wed, 10 Sep 1997 13:00:00 GMT',
+      ]);
     });
 
     describe('if the specified start date is a occurrence', () => {
       it('includes only occurrences after the specified date by default', () => {
-        expect(
-          rule
-            .between(new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00'))
-            .map(formatUTC),
-        ).toMatchInlineSnapshot(`
-          [
-            "Sat, 06 Sep 1997 13:00:00 GMT",
-            "Sun, 07 Sep 1997 13:00:00 GMT",
-            "Mon, 08 Sep 1997 13:00:00 GMT",
-            "Tue, 09 Sep 1997 13:00:00 GMT",
-            "Wed, 10 Sep 1997 13:00:00 GMT",
-          ]
-        `);
+        const r = [new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
+        assertBetweenDates(rule, r[0]!, r[1]!, formatUTC, [
+          'Sat, 06 Sep 1997 13:00:00 GMT',
+          'Sun, 07 Sep 1997 13:00:00 GMT',
+          'Mon, 08 Sep 1997 13:00:00 GMT',
+          'Tue, 09 Sep 1997 13:00:00 GMT',
+          'Wed, 10 Sep 1997 13:00:00 GMT',
+        ]);
       });
 
       it('returns the specified date when passed inclusive: true', () => {
-        expect(
-          rule
-            .between(new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00'), true)
-            .map(formatUTC),
-        ).toMatchInlineSnapshot(`
+        const r = [new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
+        expect(rule.between(r[0]!, r[1]!, true).map(formatUTC)).toMatchInlineSnapshot(`
           [
             "Fri, 05 Sep 1997 13:00:00 GMT",
             "Sat, 06 Sep 1997 13:00:00 GMT",
@@ -172,26 +159,18 @@ describe('RRule class methods', () => {
 
     describe('if the specified end date is a occurrence', () => {
       it('includes only occurrences after the specified date by default', () => {
-        expect(
-          rule
-            .between(new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00'))
-            .map(formatUTC),
-        ).toMatchInlineSnapshot(`
-          [
-            "Sat, 06 Sep 1997 13:00:00 GMT",
-            "Sun, 07 Sep 1997 13:00:00 GMT",
-            "Mon, 08 Sep 1997 13:00:00 GMT",
-            "Tue, 09 Sep 1997 13:00:00 GMT",
-          ]
-        `);
+        const r = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00')];
+        assertBetweenDates(rule, r[0]!, r[1]!, formatUTC, [
+          'Sat, 06 Sep 1997 13:00:00 GMT',
+          'Sun, 07 Sep 1997 13:00:00 GMT',
+          'Mon, 08 Sep 1997 13:00:00 GMT',
+          'Tue, 09 Sep 1997 13:00:00 GMT',
+        ]);
       });
 
       it('returns the specified date when passed inclusive: true', () => {
-        expect(
-          rule
-            .between(new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00'), true)
-            .map(formatUTC),
-        ).toMatchInlineSnapshot(`
+        const r = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00')];
+        expect(rule.between(r[0]!, r[1]!, true).map(formatUTC)).toMatchInlineSnapshot(`
           [
             "Sat, 06 Sep 1997 13:00:00 GMT",
             "Sun, 07 Sep 1997 13:00:00 GMT",
@@ -218,28 +197,28 @@ describe('RRule class methods', () => {
 type ITestRRule = {
   rule: RRuleTemporal;
   rrule: string;
-  snapshot: string;
+  dates: string[];
   print?: (d: Temporal.ZonedDateTime | null) => string | undefined;
   between?: (Date | Temporal.ZonedDateTime)[];
   limit?: number;
 };
 
-function expectSnapshot({rule, snapshot, between, limit: max, print = formatUTC}: Omit<ITestRRule, 'rrule'>) {
+function expectdates({rule, dates, between, limit: max, print = formatUTC}: Omit<ITestRRule, 'rrule'>) {
   if (between && between.length >= 2) {
-    expect(rule.between(between[0]!, between[1]!, true).map(print)).toMatchInlineSnapshot(snapshot);
+    expect(rule.between(between[0]!, between[1]!, true).map(print)).toEqual(dates);
   } else if (max) {
-    expect(rule.all(limit(max)).map(print)).toMatchInlineSnapshot(snapshot);
+    expect(rule.all(limit(max)).map(print)).toEqual(dates);
   } else {
-    expect(rule.all().map(print)).toMatchInlineSnapshot(snapshot);
+    expect(rule.all().map(print)).toEqual(dates);
   }
 }
 
-function testWithConstructorAndRRule({rule, rrule, snapshot, between, limit: max, print = formatUTC}: ITestRRule) {
+function testWithConstructorAndRRule({rule, rrule, dates, between, limit: max, print = formatUTC}: ITestRRule) {
   it('using constructor', function () {
-    expectSnapshot({rule, snapshot, between, limit: max, print});
+    expectdates({rule, dates, between, limit: max, print});
   });
   it('using rrule', function () {
-    expectSnapshot({rule: new RRuleTemporal({rruleString: rrule}), snapshot, between, limit: max, print});
+    expectdates({rule: new RRuleTemporal({rruleString: rrule}), dates, between, limit: max, print});
   });
 }
 
@@ -255,21 +234,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;COUNT=10';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Wed, 03 Sep 1997 13:00:00 GMT",
-        "Thu, 04 Sep 1997 13:00:00 GMT",
-        "Fri, 05 Sep 1997 13:00:00 GMT",
-        "Sat, 06 Sep 1997 13:00:00 GMT",
-        "Sun, 07 Sep 1997 13:00:00 GMT",
-        "Mon, 08 Sep 1997 13:00:00 GMT",
-        "Tue, 09 Sep 1997 13:00:00 GMT",
-        "Wed, 10 Sep 1997 13:00:00 GMT",
-        "Thu, 11 Sep 1997 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Wed, 03 Sep 1997 13:00:00 GMT',
+      'Thu, 04 Sep 1997 13:00:00 GMT',
+      'Fri, 05 Sep 1997 13:00:00 GMT',
+      'Sat, 06 Sep 1997 13:00:00 GMT',
+      'Sun, 07 Sep 1997 13:00:00 GMT',
+      'Mon, 08 Sep 1997 13:00:00 GMT',
+      'Tue, 09 Sep 1997 13:00:00 GMT',
+      'Wed, 10 Sep 1997 13:00:00 GMT',
+      'Thu, 11 Sep 1997 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Daily until December 24, 1997', () => {
@@ -280,124 +257,122 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;UNTIL=19971224T000000Z';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Wed, 03 Sep 1997 13:00:00 GMT",
-        "Thu, 04 Sep 1997 13:00:00 GMT",
-        "Fri, 05 Sep 1997 13:00:00 GMT",
-        "Sat, 06 Sep 1997 13:00:00 GMT",
-        "Sun, 07 Sep 1997 13:00:00 GMT",
-        "Mon, 08 Sep 1997 13:00:00 GMT",
-        "Tue, 09 Sep 1997 13:00:00 GMT",
-        "Wed, 10 Sep 1997 13:00:00 GMT",
-        "Thu, 11 Sep 1997 13:00:00 GMT",
-        "Fri, 12 Sep 1997 13:00:00 GMT",
-        "Sat, 13 Sep 1997 13:00:00 GMT",
-        "Sun, 14 Sep 1997 13:00:00 GMT",
-        "Mon, 15 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Wed, 17 Sep 1997 13:00:00 GMT",
-        "Thu, 18 Sep 1997 13:00:00 GMT",
-        "Fri, 19 Sep 1997 13:00:00 GMT",
-        "Sat, 20 Sep 1997 13:00:00 GMT",
-        "Sun, 21 Sep 1997 13:00:00 GMT",
-        "Mon, 22 Sep 1997 13:00:00 GMT",
-        "Tue, 23 Sep 1997 13:00:00 GMT",
-        "Wed, 24 Sep 1997 13:00:00 GMT",
-        "Thu, 25 Sep 1997 13:00:00 GMT",
-        "Fri, 26 Sep 1997 13:00:00 GMT",
-        "Sat, 27 Sep 1997 13:00:00 GMT",
-        "Sun, 28 Sep 1997 13:00:00 GMT",
-        "Mon, 29 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Wed, 01 Oct 1997 13:00:00 GMT",
-        "Thu, 02 Oct 1997 13:00:00 GMT",
-        "Fri, 03 Oct 1997 13:00:00 GMT",
-        "Sat, 04 Oct 1997 13:00:00 GMT",
-        "Sun, 05 Oct 1997 13:00:00 GMT",
-        "Mon, 06 Oct 1997 13:00:00 GMT",
-        "Tue, 07 Oct 1997 13:00:00 GMT",
-        "Wed, 08 Oct 1997 13:00:00 GMT",
-        "Thu, 09 Oct 1997 13:00:00 GMT",
-        "Fri, 10 Oct 1997 13:00:00 GMT",
-        "Sat, 11 Oct 1997 13:00:00 GMT",
-        "Sun, 12 Oct 1997 13:00:00 GMT",
-        "Mon, 13 Oct 1997 13:00:00 GMT",
-        "Tue, 14 Oct 1997 13:00:00 GMT",
-        "Wed, 15 Oct 1997 13:00:00 GMT",
-        "Thu, 16 Oct 1997 13:00:00 GMT",
-        "Fri, 17 Oct 1997 13:00:00 GMT",
-        "Sat, 18 Oct 1997 13:00:00 GMT",
-        "Sun, 19 Oct 1997 13:00:00 GMT",
-        "Mon, 20 Oct 1997 13:00:00 GMT",
-        "Tue, 21 Oct 1997 13:00:00 GMT",
-        "Wed, 22 Oct 1997 13:00:00 GMT",
-        "Thu, 23 Oct 1997 13:00:00 GMT",
-        "Fri, 24 Oct 1997 13:00:00 GMT",
-        "Sat, 25 Oct 1997 13:00:00 GMT",
-        "Sun, 26 Oct 1997 14:00:00 GMT",
-        "Mon, 27 Oct 1997 14:00:00 GMT",
-        "Tue, 28 Oct 1997 14:00:00 GMT",
-        "Wed, 29 Oct 1997 14:00:00 GMT",
-        "Thu, 30 Oct 1997 14:00:00 GMT",
-        "Fri, 31 Oct 1997 14:00:00 GMT",
-        "Sat, 01 Nov 1997 14:00:00 GMT",
-        "Sun, 02 Nov 1997 14:00:00 GMT",
-        "Mon, 03 Nov 1997 14:00:00 GMT",
-        "Tue, 04 Nov 1997 14:00:00 GMT",
-        "Wed, 05 Nov 1997 14:00:00 GMT",
-        "Thu, 06 Nov 1997 14:00:00 GMT",
-        "Fri, 07 Nov 1997 14:00:00 GMT",
-        "Sat, 08 Nov 1997 14:00:00 GMT",
-        "Sun, 09 Nov 1997 14:00:00 GMT",
-        "Mon, 10 Nov 1997 14:00:00 GMT",
-        "Tue, 11 Nov 1997 14:00:00 GMT",
-        "Wed, 12 Nov 1997 14:00:00 GMT",
-        "Thu, 13 Nov 1997 14:00:00 GMT",
-        "Fri, 14 Nov 1997 14:00:00 GMT",
-        "Sat, 15 Nov 1997 14:00:00 GMT",
-        "Sun, 16 Nov 1997 14:00:00 GMT",
-        "Mon, 17 Nov 1997 14:00:00 GMT",
-        "Tue, 18 Nov 1997 14:00:00 GMT",
-        "Wed, 19 Nov 1997 14:00:00 GMT",
-        "Thu, 20 Nov 1997 14:00:00 GMT",
-        "Fri, 21 Nov 1997 14:00:00 GMT",
-        "Sat, 22 Nov 1997 14:00:00 GMT",
-        "Sun, 23 Nov 1997 14:00:00 GMT",
-        "Mon, 24 Nov 1997 14:00:00 GMT",
-        "Tue, 25 Nov 1997 14:00:00 GMT",
-        "Wed, 26 Nov 1997 14:00:00 GMT",
-        "Thu, 27 Nov 1997 14:00:00 GMT",
-        "Fri, 28 Nov 1997 14:00:00 GMT",
-        "Sat, 29 Nov 1997 14:00:00 GMT",
-        "Sun, 30 Nov 1997 14:00:00 GMT",
-        "Mon, 01 Dec 1997 14:00:00 GMT",
-        "Tue, 02 Dec 1997 14:00:00 GMT",
-        "Wed, 03 Dec 1997 14:00:00 GMT",
-        "Thu, 04 Dec 1997 14:00:00 GMT",
-        "Fri, 05 Dec 1997 14:00:00 GMT",
-        "Sat, 06 Dec 1997 14:00:00 GMT",
-        "Sun, 07 Dec 1997 14:00:00 GMT",
-        "Mon, 08 Dec 1997 14:00:00 GMT",
-        "Tue, 09 Dec 1997 14:00:00 GMT",
-        "Wed, 10 Dec 1997 14:00:00 GMT",
-        "Thu, 11 Dec 1997 14:00:00 GMT",
-        "Fri, 12 Dec 1997 14:00:00 GMT",
-        "Sat, 13 Dec 1997 14:00:00 GMT",
-        "Sun, 14 Dec 1997 14:00:00 GMT",
-        "Mon, 15 Dec 1997 14:00:00 GMT",
-        "Tue, 16 Dec 1997 14:00:00 GMT",
-        "Wed, 17 Dec 1997 14:00:00 GMT",
-        "Thu, 18 Dec 1997 14:00:00 GMT",
-        "Fri, 19 Dec 1997 14:00:00 GMT",
-        "Sat, 20 Dec 1997 14:00:00 GMT",
-        "Sun, 21 Dec 1997 14:00:00 GMT",
-        "Mon, 22 Dec 1997 14:00:00 GMT",
-        "Tue, 23 Dec 1997 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Wed, 03 Sep 1997 13:00:00 GMT',
+      'Thu, 04 Sep 1997 13:00:00 GMT',
+      'Fri, 05 Sep 1997 13:00:00 GMT',
+      'Sat, 06 Sep 1997 13:00:00 GMT',
+      'Sun, 07 Sep 1997 13:00:00 GMT',
+      'Mon, 08 Sep 1997 13:00:00 GMT',
+      'Tue, 09 Sep 1997 13:00:00 GMT',
+      'Wed, 10 Sep 1997 13:00:00 GMT',
+      'Thu, 11 Sep 1997 13:00:00 GMT',
+      'Fri, 12 Sep 1997 13:00:00 GMT',
+      'Sat, 13 Sep 1997 13:00:00 GMT',
+      'Sun, 14 Sep 1997 13:00:00 GMT',
+      'Mon, 15 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Wed, 17 Sep 1997 13:00:00 GMT',
+      'Thu, 18 Sep 1997 13:00:00 GMT',
+      'Fri, 19 Sep 1997 13:00:00 GMT',
+      'Sat, 20 Sep 1997 13:00:00 GMT',
+      'Sun, 21 Sep 1997 13:00:00 GMT',
+      'Mon, 22 Sep 1997 13:00:00 GMT',
+      'Tue, 23 Sep 1997 13:00:00 GMT',
+      'Wed, 24 Sep 1997 13:00:00 GMT',
+      'Thu, 25 Sep 1997 13:00:00 GMT',
+      'Fri, 26 Sep 1997 13:00:00 GMT',
+      'Sat, 27 Sep 1997 13:00:00 GMT',
+      'Sun, 28 Sep 1997 13:00:00 GMT',
+      'Mon, 29 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Wed, 01 Oct 1997 13:00:00 GMT',
+      'Thu, 02 Oct 1997 13:00:00 GMT',
+      'Fri, 03 Oct 1997 13:00:00 GMT',
+      'Sat, 04 Oct 1997 13:00:00 GMT',
+      'Sun, 05 Oct 1997 13:00:00 GMT',
+      'Mon, 06 Oct 1997 13:00:00 GMT',
+      'Tue, 07 Oct 1997 13:00:00 GMT',
+      'Wed, 08 Oct 1997 13:00:00 GMT',
+      'Thu, 09 Oct 1997 13:00:00 GMT',
+      'Fri, 10 Oct 1997 13:00:00 GMT',
+      'Sat, 11 Oct 1997 13:00:00 GMT',
+      'Sun, 12 Oct 1997 13:00:00 GMT',
+      'Mon, 13 Oct 1997 13:00:00 GMT',
+      'Tue, 14 Oct 1997 13:00:00 GMT',
+      'Wed, 15 Oct 1997 13:00:00 GMT',
+      'Thu, 16 Oct 1997 13:00:00 GMT',
+      'Fri, 17 Oct 1997 13:00:00 GMT',
+      'Sat, 18 Oct 1997 13:00:00 GMT',
+      'Sun, 19 Oct 1997 13:00:00 GMT',
+      'Mon, 20 Oct 1997 13:00:00 GMT',
+      'Tue, 21 Oct 1997 13:00:00 GMT',
+      'Wed, 22 Oct 1997 13:00:00 GMT',
+      'Thu, 23 Oct 1997 13:00:00 GMT',
+      'Fri, 24 Oct 1997 13:00:00 GMT',
+      'Sat, 25 Oct 1997 13:00:00 GMT',
+      'Sun, 26 Oct 1997 14:00:00 GMT',
+      'Mon, 27 Oct 1997 14:00:00 GMT',
+      'Tue, 28 Oct 1997 14:00:00 GMT',
+      'Wed, 29 Oct 1997 14:00:00 GMT',
+      'Thu, 30 Oct 1997 14:00:00 GMT',
+      'Fri, 31 Oct 1997 14:00:00 GMT',
+      'Sat, 01 Nov 1997 14:00:00 GMT',
+      'Sun, 02 Nov 1997 14:00:00 GMT',
+      'Mon, 03 Nov 1997 14:00:00 GMT',
+      'Tue, 04 Nov 1997 14:00:00 GMT',
+      'Wed, 05 Nov 1997 14:00:00 GMT',
+      'Thu, 06 Nov 1997 14:00:00 GMT',
+      'Fri, 07 Nov 1997 14:00:00 GMT',
+      'Sat, 08 Nov 1997 14:00:00 GMT',
+      'Sun, 09 Nov 1997 14:00:00 GMT',
+      'Mon, 10 Nov 1997 14:00:00 GMT',
+      'Tue, 11 Nov 1997 14:00:00 GMT',
+      'Wed, 12 Nov 1997 14:00:00 GMT',
+      'Thu, 13 Nov 1997 14:00:00 GMT',
+      'Fri, 14 Nov 1997 14:00:00 GMT',
+      'Sat, 15 Nov 1997 14:00:00 GMT',
+      'Sun, 16 Nov 1997 14:00:00 GMT',
+      'Mon, 17 Nov 1997 14:00:00 GMT',
+      'Tue, 18 Nov 1997 14:00:00 GMT',
+      'Wed, 19 Nov 1997 14:00:00 GMT',
+      'Thu, 20 Nov 1997 14:00:00 GMT',
+      'Fri, 21 Nov 1997 14:00:00 GMT',
+      'Sat, 22 Nov 1997 14:00:00 GMT',
+      'Sun, 23 Nov 1997 14:00:00 GMT',
+      'Mon, 24 Nov 1997 14:00:00 GMT',
+      'Tue, 25 Nov 1997 14:00:00 GMT',
+      'Wed, 26 Nov 1997 14:00:00 GMT',
+      'Thu, 27 Nov 1997 14:00:00 GMT',
+      'Fri, 28 Nov 1997 14:00:00 GMT',
+      'Sat, 29 Nov 1997 14:00:00 GMT',
+      'Sun, 30 Nov 1997 14:00:00 GMT',
+      'Mon, 01 Dec 1997 14:00:00 GMT',
+      'Tue, 02 Dec 1997 14:00:00 GMT',
+      'Wed, 03 Dec 1997 14:00:00 GMT',
+      'Thu, 04 Dec 1997 14:00:00 GMT',
+      'Fri, 05 Dec 1997 14:00:00 GMT',
+      'Sat, 06 Dec 1997 14:00:00 GMT',
+      'Sun, 07 Dec 1997 14:00:00 GMT',
+      'Mon, 08 Dec 1997 14:00:00 GMT',
+      'Tue, 09 Dec 1997 14:00:00 GMT',
+      'Wed, 10 Dec 1997 14:00:00 GMT',
+      'Thu, 11 Dec 1997 14:00:00 GMT',
+      'Fri, 12 Dec 1997 14:00:00 GMT',
+      'Sat, 13 Dec 1997 14:00:00 GMT',
+      'Sun, 14 Dec 1997 14:00:00 GMT',
+      'Mon, 15 Dec 1997 14:00:00 GMT',
+      'Tue, 16 Dec 1997 14:00:00 GMT',
+      'Wed, 17 Dec 1997 14:00:00 GMT',
+      'Thu, 18 Dec 1997 14:00:00 GMT',
+      'Fri, 19 Dec 1997 14:00:00 GMT',
+      'Sat, 20 Dec 1997 14:00:00 GMT',
+      'Sun, 21 Dec 1997 14:00:00 GMT',
+      'Mon, 22 Dec 1997 14:00:00 GMT',
+      'Tue, 23 Dec 1997 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every other day, forever', () => {
@@ -409,58 +384,56 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;INTERVAL=2';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1997-12-04T00:00:00.000-05:00')];
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Thu, 04 Sep 1997 13:00:00 GMT",
-        "Sat, 06 Sep 1997 13:00:00 GMT",
-        "Mon, 08 Sep 1997 13:00:00 GMT",
-        "Wed, 10 Sep 1997 13:00:00 GMT",
-        "Fri, 12 Sep 1997 13:00:00 GMT",
-        "Sun, 14 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Thu, 18 Sep 1997 13:00:00 GMT",
-        "Sat, 20 Sep 1997 13:00:00 GMT",
-        "Mon, 22 Sep 1997 13:00:00 GMT",
-        "Wed, 24 Sep 1997 13:00:00 GMT",
-        "Fri, 26 Sep 1997 13:00:00 GMT",
-        "Sun, 28 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Thu, 02 Oct 1997 13:00:00 GMT",
-        "Sat, 04 Oct 1997 13:00:00 GMT",
-        "Mon, 06 Oct 1997 13:00:00 GMT",
-        "Wed, 08 Oct 1997 13:00:00 GMT",
-        "Fri, 10 Oct 1997 13:00:00 GMT",
-        "Sun, 12 Oct 1997 13:00:00 GMT",
-        "Tue, 14 Oct 1997 13:00:00 GMT",
-        "Thu, 16 Oct 1997 13:00:00 GMT",
-        "Sat, 18 Oct 1997 13:00:00 GMT",
-        "Mon, 20 Oct 1997 13:00:00 GMT",
-        "Wed, 22 Oct 1997 13:00:00 GMT",
-        "Fri, 24 Oct 1997 13:00:00 GMT",
-        "Sun, 26 Oct 1997 14:00:00 GMT",
-        "Tue, 28 Oct 1997 14:00:00 GMT",
-        "Thu, 30 Oct 1997 14:00:00 GMT",
-        "Sat, 01 Nov 1997 14:00:00 GMT",
-        "Mon, 03 Nov 1997 14:00:00 GMT",
-        "Wed, 05 Nov 1997 14:00:00 GMT",
-        "Fri, 07 Nov 1997 14:00:00 GMT",
-        "Sun, 09 Nov 1997 14:00:00 GMT",
-        "Tue, 11 Nov 1997 14:00:00 GMT",
-        "Thu, 13 Nov 1997 14:00:00 GMT",
-        "Sat, 15 Nov 1997 14:00:00 GMT",
-        "Mon, 17 Nov 1997 14:00:00 GMT",
-        "Wed, 19 Nov 1997 14:00:00 GMT",
-        "Fri, 21 Nov 1997 14:00:00 GMT",
-        "Sun, 23 Nov 1997 14:00:00 GMT",
-        "Tue, 25 Nov 1997 14:00:00 GMT",
-        "Thu, 27 Nov 1997 14:00:00 GMT",
-        "Sat, 29 Nov 1997 14:00:00 GMT",
-        "Mon, 01 Dec 1997 14:00:00 GMT",
-        "Wed, 03 Dec 1997 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Thu, 04 Sep 1997 13:00:00 GMT',
+      'Sat, 06 Sep 1997 13:00:00 GMT',
+      'Mon, 08 Sep 1997 13:00:00 GMT',
+      'Wed, 10 Sep 1997 13:00:00 GMT',
+      'Fri, 12 Sep 1997 13:00:00 GMT',
+      'Sun, 14 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Thu, 18 Sep 1997 13:00:00 GMT',
+      'Sat, 20 Sep 1997 13:00:00 GMT',
+      'Mon, 22 Sep 1997 13:00:00 GMT',
+      'Wed, 24 Sep 1997 13:00:00 GMT',
+      'Fri, 26 Sep 1997 13:00:00 GMT',
+      'Sun, 28 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Thu, 02 Oct 1997 13:00:00 GMT',
+      'Sat, 04 Oct 1997 13:00:00 GMT',
+      'Mon, 06 Oct 1997 13:00:00 GMT',
+      'Wed, 08 Oct 1997 13:00:00 GMT',
+      'Fri, 10 Oct 1997 13:00:00 GMT',
+      'Sun, 12 Oct 1997 13:00:00 GMT',
+      'Tue, 14 Oct 1997 13:00:00 GMT',
+      'Thu, 16 Oct 1997 13:00:00 GMT',
+      'Sat, 18 Oct 1997 13:00:00 GMT',
+      'Mon, 20 Oct 1997 13:00:00 GMT',
+      'Wed, 22 Oct 1997 13:00:00 GMT',
+      'Fri, 24 Oct 1997 13:00:00 GMT',
+      'Sun, 26 Oct 1997 14:00:00 GMT',
+      'Tue, 28 Oct 1997 14:00:00 GMT',
+      'Thu, 30 Oct 1997 14:00:00 GMT',
+      'Sat, 01 Nov 1997 14:00:00 GMT',
+      'Mon, 03 Nov 1997 14:00:00 GMT',
+      'Wed, 05 Nov 1997 14:00:00 GMT',
+      'Fri, 07 Nov 1997 14:00:00 GMT',
+      'Sun, 09 Nov 1997 14:00:00 GMT',
+      'Tue, 11 Nov 1997 14:00:00 GMT',
+      'Thu, 13 Nov 1997 14:00:00 GMT',
+      'Sat, 15 Nov 1997 14:00:00 GMT',
+      'Mon, 17 Nov 1997 14:00:00 GMT',
+      'Wed, 19 Nov 1997 14:00:00 GMT',
+      'Fri, 21 Nov 1997 14:00:00 GMT',
+      'Sun, 23 Nov 1997 14:00:00 GMT',
+      'Tue, 25 Nov 1997 14:00:00 GMT',
+      'Thu, 27 Nov 1997 14:00:00 GMT',
+      'Sat, 29 Nov 1997 14:00:00 GMT',
+      'Mon, 01 Dec 1997 14:00:00 GMT',
+      'Wed, 03 Dec 1997 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('Every 10 days, 5 occurrences', () => {
@@ -472,16 +445,14 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       interval: 10,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=DAILY;INTERVAL=10;COUNT=5';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Fri, 12 Sep 1997 13:00:00 GMT",
-        "Mon, 22 Sep 1997 13:00:00 GMT",
-        "Thu, 02 Oct 1997 13:00:00 GMT",
-        "Sun, 12 Oct 1997 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Fri, 12 Sep 1997 13:00:00 GMT',
+      'Mon, 22 Sep 1997 13:00:00 GMT',
+      'Thu, 02 Oct 1997 13:00:00 GMT',
+      'Sun, 12 Oct 1997 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every day in January, for 3 years', () => {
@@ -504,105 +475,103 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     const rrule2 =
       'DTSTART;TZID=America/New_York:19980101T090000\n' +
       'RRULE:FREQ=YEARLY;UNTIL=20000131T140000Z;BYMONTH=1;BYDAY=SU,MO,TU,WE,TH,FR,SA';
-    const snapshot = `
-[
-  "Thu, 01 Jan 1998 14:00:00 GMT",
-  "Fri, 02 Jan 1998 14:00:00 GMT",
-  "Sat, 03 Jan 1998 14:00:00 GMT",
-  "Sun, 04 Jan 1998 14:00:00 GMT",
-  "Mon, 05 Jan 1998 14:00:00 GMT",
-  "Tue, 06 Jan 1998 14:00:00 GMT",
-  "Wed, 07 Jan 1998 14:00:00 GMT",
-  "Thu, 08 Jan 1998 14:00:00 GMT",
-  "Fri, 09 Jan 1998 14:00:00 GMT",
-  "Sat, 10 Jan 1998 14:00:00 GMT",
-  "Sun, 11 Jan 1998 14:00:00 GMT",
-  "Mon, 12 Jan 1998 14:00:00 GMT",
-  "Tue, 13 Jan 1998 14:00:00 GMT",
-  "Wed, 14 Jan 1998 14:00:00 GMT",
-  "Thu, 15 Jan 1998 14:00:00 GMT",
-  "Fri, 16 Jan 1998 14:00:00 GMT",
-  "Sat, 17 Jan 1998 14:00:00 GMT",
-  "Sun, 18 Jan 1998 14:00:00 GMT",
-  "Mon, 19 Jan 1998 14:00:00 GMT",
-  "Tue, 20 Jan 1998 14:00:00 GMT",
-  "Wed, 21 Jan 1998 14:00:00 GMT",
-  "Thu, 22 Jan 1998 14:00:00 GMT",
-  "Fri, 23 Jan 1998 14:00:00 GMT",
-  "Sat, 24 Jan 1998 14:00:00 GMT",
-  "Sun, 25 Jan 1998 14:00:00 GMT",
-  "Mon, 26 Jan 1998 14:00:00 GMT",
-  "Tue, 27 Jan 1998 14:00:00 GMT",
-  "Wed, 28 Jan 1998 14:00:00 GMT",
-  "Thu, 29 Jan 1998 14:00:00 GMT",
-  "Fri, 30 Jan 1998 14:00:00 GMT",
-  "Sat, 31 Jan 1998 14:00:00 GMT",
-  "Fri, 01 Jan 1999 14:00:00 GMT",
-  "Sat, 02 Jan 1999 14:00:00 GMT",
-  "Sun, 03 Jan 1999 14:00:00 GMT",
-  "Mon, 04 Jan 1999 14:00:00 GMT",
-  "Tue, 05 Jan 1999 14:00:00 GMT",
-  "Wed, 06 Jan 1999 14:00:00 GMT",
-  "Thu, 07 Jan 1999 14:00:00 GMT",
-  "Fri, 08 Jan 1999 14:00:00 GMT",
-  "Sat, 09 Jan 1999 14:00:00 GMT",
-  "Sun, 10 Jan 1999 14:00:00 GMT",
-  "Mon, 11 Jan 1999 14:00:00 GMT",
-  "Tue, 12 Jan 1999 14:00:00 GMT",
-  "Wed, 13 Jan 1999 14:00:00 GMT",
-  "Thu, 14 Jan 1999 14:00:00 GMT",
-  "Fri, 15 Jan 1999 14:00:00 GMT",
-  "Sat, 16 Jan 1999 14:00:00 GMT",
-  "Sun, 17 Jan 1999 14:00:00 GMT",
-  "Mon, 18 Jan 1999 14:00:00 GMT",
-  "Tue, 19 Jan 1999 14:00:00 GMT",
-  "Wed, 20 Jan 1999 14:00:00 GMT",
-  "Thu, 21 Jan 1999 14:00:00 GMT",
-  "Fri, 22 Jan 1999 14:00:00 GMT",
-  "Sat, 23 Jan 1999 14:00:00 GMT",
-  "Sun, 24 Jan 1999 14:00:00 GMT",
-  "Mon, 25 Jan 1999 14:00:00 GMT",
-  "Tue, 26 Jan 1999 14:00:00 GMT",
-  "Wed, 27 Jan 1999 14:00:00 GMT",
-  "Thu, 28 Jan 1999 14:00:00 GMT",
-  "Fri, 29 Jan 1999 14:00:00 GMT",
-  "Sat, 30 Jan 1999 14:00:00 GMT",
-  "Sun, 31 Jan 1999 14:00:00 GMT",
-  "Sat, 01 Jan 2000 14:00:00 GMT",
-  "Sun, 02 Jan 2000 14:00:00 GMT",
-  "Mon, 03 Jan 2000 14:00:00 GMT",
-  "Tue, 04 Jan 2000 14:00:00 GMT",
-  "Wed, 05 Jan 2000 14:00:00 GMT",
-  "Thu, 06 Jan 2000 14:00:00 GMT",
-  "Fri, 07 Jan 2000 14:00:00 GMT",
-  "Sat, 08 Jan 2000 14:00:00 GMT",
-  "Sun, 09 Jan 2000 14:00:00 GMT",
-  "Mon, 10 Jan 2000 14:00:00 GMT",
-  "Tue, 11 Jan 2000 14:00:00 GMT",
-  "Wed, 12 Jan 2000 14:00:00 GMT",
-  "Thu, 13 Jan 2000 14:00:00 GMT",
-  "Fri, 14 Jan 2000 14:00:00 GMT",
-  "Sat, 15 Jan 2000 14:00:00 GMT",
-  "Sun, 16 Jan 2000 14:00:00 GMT",
-  "Mon, 17 Jan 2000 14:00:00 GMT",
-  "Tue, 18 Jan 2000 14:00:00 GMT",
-  "Wed, 19 Jan 2000 14:00:00 GMT",
-  "Thu, 20 Jan 2000 14:00:00 GMT",
-  "Fri, 21 Jan 2000 14:00:00 GMT",
-  "Sat, 22 Jan 2000 14:00:00 GMT",
-  "Sun, 23 Jan 2000 14:00:00 GMT",
-  "Mon, 24 Jan 2000 14:00:00 GMT",
-  "Tue, 25 Jan 2000 14:00:00 GMT",
-  "Wed, 26 Jan 2000 14:00:00 GMT",
-  "Thu, 27 Jan 2000 14:00:00 GMT",
-  "Fri, 28 Jan 2000 14:00:00 GMT",
-  "Sat, 29 Jan 2000 14:00:00 GMT",
-  "Sun, 30 Jan 2000 14:00:00 GMT",
-  "Mon, 31 Jan 2000 14:00:00 GMT",
-]
-`;
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot});
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot});
+    const dates = [
+      'Thu, 01 Jan 1998 14:00:00 GMT',
+      'Fri, 02 Jan 1998 14:00:00 GMT',
+      'Sat, 03 Jan 1998 14:00:00 GMT',
+      'Sun, 04 Jan 1998 14:00:00 GMT',
+      'Mon, 05 Jan 1998 14:00:00 GMT',
+      'Tue, 06 Jan 1998 14:00:00 GMT',
+      'Wed, 07 Jan 1998 14:00:00 GMT',
+      'Thu, 08 Jan 1998 14:00:00 GMT',
+      'Fri, 09 Jan 1998 14:00:00 GMT',
+      'Sat, 10 Jan 1998 14:00:00 GMT',
+      'Sun, 11 Jan 1998 14:00:00 GMT',
+      'Mon, 12 Jan 1998 14:00:00 GMT',
+      'Tue, 13 Jan 1998 14:00:00 GMT',
+      'Wed, 14 Jan 1998 14:00:00 GMT',
+      'Thu, 15 Jan 1998 14:00:00 GMT',
+      'Fri, 16 Jan 1998 14:00:00 GMT',
+      'Sat, 17 Jan 1998 14:00:00 GMT',
+      'Sun, 18 Jan 1998 14:00:00 GMT',
+      'Mon, 19 Jan 1998 14:00:00 GMT',
+      'Tue, 20 Jan 1998 14:00:00 GMT',
+      'Wed, 21 Jan 1998 14:00:00 GMT',
+      'Thu, 22 Jan 1998 14:00:00 GMT',
+      'Fri, 23 Jan 1998 14:00:00 GMT',
+      'Sat, 24 Jan 1998 14:00:00 GMT',
+      'Sun, 25 Jan 1998 14:00:00 GMT',
+      'Mon, 26 Jan 1998 14:00:00 GMT',
+      'Tue, 27 Jan 1998 14:00:00 GMT',
+      'Wed, 28 Jan 1998 14:00:00 GMT',
+      'Thu, 29 Jan 1998 14:00:00 GMT',
+      'Fri, 30 Jan 1998 14:00:00 GMT',
+      'Sat, 31 Jan 1998 14:00:00 GMT',
+      'Fri, 01 Jan 1999 14:00:00 GMT',
+      'Sat, 02 Jan 1999 14:00:00 GMT',
+      'Sun, 03 Jan 1999 14:00:00 GMT',
+      'Mon, 04 Jan 1999 14:00:00 GMT',
+      'Tue, 05 Jan 1999 14:00:00 GMT',
+      'Wed, 06 Jan 1999 14:00:00 GMT',
+      'Thu, 07 Jan 1999 14:00:00 GMT',
+      'Fri, 08 Jan 1999 14:00:00 GMT',
+      'Sat, 09 Jan 1999 14:00:00 GMT',
+      'Sun, 10 Jan 1999 14:00:00 GMT',
+      'Mon, 11 Jan 1999 14:00:00 GMT',
+      'Tue, 12 Jan 1999 14:00:00 GMT',
+      'Wed, 13 Jan 1999 14:00:00 GMT',
+      'Thu, 14 Jan 1999 14:00:00 GMT',
+      'Fri, 15 Jan 1999 14:00:00 GMT',
+      'Sat, 16 Jan 1999 14:00:00 GMT',
+      'Sun, 17 Jan 1999 14:00:00 GMT',
+      'Mon, 18 Jan 1999 14:00:00 GMT',
+      'Tue, 19 Jan 1999 14:00:00 GMT',
+      'Wed, 20 Jan 1999 14:00:00 GMT',
+      'Thu, 21 Jan 1999 14:00:00 GMT',
+      'Fri, 22 Jan 1999 14:00:00 GMT',
+      'Sat, 23 Jan 1999 14:00:00 GMT',
+      'Sun, 24 Jan 1999 14:00:00 GMT',
+      'Mon, 25 Jan 1999 14:00:00 GMT',
+      'Tue, 26 Jan 1999 14:00:00 GMT',
+      'Wed, 27 Jan 1999 14:00:00 GMT',
+      'Thu, 28 Jan 1999 14:00:00 GMT',
+      'Fri, 29 Jan 1999 14:00:00 GMT',
+      'Sat, 30 Jan 1999 14:00:00 GMT',
+      'Sun, 31 Jan 1999 14:00:00 GMT',
+      'Sat, 01 Jan 2000 14:00:00 GMT',
+      'Sun, 02 Jan 2000 14:00:00 GMT',
+      'Mon, 03 Jan 2000 14:00:00 GMT',
+      'Tue, 04 Jan 2000 14:00:00 GMT',
+      'Wed, 05 Jan 2000 14:00:00 GMT',
+      'Thu, 06 Jan 2000 14:00:00 GMT',
+      'Fri, 07 Jan 2000 14:00:00 GMT',
+      'Sat, 08 Jan 2000 14:00:00 GMT',
+      'Sun, 09 Jan 2000 14:00:00 GMT',
+      'Mon, 10 Jan 2000 14:00:00 GMT',
+      'Tue, 11 Jan 2000 14:00:00 GMT',
+      'Wed, 12 Jan 2000 14:00:00 GMT',
+      'Thu, 13 Jan 2000 14:00:00 GMT',
+      'Fri, 14 Jan 2000 14:00:00 GMT',
+      'Sat, 15 Jan 2000 14:00:00 GMT',
+      'Sun, 16 Jan 2000 14:00:00 GMT',
+      'Mon, 17 Jan 2000 14:00:00 GMT',
+      'Tue, 18 Jan 2000 14:00:00 GMT',
+      'Wed, 19 Jan 2000 14:00:00 GMT',
+      'Thu, 20 Jan 2000 14:00:00 GMT',
+      'Fri, 21 Jan 2000 14:00:00 GMT',
+      'Sat, 22 Jan 2000 14:00:00 GMT',
+      'Sun, 23 Jan 2000 14:00:00 GMT',
+      'Mon, 24 Jan 2000 14:00:00 GMT',
+      'Tue, 25 Jan 2000 14:00:00 GMT',
+      'Wed, 26 Jan 2000 14:00:00 GMT',
+      'Thu, 27 Jan 2000 14:00:00 GMT',
+      'Fri, 28 Jan 2000 14:00:00 GMT',
+      'Sat, 29 Jan 2000 14:00:00 GMT',
+      'Sun, 30 Jan 2000 14:00:00 GMT',
+      'Mon, 31 Jan 2000 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates});
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates});
   });
 
   describe('Weekly for 10 occurrences', () => {
@@ -613,21 +582,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;COUNT=10';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 09 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Tue, 23 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Tue, 07 Oct 1997 13:00:00 GMT",
-        "Tue, 14 Oct 1997 13:00:00 GMT",
-        "Tue, 21 Oct 1997 13:00:00 GMT",
-        "Tue, 28 Oct 1997 14:00:00 GMT",
-        "Tue, 04 Nov 1997 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Tue, 09 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Tue, 23 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Tue, 07 Oct 1997 13:00:00 GMT',
+      'Tue, 14 Oct 1997 13:00:00 GMT',
+      'Tue, 21 Oct 1997 13:00:00 GMT',
+      'Tue, 28 Oct 1997 14:00:00 GMT',
+      'Tue, 04 Nov 1997 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Weekly until December 24, 1997', () => {
@@ -638,28 +605,26 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;UNTIL=19971224T000000Z';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 09 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Tue, 23 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Tue, 07 Oct 1997 13:00:00 GMT",
-        "Tue, 14 Oct 1997 13:00:00 GMT",
-        "Tue, 21 Oct 1997 13:00:00 GMT",
-        "Tue, 28 Oct 1997 14:00:00 GMT",
-        "Tue, 04 Nov 1997 14:00:00 GMT",
-        "Tue, 11 Nov 1997 14:00:00 GMT",
-        "Tue, 18 Nov 1997 14:00:00 GMT",
-        "Tue, 25 Nov 1997 14:00:00 GMT",
-        "Tue, 02 Dec 1997 14:00:00 GMT",
-        "Tue, 09 Dec 1997 14:00:00 GMT",
-        "Tue, 16 Dec 1997 14:00:00 GMT",
-        "Tue, 23 Dec 1997 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Tue, 09 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Tue, 23 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Tue, 07 Oct 1997 13:00:00 GMT',
+      'Tue, 14 Oct 1997 13:00:00 GMT',
+      'Tue, 21 Oct 1997 13:00:00 GMT',
+      'Tue, 28 Oct 1997 14:00:00 GMT',
+      'Tue, 04 Nov 1997 14:00:00 GMT',
+      'Tue, 11 Nov 1997 14:00:00 GMT',
+      'Tue, 18 Nov 1997 14:00:00 GMT',
+      'Tue, 25 Nov 1997 14:00:00 GMT',
+      'Tue, 02 Dec 1997 14:00:00 GMT',
+      'Tue, 09 Dec 1997 14:00:00 GMT',
+      'Tue, 16 Dec 1997 14:00:00 GMT',
+      'Tue, 23 Dec 1997 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every other week, forever', () => {
@@ -671,24 +636,22 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;WKST=SU';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-02-18T09:00:00.000-05:00')];
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Tue, 14 Oct 1997 13:00:00 GMT",
-        "Tue, 28 Oct 1997 14:00:00 GMT",
-        "Tue, 11 Nov 1997 14:00:00 GMT",
-        "Tue, 25 Nov 1997 14:00:00 GMT",
-        "Tue, 09 Dec 1997 14:00:00 GMT",
-        "Tue, 23 Dec 1997 14:00:00 GMT",
-        "Tue, 06 Jan 1998 14:00:00 GMT",
-        "Tue, 20 Jan 1998 14:00:00 GMT",
-        "Tue, 03 Feb 1998 14:00:00 GMT",
-        "Tue, 17 Feb 1998 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Tue, 14 Oct 1997 13:00:00 GMT',
+      'Tue, 28 Oct 1997 14:00:00 GMT',
+      'Tue, 11 Nov 1997 14:00:00 GMT',
+      'Tue, 25 Nov 1997 14:00:00 GMT',
+      'Tue, 09 Dec 1997 14:00:00 GMT',
+      'Tue, 23 Dec 1997 14:00:00 GMT',
+      'Tue, 06 Jan 1998 14:00:00 GMT',
+      'Tue, 20 Jan 1998 14:00:00 GMT',
+      'Tue, 03 Feb 1998 14:00:00 GMT',
+      'Tue, 17 Feb 1998 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('Weekly on Tuesday and Thursday for five weeks', () => {
@@ -712,22 +675,20 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['TU', 'TH'],
     });
     const rrule2 = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;COUNT=10;WKST=SU;BYDAY=TU,TH';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Thu, 04 Sep 1997 13:00:00 GMT",
-        "Tue, 09 Sep 1997 13:00:00 GMT",
-        "Thu, 11 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Thu, 18 Sep 1997 13:00:00 GMT",
-        "Tue, 23 Sep 1997 13:00:00 GMT",
-        "Thu, 25 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Thu, 02 Oct 1997 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot});
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Thu, 04 Sep 1997 13:00:00 GMT',
+      'Tue, 09 Sep 1997 13:00:00 GMT',
+      'Thu, 11 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Thu, 18 Sep 1997 13:00:00 GMT',
+      'Tue, 23 Sep 1997 13:00:00 GMT',
+      'Thu, 25 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Thu, 02 Oct 1997 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates});
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates});
   });
 
   describe('Every other week on Monday, Wednesday, and Friday until December 24, 1997, starting on Monday, September 1, 1997', () => {
@@ -742,36 +703,34 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     const rrule =
       'DTSTART;TZID=America/New_York:19970901T090000\n' +
       'RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=19971224T000000Z;WKST=SU;BYDAY=MO,WE,FR';
-    const snapshot = `
-      [
-        "Mon, 01 Sep 1997 13:00:00 GMT",
-        "Wed, 03 Sep 1997 13:00:00 GMT",
-        "Fri, 05 Sep 1997 13:00:00 GMT",
-        "Mon, 15 Sep 1997 13:00:00 GMT",
-        "Wed, 17 Sep 1997 13:00:00 GMT",
-        "Fri, 19 Sep 1997 13:00:00 GMT",
-        "Mon, 29 Sep 1997 13:00:00 GMT",
-        "Wed, 01 Oct 1997 13:00:00 GMT",
-        "Fri, 03 Oct 1997 13:00:00 GMT",
-        "Mon, 13 Oct 1997 13:00:00 GMT",
-        "Wed, 15 Oct 1997 13:00:00 GMT",
-        "Fri, 17 Oct 1997 13:00:00 GMT",
-        "Mon, 27 Oct 1997 14:00:00 GMT",
-        "Wed, 29 Oct 1997 14:00:00 GMT",
-        "Fri, 31 Oct 1997 14:00:00 GMT",
-        "Mon, 10 Nov 1997 14:00:00 GMT",
-        "Wed, 12 Nov 1997 14:00:00 GMT",
-        "Fri, 14 Nov 1997 14:00:00 GMT",
-        "Mon, 24 Nov 1997 14:00:00 GMT",
-        "Wed, 26 Nov 1997 14:00:00 GMT",
-        "Fri, 28 Nov 1997 14:00:00 GMT",
-        "Mon, 08 Dec 1997 14:00:00 GMT",
-        "Wed, 10 Dec 1997 14:00:00 GMT",
-        "Fri, 12 Dec 1997 14:00:00 GMT",
-        "Mon, 22 Dec 1997 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Mon, 01 Sep 1997 13:00:00 GMT',
+      'Wed, 03 Sep 1997 13:00:00 GMT',
+      'Fri, 05 Sep 1997 13:00:00 GMT',
+      'Mon, 15 Sep 1997 13:00:00 GMT',
+      'Wed, 17 Sep 1997 13:00:00 GMT',
+      'Fri, 19 Sep 1997 13:00:00 GMT',
+      'Mon, 29 Sep 1997 13:00:00 GMT',
+      'Wed, 01 Oct 1997 13:00:00 GMT',
+      'Fri, 03 Oct 1997 13:00:00 GMT',
+      'Mon, 13 Oct 1997 13:00:00 GMT',
+      'Wed, 15 Oct 1997 13:00:00 GMT',
+      'Fri, 17 Oct 1997 13:00:00 GMT',
+      'Mon, 27 Oct 1997 14:00:00 GMT',
+      'Wed, 29 Oct 1997 14:00:00 GMT',
+      'Fri, 31 Oct 1997 14:00:00 GMT',
+      'Mon, 10 Nov 1997 14:00:00 GMT',
+      'Wed, 12 Nov 1997 14:00:00 GMT',
+      'Fri, 14 Nov 1997 14:00:00 GMT',
+      'Mon, 24 Nov 1997 14:00:00 GMT',
+      'Wed, 26 Nov 1997 14:00:00 GMT',
+      'Fri, 28 Nov 1997 14:00:00 GMT',
+      'Mon, 08 Dec 1997 14:00:00 GMT',
+      'Wed, 10 Dec 1997 14:00:00 GMT',
+      'Fri, 12 Dec 1997 14:00:00 GMT',
+      'Mon, 22 Dec 1997 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every other week on Tuesday and Thursday, for 8 occurrences', () => {
@@ -785,19 +744,17 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule =
       'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=8;WKST=SU;BYDAY=TU,TH';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Thu, 04 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Thu, 18 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Thu, 02 Oct 1997 13:00:00 GMT",
-        "Tue, 14 Oct 1997 13:00:00 GMT",
-        "Thu, 16 Oct 1997 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Thu, 04 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Thu, 18 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Thu, 02 Oct 1997 13:00:00 GMT',
+      'Tue, 14 Oct 1997 13:00:00 GMT',
+      'Thu, 16 Oct 1997 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Monthly on the first Friday for 10 occurrences', () => {
@@ -809,21 +766,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970905T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYDAY=1FR';
-    const snapshot = `
-      [
-        "Fri, 05 Sep 1997 13:00:00 GMT",
-        "Fri, 03 Oct 1997 13:00:00 GMT",
-        "Fri, 07 Nov 1997 14:00:00 GMT",
-        "Fri, 05 Dec 1997 14:00:00 GMT",
-        "Fri, 02 Jan 1998 14:00:00 GMT",
-        "Fri, 06 Feb 1998 14:00:00 GMT",
-        "Fri, 06 Mar 1998 14:00:00 GMT",
-        "Fri, 03 Apr 1998 14:00:00 GMT",
-        "Fri, 01 May 1998 13:00:00 GMT",
-        "Fri, 05 Jun 1998 13:00:00 GMT",
-      ]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Fri, 05 Sep 1997 13:00:00 GMT',
+      'Fri, 03 Oct 1997 13:00:00 GMT',
+      'Fri, 07 Nov 1997 14:00:00 GMT',
+      'Fri, 05 Dec 1997 14:00:00 GMT',
+      'Fri, 02 Jan 1998 14:00:00 GMT',
+      'Fri, 06 Feb 1998 14:00:00 GMT',
+      'Fri, 06 Mar 1998 14:00:00 GMT',
+      'Fri, 03 Apr 1998 14:00:00 GMT',
+      'Fri, 01 May 1998 13:00:00 GMT',
+      'Fri, 05 Jun 1998 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Monthly on the first Friday until December 24, 1997', () => {
@@ -835,15 +790,13 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       until: DATE_1997_DEC_24_MIDNIGHT_NEW_YORK,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970905T090000\nRRULE:FREQ=MONTHLY;UNTIL=19971224T000000Z;BYDAY=1FR';
-    const snapshot = `
-      [
-        "Fri, 05 Sep 1997 13:00:00 GMT",
-        "Fri, 03 Oct 1997 13:00:00 GMT",
-        "Fri, 07 Nov 1997 14:00:00 GMT",
-        "Fri, 05 Dec 1997 14:00:00 GMT",
-      ]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Fri, 05 Sep 1997 13:00:00 GMT',
+      'Fri, 03 Oct 1997 13:00:00 GMT',
+      'Fri, 07 Nov 1997 14:00:00 GMT',
+      'Fri, 05 Dec 1997 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every other month on the first and last Sunday of the month for 10 occurrences', () => {
@@ -857,21 +810,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule =
       'DTSTART;TZID=America/New_York:19970907T090000\nRRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;BYDAY=1SU,-1SU';
-    const snapshot = `
-      [
-        "Sun, 07 Sep 1997 13:00:00 GMT",
-        "Sun, 28 Sep 1997 13:00:00 GMT",
-        "Sun, 02 Nov 1997 14:00:00 GMT",
-        "Sun, 30 Nov 1997 14:00:00 GMT",
-        "Sun, 04 Jan 1998 14:00:00 GMT",
-        "Sun, 25 Jan 1998 14:00:00 GMT",
-        "Sun, 01 Mar 1998 14:00:00 GMT",
-        "Sun, 29 Mar 1998 14:00:00 GMT",
-        "Sun, 03 May 1998 13:00:00 GMT",
-        "Sun, 31 May 1998 13:00:00 GMT",
-      ]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Sun, 07 Sep 1997 13:00:00 GMT',
+      'Sun, 28 Sep 1997 13:00:00 GMT',
+      'Sun, 02 Nov 1997 14:00:00 GMT',
+      'Sun, 30 Nov 1997 14:00:00 GMT',
+      'Sun, 04 Jan 1998 14:00:00 GMT',
+      'Sun, 25 Jan 1998 14:00:00 GMT',
+      'Sun, 01 Mar 1998 14:00:00 GMT',
+      'Sun, 29 Mar 1998 14:00:00 GMT',
+      'Sun, 03 May 1998 13:00:00 GMT',
+      'Sun, 31 May 1998 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Monthly on the second-to-last Monday of the month for 6 months', () => {
@@ -883,17 +834,15 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 6,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970922T090000\nRRULE:FREQ=MONTHLY;COUNT=6;BYDAY=-2MO';
-    const snapshot = `
-      [
-        "Mon, 22 Sep 1997 13:00:00 GMT",
-        "Mon, 20 Oct 1997 13:00:00 GMT",
-        "Mon, 17 Nov 1997 14:00:00 GMT",
-        "Mon, 22 Dec 1997 14:00:00 GMT",
-        "Mon, 19 Jan 1998 14:00:00 GMT",
-        "Mon, 16 Feb 1998 14:00:00 GMT",
-      ]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Mon, 22 Sep 1997 13:00:00 GMT',
+      'Mon, 20 Oct 1997 13:00:00 GMT',
+      'Mon, 17 Nov 1997 14:00:00 GMT',
+      'Mon, 22 Dec 1997 14:00:00 GMT',
+      'Mon, 19 Jan 1998 14:00:00 GMT',
+      'Mon, 16 Feb 1998 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Monthly on the third-to-the-last day of the month, forever:', () => {
@@ -904,17 +853,15 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonthDay: [-3],
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970928T090000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-3';
-    const snapshot = `
-      [
-        "1997-09-28T13:00:00.000Z",
-        "1997-10-29T14:00:00.000Z",
-        "1997-11-28T14:00:00.000Z",
-        "1997-12-29T14:00:00.000Z",
-        "1998-01-29T14:00:00.000Z",
-        "1998-02-26T14:00:00.000Z",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 6, print: formatISO});
+    const dates = [
+      '1997-09-28T13:00:00.000Z',
+      '1997-10-29T14:00:00.000Z',
+      '1997-11-28T14:00:00.000Z',
+      '1997-12-29T14:00:00.000Z',
+      '1998-01-29T14:00:00.000Z',
+      '1998-02-26T14:00:00.000Z',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, limit: 6, print: formatISO});
   });
 
   describe('Monthly on the 2nd and 15th of the month for 10 occurrences', () => {
@@ -926,21 +873,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=2,15';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Mon, 15 Sep 1997 13:00:00 GMT",
-        "Thu, 02 Oct 1997 13:00:00 GMT",
-        "Wed, 15 Oct 1997 13:00:00 GMT",
-        "Sun, 02 Nov 1997 14:00:00 GMT",
-        "Sat, 15 Nov 1997 14:00:00 GMT",
-        "Tue, 02 Dec 1997 14:00:00 GMT",
-        "Mon, 15 Dec 1997 14:00:00 GMT",
-        "Fri, 02 Jan 1998 14:00:00 GMT",
-        "Thu, 15 Jan 1998 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Mon, 15 Sep 1997 13:00:00 GMT',
+      'Thu, 02 Oct 1997 13:00:00 GMT',
+      'Wed, 15 Oct 1997 13:00:00 GMT',
+      'Sun, 02 Nov 1997 14:00:00 GMT',
+      'Sat, 15 Nov 1997 14:00:00 GMT',
+      'Tue, 02 Dec 1997 14:00:00 GMT',
+      'Mon, 15 Dec 1997 14:00:00 GMT',
+      'Fri, 02 Jan 1998 14:00:00 GMT',
+      'Thu, 15 Jan 1998 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Monthly on the first and last day of the month for 10 occurrences', () => {
@@ -952,21 +897,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970930T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=1,-1';
-    const snapshot = `
-[
-  "Wed, 01 Oct 1997 13:00:00 GMT",
-  "Fri, 31 Oct 1997 14:00:00 GMT",
-  "Sat, 01 Nov 1997 14:00:00 GMT",
-  "Sun, 30 Nov 1997 14:00:00 GMT",
-  "Mon, 01 Dec 1997 14:00:00 GMT",
-  "Wed, 31 Dec 1997 14:00:00 GMT",
-  "Thu, 01 Jan 1998 14:00:00 GMT",
-  "Sat, 31 Jan 1998 14:00:00 GMT",
-  "Sun, 01 Feb 1998 14:00:00 GMT",
-  "Sat, 28 Feb 1998 14:00:00 GMT",
-]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Wed, 01 Oct 1997 13:00:00 GMT',
+      'Fri, 31 Oct 1997 14:00:00 GMT',
+      'Sat, 01 Nov 1997 14:00:00 GMT',
+      'Sun, 30 Nov 1997 14:00:00 GMT',
+      'Mon, 01 Dec 1997 14:00:00 GMT',
+      'Wed, 31 Dec 1997 14:00:00 GMT',
+      'Thu, 01 Jan 1998 14:00:00 GMT',
+      'Sat, 31 Jan 1998 14:00:00 GMT',
+      'Sun, 01 Feb 1998 14:00:00 GMT',
+      'Sat, 28 Feb 1998 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every 18 months on the 10th thru 15th of the month for 10 occurrences', () => {
@@ -981,21 +924,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     const rrule =
       'DTSTART;TZID=America/New_York:19970910T090000\n' +
       'RRULE:FREQ=MONTHLY;INTERVAL=18;COUNT=10;BYMONTHDAY=10,11,12,13,14,15';
-    const snapshot = `
-      [
-        "Wed, 10 Sep 1997 13:00:00 GMT",
-        "Thu, 11 Sep 1997 13:00:00 GMT",
-        "Fri, 12 Sep 1997 13:00:00 GMT",
-        "Sat, 13 Sep 1997 13:00:00 GMT",
-        "Sun, 14 Sep 1997 13:00:00 GMT",
-        "Mon, 15 Sep 1997 13:00:00 GMT",
-        "Wed, 10 Mar 1999 14:00:00 GMT",
-        "Thu, 11 Mar 1999 14:00:00 GMT",
-        "Fri, 12 Mar 1999 14:00:00 GMT",
-        "Sat, 13 Mar 1999 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Wed, 10 Sep 1997 13:00:00 GMT',
+      'Thu, 11 Sep 1997 13:00:00 GMT',
+      'Fri, 12 Sep 1997 13:00:00 GMT',
+      'Sat, 13 Sep 1997 13:00:00 GMT',
+      'Sun, 14 Sep 1997 13:00:00 GMT',
+      'Mon, 15 Sep 1997 13:00:00 GMT',
+      'Wed, 10 Mar 1999 14:00:00 GMT',
+      'Thu, 11 Mar 1999 14:00:00 GMT',
+      'Fri, 12 Mar 1999 14:00:00 GMT',
+      'Sat, 13 Mar 1999 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every Tuesday, every other month', () => {
@@ -1008,29 +949,27 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=TU';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('1998-04-01T09:00:00.000-04:00')];
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 09 Sep 1997 13:00:00 GMT",
-        "Tue, 16 Sep 1997 13:00:00 GMT",
-        "Tue, 23 Sep 1997 13:00:00 GMT",
-        "Tue, 30 Sep 1997 13:00:00 GMT",
-        "Tue, 04 Nov 1997 14:00:00 GMT",
-        "Tue, 11 Nov 1997 14:00:00 GMT",
-        "Tue, 18 Nov 1997 14:00:00 GMT",
-        "Tue, 25 Nov 1997 14:00:00 GMT",
-        "Tue, 06 Jan 1998 14:00:00 GMT",
-        "Tue, 13 Jan 1998 14:00:00 GMT",
-        "Tue, 20 Jan 1998 14:00:00 GMT",
-        "Tue, 27 Jan 1998 14:00:00 GMT",
-        "Tue, 03 Mar 1998 14:00:00 GMT",
-        "Tue, 10 Mar 1998 14:00:00 GMT",
-        "Tue, 17 Mar 1998 14:00:00 GMT",
-        "Tue, 24 Mar 1998 14:00:00 GMT",
-        "Tue, 31 Mar 1998 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Tue, 09 Sep 1997 13:00:00 GMT',
+      'Tue, 16 Sep 1997 13:00:00 GMT',
+      'Tue, 23 Sep 1997 13:00:00 GMT',
+      'Tue, 30 Sep 1997 13:00:00 GMT',
+      'Tue, 04 Nov 1997 14:00:00 GMT',
+      'Tue, 11 Nov 1997 14:00:00 GMT',
+      'Tue, 18 Nov 1997 14:00:00 GMT',
+      'Tue, 25 Nov 1997 14:00:00 GMT',
+      'Tue, 06 Jan 1998 14:00:00 GMT',
+      'Tue, 13 Jan 1998 14:00:00 GMT',
+      'Tue, 20 Jan 1998 14:00:00 GMT',
+      'Tue, 27 Jan 1998 14:00:00 GMT',
+      'Tue, 03 Mar 1998 14:00:00 GMT',
+      'Tue, 10 Mar 1998 14:00:00 GMT',
+      'Tue, 17 Mar 1998 14:00:00 GMT',
+      'Tue, 24 Mar 1998 14:00:00 GMT',
+      'Tue, 31 Mar 1998 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('Yearly in June and July for 10 occurrences', () => {
@@ -1042,21 +981,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 10,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970610T090000\nRRULE:FREQ=YEARLY;COUNT=10;BYMONTH=6,7';
-    const snapshot = `
-      [
-        "Tue, 10 Jun 1997 13:00:00 GMT",
-        "Thu, 10 Jul 1997 13:00:00 GMT",
-        "Wed, 10 Jun 1998 13:00:00 GMT",
-        "Fri, 10 Jul 1998 13:00:00 GMT",
-        "Thu, 10 Jun 1999 13:00:00 GMT",
-        "Sat, 10 Jul 1999 13:00:00 GMT",
-        "Sat, 10 Jun 2000 13:00:00 GMT",
-        "Mon, 10 Jul 2000 13:00:00 GMT",
-        "Sun, 10 Jun 2001 13:00:00 GMT",
-        "Tue, 10 Jul 2001 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 10 Jun 1997 13:00:00 GMT',
+      'Thu, 10 Jul 1997 13:00:00 GMT',
+      'Wed, 10 Jun 1998 13:00:00 GMT',
+      'Fri, 10 Jul 1998 13:00:00 GMT',
+      'Thu, 10 Jun 1999 13:00:00 GMT',
+      'Sat, 10 Jul 1999 13:00:00 GMT',
+      'Sat, 10 Jun 2000 13:00:00 GMT',
+      'Mon, 10 Jul 2000 13:00:00 GMT',
+      'Sun, 10 Jun 2001 13:00:00 GMT',
+      'Tue, 10 Jul 2001 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every other year on January, February, and March for 10 occurrences', () => {
@@ -1069,21 +1006,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byMonth: [1, 2, 3],
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970310T090000\nRRULE:FREQ=YEARLY;INTERVAL=2;COUNT=10;BYMONTH=1,2,3';
-    const snapshot = `
-      [
-        "Mon, 10 Mar 1997 14:00:00 GMT",
-        "Sun, 10 Jan 1999 14:00:00 GMT",
-        "Wed, 10 Feb 1999 14:00:00 GMT",
-        "Wed, 10 Mar 1999 14:00:00 GMT",
-        "Wed, 10 Jan 2001 14:00:00 GMT",
-        "Sat, 10 Feb 2001 14:00:00 GMT",
-        "Sat, 10 Mar 2001 14:00:00 GMT",
-        "Fri, 10 Jan 2003 14:00:00 GMT",
-        "Mon, 10 Feb 2003 14:00:00 GMT",
-        "Mon, 10 Mar 2003 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Mon, 10 Mar 1997 14:00:00 GMT',
+      'Sun, 10 Jan 1999 14:00:00 GMT',
+      'Wed, 10 Feb 1999 14:00:00 GMT',
+      'Wed, 10 Mar 1999 14:00:00 GMT',
+      'Wed, 10 Jan 2001 14:00:00 GMT',
+      'Sat, 10 Feb 2001 14:00:00 GMT',
+      'Sat, 10 Mar 2001 14:00:00 GMT',
+      'Fri, 10 Jan 2003 14:00:00 GMT',
+      'Mon, 10 Feb 2003 14:00:00 GMT',
+      'Mon, 10 Mar 2003 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every third year on the 1st, 100th, and 200th day for 10 occurrences', () => {
@@ -1097,21 +1032,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule =
       'DTSTART;TZID=America/New_York:19970101T090000\nRRULE:FREQ=YEARLY;INTERVAL=3;COUNT=10;BYYEARDAY=1,100,200';
-    const snapshot = `
-      [
-        "Wed, 01 Jan 1997 14:00:00 GMT",
-        "Thu, 10 Apr 1997 13:00:00 GMT",
-        "Sat, 19 Jul 1997 13:00:00 GMT",
-        "Sat, 01 Jan 2000 14:00:00 GMT",
-        "Sun, 09 Apr 2000 13:00:00 GMT",
-        "Tue, 18 Jul 2000 13:00:00 GMT",
-        "Wed, 01 Jan 2003 14:00:00 GMT",
-        "Thu, 10 Apr 2003 13:00:00 GMT",
-        "Sat, 19 Jul 2003 13:00:00 GMT",
-        "Sun, 01 Jan 2006 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Wed, 01 Jan 1997 14:00:00 GMT',
+      'Thu, 10 Apr 1997 13:00:00 GMT',
+      'Sat, 19 Jul 1997 13:00:00 GMT',
+      'Sat, 01 Jan 2000 14:00:00 GMT',
+      'Sun, 09 Apr 2000 13:00:00 GMT',
+      'Tue, 18 Jul 2000 13:00:00 GMT',
+      'Wed, 01 Jan 2003 14:00:00 GMT',
+      'Thu, 10 Apr 2003 13:00:00 GMT',
+      'Sat, 19 Jul 2003 13:00:00 GMT',
+      'Sun, 01 Jan 2006 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every 20th Monday of the year, forever', () => {
@@ -1122,14 +1055,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byDay: ['20MO'],
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970519T090000\nRRULE:FREQ=YEARLY;BYDAY=20MO';
-    const snapshot = `
-      [
-        "Mon, 19 May 1997 13:00:00 GMT",
-        "Mon, 18 May 1998 13:00:00 GMT",
-        "Mon, 17 May 1999 13:00:00 GMT",
-      ]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 3});
+    const dates = ['Mon, 19 May 1997 13:00:00 GMT', 'Mon, 18 May 1998 13:00:00 GMT', 'Mon, 17 May 1999 13:00:00 GMT'];
+    testWithConstructorAndRRule({rule, rrule, dates, limit: 3});
   });
 
   describe('Monday of week number 20 (where the default start of the week is Monday), forever', () => {
@@ -1141,14 +1068,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byWeekNo: [20],
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970512T090000\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO';
-    const snapshot = `
-[
-  "Mon, 12 May 1997 13:00:00 GMT",
-  "Mon, 11 May 1998 13:00:00 GMT",
-  "Mon, 10 May 1999 13:00:00 GMT",
-]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 3});
+    const dates = ['Mon, 12 May 1997 13:00:00 GMT', 'Mon, 11 May 1998 13:00:00 GMT', 'Mon, 10 May 1999 13:00:00 GMT'];
+    testWithConstructorAndRRule({rule, rrule, dates, limit: 3});
   });
 
   describe('Every Thursday in March, forever:', () => {
@@ -1161,22 +1082,20 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970313T090000\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=TH';
     const between = [new Date('1997-03-13T09:00:00.000-05:00'), new Date('1999-03-25T09:00:00.000-05:00')];
-    const snapshot = `
-      [
-        "Thu, 13 Mar 1997 14:00:00 GMT",
-        "Thu, 20 Mar 1997 14:00:00 GMT",
-        "Thu, 27 Mar 1997 14:00:00 GMT",
-        "Thu, 05 Mar 1998 14:00:00 GMT",
-        "Thu, 12 Mar 1998 14:00:00 GMT",
-        "Thu, 19 Mar 1998 14:00:00 GMT",
-        "Thu, 26 Mar 1998 14:00:00 GMT",
-        "Thu, 04 Mar 1999 14:00:00 GMT",
-        "Thu, 11 Mar 1999 14:00:00 GMT",
-        "Thu, 18 Mar 1999 14:00:00 GMT",
-        "Thu, 25 Mar 1999 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Thu, 13 Mar 1997 14:00:00 GMT',
+      'Thu, 20 Mar 1997 14:00:00 GMT',
+      'Thu, 27 Mar 1997 14:00:00 GMT',
+      'Thu, 05 Mar 1998 14:00:00 GMT',
+      'Thu, 12 Mar 1998 14:00:00 GMT',
+      'Thu, 19 Mar 1998 14:00:00 GMT',
+      'Thu, 26 Mar 1998 14:00:00 GMT',
+      'Thu, 04 Mar 1999 14:00:00 GMT',
+      'Thu, 11 Mar 1999 14:00:00 GMT',
+      'Thu, 18 Mar 1999 14:00:00 GMT',
+      'Thu, 25 Mar 1999 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('Every Thursday, but only during June, July, and August, forever', () => {
@@ -1189,49 +1108,47 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970605T090000\nRRULE:FREQ=YEARLY;BYDAY=TH;BYMONTH=6,7,8';
     const between = [new Date('1997-06-05T09:00:00.000-05:00'), new Date('1999-08-26T09:00:00.000-05:00')];
-    const snapshot = `
-[
-  "Thu, 12 Jun 1997 13:00:00 GMT",
-  "Thu, 19 Jun 1997 13:00:00 GMT",
-  "Thu, 26 Jun 1997 13:00:00 GMT",
-  "Thu, 03 Jul 1997 13:00:00 GMT",
-  "Thu, 10 Jul 1997 13:00:00 GMT",
-  "Thu, 17 Jul 1997 13:00:00 GMT",
-  "Thu, 24 Jul 1997 13:00:00 GMT",
-  "Thu, 31 Jul 1997 13:00:00 GMT",
-  "Thu, 07 Aug 1997 13:00:00 GMT",
-  "Thu, 14 Aug 1997 13:00:00 GMT",
-  "Thu, 21 Aug 1997 13:00:00 GMT",
-  "Thu, 28 Aug 1997 13:00:00 GMT",
-  "Thu, 04 Jun 1998 13:00:00 GMT",
-  "Thu, 11 Jun 1998 13:00:00 GMT",
-  "Thu, 18 Jun 1998 13:00:00 GMT",
-  "Thu, 25 Jun 1998 13:00:00 GMT",
-  "Thu, 02 Jul 1998 13:00:00 GMT",
-  "Thu, 09 Jul 1998 13:00:00 GMT",
-  "Thu, 16 Jul 1998 13:00:00 GMT",
-  "Thu, 23 Jul 1998 13:00:00 GMT",
-  "Thu, 30 Jul 1998 13:00:00 GMT",
-  "Thu, 06 Aug 1998 13:00:00 GMT",
-  "Thu, 13 Aug 1998 13:00:00 GMT",
-  "Thu, 20 Aug 1998 13:00:00 GMT",
-  "Thu, 27 Aug 1998 13:00:00 GMT",
-  "Thu, 03 Jun 1999 13:00:00 GMT",
-  "Thu, 10 Jun 1999 13:00:00 GMT",
-  "Thu, 17 Jun 1999 13:00:00 GMT",
-  "Thu, 24 Jun 1999 13:00:00 GMT",
-  "Thu, 01 Jul 1999 13:00:00 GMT",
-  "Thu, 08 Jul 1999 13:00:00 GMT",
-  "Thu, 15 Jul 1999 13:00:00 GMT",
-  "Thu, 22 Jul 1999 13:00:00 GMT",
-  "Thu, 29 Jul 1999 13:00:00 GMT",
-  "Thu, 05 Aug 1999 13:00:00 GMT",
-  "Thu, 12 Aug 1999 13:00:00 GMT",
-  "Thu, 19 Aug 1999 13:00:00 GMT",
-  "Thu, 26 Aug 1999 13:00:00 GMT",
-]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Thu, 12 Jun 1997 13:00:00 GMT',
+      'Thu, 19 Jun 1997 13:00:00 GMT',
+      'Thu, 26 Jun 1997 13:00:00 GMT',
+      'Thu, 03 Jul 1997 13:00:00 GMT',
+      'Thu, 10 Jul 1997 13:00:00 GMT',
+      'Thu, 17 Jul 1997 13:00:00 GMT',
+      'Thu, 24 Jul 1997 13:00:00 GMT',
+      'Thu, 31 Jul 1997 13:00:00 GMT',
+      'Thu, 07 Aug 1997 13:00:00 GMT',
+      'Thu, 14 Aug 1997 13:00:00 GMT',
+      'Thu, 21 Aug 1997 13:00:00 GMT',
+      'Thu, 28 Aug 1997 13:00:00 GMT',
+      'Thu, 04 Jun 1998 13:00:00 GMT',
+      'Thu, 11 Jun 1998 13:00:00 GMT',
+      'Thu, 18 Jun 1998 13:00:00 GMT',
+      'Thu, 25 Jun 1998 13:00:00 GMT',
+      'Thu, 02 Jul 1998 13:00:00 GMT',
+      'Thu, 09 Jul 1998 13:00:00 GMT',
+      'Thu, 16 Jul 1998 13:00:00 GMT',
+      'Thu, 23 Jul 1998 13:00:00 GMT',
+      'Thu, 30 Jul 1998 13:00:00 GMT',
+      'Thu, 06 Aug 1998 13:00:00 GMT',
+      'Thu, 13 Aug 1998 13:00:00 GMT',
+      'Thu, 20 Aug 1998 13:00:00 GMT',
+      'Thu, 27 Aug 1998 13:00:00 GMT',
+      'Thu, 03 Jun 1999 13:00:00 GMT',
+      'Thu, 10 Jun 1999 13:00:00 GMT',
+      'Thu, 17 Jun 1999 13:00:00 GMT',
+      'Thu, 24 Jun 1999 13:00:00 GMT',
+      'Thu, 01 Jul 1999 13:00:00 GMT',
+      'Thu, 08 Jul 1999 13:00:00 GMT',
+      'Thu, 15 Jul 1999 13:00:00 GMT',
+      'Thu, 22 Jul 1999 13:00:00 GMT',
+      'Thu, 29 Jul 1999 13:00:00 GMT',
+      'Thu, 05 Aug 1999 13:00:00 GMT',
+      'Thu, 12 Aug 1999 13:00:00 GMT',
+      'Thu, 19 Aug 1999 13:00:00 GMT',
+      'Thu, 26 Aug 1999 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('Every Friday the 13th, forever:', () => {
@@ -1244,16 +1161,14 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13';
     const between = [DATE_1997_SEP_02_9AM_NEW_YORK_DST, new Date('2000-10-13T09:00:00.000-05:00')];
-    const snapshot = `
-      [
-        "Fri, 13 Feb 1998 14:00:00 GMT",
-        "Fri, 13 Mar 1998 14:00:00 GMT",
-        "Fri, 13 Nov 1998 14:00:00 GMT",
-        "Fri, 13 Aug 1999 13:00:00 GMT",
-        "Fri, 13 Oct 2000 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Fri, 13 Feb 1998 14:00:00 GMT',
+      'Fri, 13 Mar 1998 14:00:00 GMT',
+      'Fri, 13 Nov 1998 14:00:00 GMT',
+      'Fri, 13 Aug 1999 13:00:00 GMT',
+      'Fri, 13 Oct 2000 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('The first Saturday that follows the first Sunday of the month, forever', () => {
@@ -1267,21 +1182,19 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     const rrule =
       'DTSTART;TZID=America/New_York:19970913T090000\nRRULE:FREQ=MONTHLY;BYDAY=SA;BYMONTHDAY=7,8,9,10,11,12,13';
     const between = [new Date('1997-09-13T09:00:00.000-04:00'), new Date('1998-06-13T09:00:00.000-04:00')];
-    const snapshot = `
-      [
-        "Sat, 13 Sep 1997 13:00:00 GMT",
-        "Sat, 11 Oct 1997 13:00:00 GMT",
-        "Sat, 08 Nov 1997 14:00:00 GMT",
-        "Sat, 13 Dec 1997 14:00:00 GMT",
-        "Sat, 10 Jan 1998 14:00:00 GMT",
-        "Sat, 07 Feb 1998 14:00:00 GMT",
-        "Sat, 07 Mar 1998 14:00:00 GMT",
-        "Sat, 11 Apr 1998 13:00:00 GMT",
-        "Sat, 09 May 1998 13:00:00 GMT",
-        "Sat, 13 Jun 1998 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Sat, 13 Sep 1997 13:00:00 GMT',
+      'Sat, 11 Oct 1997 13:00:00 GMT',
+      'Sat, 08 Nov 1997 14:00:00 GMT',
+      'Sat, 13 Dec 1997 14:00:00 GMT',
+      'Sat, 10 Jan 1998 14:00:00 GMT',
+      'Sat, 07 Feb 1998 14:00:00 GMT',
+      'Sat, 07 Mar 1998 14:00:00 GMT',
+      'Sat, 11 Apr 1998 13:00:00 GMT',
+      'Sat, 09 May 1998 13:00:00 GMT',
+      'Sat, 13 Jun 1998 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('Every 4 years, the first Tuesday after a Monday in November, forever (U.S. Presidential Election day)', () => {
@@ -1298,19 +1211,17 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'DTSTART;TZID=America/New_York:19961105T090000\n' +
       'RRULE:FREQ=YEARLY;INTERVAL=4;BYMONTH=11;BYDAY=TU;BYMONTHDAY=2,3,4,5,6,7,8';
     const between = [new Date('1996-11-05T09:00:00.000-05:00'), new Date('2024-11-05T09:00:00.000-05:00')];
-    const snapshot = `
-      [
-        "Tue, 05 Nov 1996 14:00:00 GMT",
-        "Tue, 07 Nov 2000 14:00:00 GMT",
-        "Tue, 02 Nov 2004 14:00:00 GMT",
-        "Tue, 04 Nov 2008 14:00:00 GMT",
-        "Tue, 06 Nov 2012 14:00:00 GMT",
-        "Tue, 08 Nov 2016 14:00:00 GMT",
-        "Tue, 03 Nov 2020 14:00:00 GMT",
-        "Tue, 05 Nov 2024 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot, between});
+    const dates = [
+      'Tue, 05 Nov 1996 14:00:00 GMT',
+      'Tue, 07 Nov 2000 14:00:00 GMT',
+      'Tue, 02 Nov 2004 14:00:00 GMT',
+      'Tue, 04 Nov 2008 14:00:00 GMT',
+      'Tue, 06 Nov 2012 14:00:00 GMT',
+      'Tue, 08 Nov 2016 14:00:00 GMT',
+      'Tue, 03 Nov 2020 14:00:00 GMT',
+      'Tue, 05 Nov 2024 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, between});
   });
 
   describe('The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months', () => {
@@ -1323,14 +1234,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       bySetPos: [3],
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970904T090000\nRRULE:FREQ=MONTHLY;COUNT=3;BYDAY=TU,WE,TH;BYSETPOS=3';
-    const snapshot = `
-      [
-        "Thu, 04 Sep 1997 13:00:00 GMT",
-        "Tue, 07 Oct 1997 13:00:00 GMT",
-        "Thu, 06 Nov 1997 14:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = ['Thu, 04 Sep 1997 13:00:00 GMT', 'Tue, 07 Oct 1997 13:00:00 GMT', 'Thu, 06 Nov 1997 14:00:00 GMT'];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('The second last weekday of the month', () => {
@@ -1342,18 +1247,16 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       bySetPos: [-2],
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970929T090000\nRRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-2';
-    const snapshot = `
-      [
-        "Mon, 29 Sep 1997 13:00:00 GMT",
-        "Thu, 30 Oct 1997 14:00:00 GMT",
-        "Thu, 27 Nov 1997 14:00:00 GMT",
-        "Tue, 30 Dec 1997 14:00:00 GMT",
-        "Thu, 29 Jan 1998 14:00:00 GMT",
-        "Thu, 26 Feb 1998 14:00:00 GMT",
-        "Mon, 30 Mar 1998 14:00:00 GMT",
-      ]
-`;
-    testWithConstructorAndRRule({rule, rrule, snapshot, limit: 7});
+    const dates = [
+      'Mon, 29 Sep 1997 13:00:00 GMT',
+      'Thu, 30 Oct 1997 14:00:00 GMT',
+      'Thu, 27 Nov 1997 14:00:00 GMT',
+      'Tue, 30 Dec 1997 14:00:00 GMT',
+      'Thu, 29 Jan 1998 14:00:00 GMT',
+      'Thu, 26 Feb 1998 14:00:00 GMT',
+      'Mon, 30 Mar 1998 14:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates, limit: 7});
   });
 
   describe('Every 3 hours from 9:00 AM to 5:00 PM on a specific day', () => {
@@ -1366,14 +1269,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     // see https://www.rfc-editor.org/errata/eid3883
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=HOURLY;INTERVAL=3;UNTIL=19970902T210000Z';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 02 Sep 1997 16:00:00 GMT",
-        "Tue, 02 Sep 1997 19:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = ['Tue, 02 Sep 1997 13:00:00 GMT', 'Tue, 02 Sep 1997 16:00:00 GMT', 'Tue, 02 Sep 1997 19:00:00 GMT'];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every 15 minutes for 6 occurrences', () => {
@@ -1385,17 +1282,15 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 6,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MINUTELY;INTERVAL=15;COUNT=6';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 02 Sep 1997 13:15:00 GMT",
-        "Tue, 02 Sep 1997 13:30:00 GMT",
-        "Tue, 02 Sep 1997 13:45:00 GMT",
-        "Tue, 02 Sep 1997 14:00:00 GMT",
-        "Tue, 02 Sep 1997 14:15:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Tue, 02 Sep 1997 13:15:00 GMT',
+      'Tue, 02 Sep 1997 13:30:00 GMT',
+      'Tue, 02 Sep 1997 13:45:00 GMT',
+      'Tue, 02 Sep 1997 14:00:00 GMT',
+      'Tue, 02 Sep 1997 14:15:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every hour and a half for 4 occurrences', () => {
@@ -1407,15 +1302,13 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 4,
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MINUTELY;INTERVAL=90;COUNT=4';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 02 Sep 1997 14:30:00 GMT",
-        "Tue, 02 Sep 1997 16:00:00 GMT",
-        "Tue, 02 Sep 1997 17:30:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Tue, 02 Sep 1997 14:30:00 GMT',
+      'Tue, 02 Sep 1997 16:00:00 GMT',
+      'Tue, 02 Sep 1997 17:30:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
 
   describe('Every 20 minutes from 9:00 AM to 4:40 PM every day', () => {
@@ -1439,28 +1332,26 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     const rrule2 =
       'DTSTART;TZID=America/New_York:19970902T090000\n' +
       'RRULE:FREQ=MINUTELY;INTERVAL=20;BYHOUR=9,10,11,12,13,14,15,16';
-    const snapshot = `
-      [
-        "Tue, 02 Sep 1997 13:00:00 GMT",
-        "Tue, 02 Sep 1997 13:20:00 GMT",
-        "Tue, 02 Sep 1997 13:40:00 GMT",
-        "Tue, 02 Sep 1997 14:00:00 GMT",
-        "Tue, 02 Sep 1997 14:20:00 GMT",
-        "Tue, 02 Sep 1997 14:40:00 GMT",
-        "Tue, 02 Sep 1997 15:00:00 GMT",
-        "Tue, 02 Sep 1997 15:20:00 GMT",
-        "Tue, 02 Sep 1997 15:40:00 GMT",
-        "Tue, 02 Sep 1997 16:00:00 GMT",
-        "Tue, 02 Sep 1997 16:20:00 GMT",
-        "Tue, 02 Sep 1997 16:40:00 GMT",
-        "Tue, 02 Sep 1997 17:00:00 GMT",
-        "Tue, 02 Sep 1997 17:20:00 GMT",
-        "Tue, 02 Sep 1997 17:40:00 GMT",
-        "Tue, 02 Sep 1997 18:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot, limit: 16});
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot, limit: 16});
+    const dates = [
+      'Tue, 02 Sep 1997 13:00:00 GMT',
+      'Tue, 02 Sep 1997 13:20:00 GMT',
+      'Tue, 02 Sep 1997 13:40:00 GMT',
+      'Tue, 02 Sep 1997 14:00:00 GMT',
+      'Tue, 02 Sep 1997 14:20:00 GMT',
+      'Tue, 02 Sep 1997 14:40:00 GMT',
+      'Tue, 02 Sep 1997 15:00:00 GMT',
+      'Tue, 02 Sep 1997 15:20:00 GMT',
+      'Tue, 02 Sep 1997 15:40:00 GMT',
+      'Tue, 02 Sep 1997 16:00:00 GMT',
+      'Tue, 02 Sep 1997 16:20:00 GMT',
+      'Tue, 02 Sep 1997 16:40:00 GMT',
+      'Tue, 02 Sep 1997 17:00:00 GMT',
+      'Tue, 02 Sep 1997 17:20:00 GMT',
+      'Tue, 02 Sep 1997 17:40:00 GMT',
+      'Tue, 02 Sep 1997 18:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates, limit: 16});
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates, limit: 16});
   });
 
   describe('An example where an invalid date (i.e. February 30) is ignored', () => {
@@ -1472,16 +1363,14 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       count: 5,
     });
     const rrule = 'DTSTART;TZID=America/New_York:20070115T090000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=15,30;COUNT=5';
-    const snapshot = `
-      [
-        "Mon, 15 Jan 2007 14:00:00 GMT",
-        "Tue, 30 Jan 2007 14:00:00 GMT",
-        "Thu, 15 Feb 2007 14:00:00 GMT",
-        "Thu, 15 Mar 2007 13:00:00 GMT",
-        "Fri, 30 Mar 2007 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule, rrule, snapshot});
+    const dates = [
+      'Mon, 15 Jan 2007 14:00:00 GMT',
+      'Tue, 30 Jan 2007 14:00:00 GMT',
+      'Thu, 15 Feb 2007 14:00:00 GMT',
+      'Thu, 15 Mar 2007 13:00:00 GMT',
+      'Fri, 30 Mar 2007 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule, rrule, dates});
   });
   describe('An example where the days generated makes a difference because of WKST', () => {
     const rule1 = new RRuleTemporal({
@@ -1495,15 +1384,13 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule1 =
       'DTSTART;TZID=America/New_York:19970805T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=MO';
-    const snapshot1 = `
-      [
-        "Tue, 05 Aug 1997 13:00:00 GMT",
-        "Sun, 10 Aug 1997 13:00:00 GMT",
-        "Tue, 19 Aug 1997 13:00:00 GMT",
-        "Sun, 24 Aug 1997 13:00:00 GMT",
-      ]
-    `;
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, snapshot: snapshot1});
+    const dates1 = [
+      'Tue, 05 Aug 1997 13:00:00 GMT',
+      'Sun, 10 Aug 1997 13:00:00 GMT',
+      'Tue, 19 Aug 1997 13:00:00 GMT',
+      'Sun, 24 Aug 1997 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates: dates1});
     const rule2 = new RRuleTemporal({
       dtstart: zdt(1997, 8, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -1515,14 +1402,12 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule2 =
       'DTSTART;TZID=America/New_York:19970805T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=SU';
-    const snapshot2 = `
-        [
-          "Tue, 05 Aug 1997 13:00:00 GMT",
-          "Sun, 17 Aug 1997 13:00:00 GMT",
-          "Tue, 19 Aug 1997 13:00:00 GMT",
-          "Sun, 31 Aug 1997 13:00:00 GMT",
-        ]
-      `;
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, snapshot: snapshot2});
+    const dates2 = [
+      'Tue, 05 Aug 1997 13:00:00 GMT',
+      'Sun, 17 Aug 1997 13:00:00 GMT',
+      'Tue, 19 Aug 1997 13:00:00 GMT',
+      'Sun, 31 Aug 1997 13:00:00 GMT',
+    ];
+    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates: dates2});
   });
 });

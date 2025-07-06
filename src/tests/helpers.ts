@@ -23,5 +23,24 @@ export const formatUTC = (d: IDateTime) => toTimezone('UTC')(d)?.toUTCString();
 
 export const formatISO = (d: IDateTime) => toTimezone('UTC')(d)?.toISOString();
 
-type Opts = Pick<RRuleOptions, 'maxIterations' | 'includeDtstart'>;
-export const parse = (rruleString: string, opts?: Opts) => new RRuleTemporal({rruleString, ...opts});
+type ParseOptions = Pick<RRuleOptions, 'maxIterations' | 'includeDtstart'>;
+export const parse = (rruleString: string, opts?: ParseOptions) => new RRuleTemporal({rruleString, ...opts});
+
+type IFormat = (d: IDateTime) => (string | undefined);
+type Opts = { max?: number|null, format?: IFormat };
+
+export function assertAllDates(rule: RRuleTemporal, dates: string[], {max=null, format = formatISO}: Opts = {}) {
+    const result = rule.all(max === null ? limit(dates.length) : max === undefined ? undefined : limit(max))
+    expect(result).toHaveLength(dates.length);
+    expect(result.map(format)).toEqual(dates);
+}
+
+export function assertAllDatesWithFormat(rule: RRuleTemporal, format: IFormat, dates: string[], opts: Opts = {}) {
+    assertAllDates(rule, dates, {...opts, format});
+}
+
+export function assertBetweenDates(rule: RRuleTemporal, start: Date, end: Date, format: IFormat, dates: string[]) {
+    const result = rule.between(start, end)
+    expect(result).toHaveLength(dates.length);
+    expect(result.map(format!)).toEqual(dates);
+}
