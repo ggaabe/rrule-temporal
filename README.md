@@ -74,8 +74,8 @@ const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 ## Converting back to text
 
 ```typescript
-rule.toString(); // DTSTART and RRULE lines
-rule.toText();   // human readable description
+rule.toString();          // DTSTART and RRULE lines
+toText(rule);             // human readable description
 ```
 
 ## API
@@ -88,7 +88,7 @@ rule.toText();   // human readable description
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(formatter?)` | English description of the rule. |
+| `toText(rule, locale?)` | English description of the rule. |
 | `options()` | Return the normalized options object. |
 
 ## Further examples
