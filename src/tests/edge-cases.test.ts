@@ -8,6 +8,45 @@ const DATE_2019_DECEMBER_19 = zdt(2019, 12, 19, 0, 'UTC');
 const DATE_2020 = zdt(2020, 1, 1, 0, 'UTC');
 const DATE_2023_JAN_6_11PM = zdt(2023, 1, 6, 23, 'UTC');
 
+describe('timezone default for rrules', function () {
+  it('tzid provides default timezone if not specified in dtstart', () => {
+    const timezone = 'Europe/Oslo';
+    const rruleString = 'DTSTART:20230325T080000Z\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4';
+    const rule = new RRuleTemporal({rruleString, tzid: timezone});
+    assertDates({rule, print: format(timezone)}, [
+      '2023-03-25T09:00:00+01:00[Europe/Oslo]',
+      '2023-04-08T09:00:00+02:00[Europe/Oslo]',
+      '2023-04-22T09:00:00+02:00[Europe/Oslo]',
+      '2023-05-06T09:00:00+02:00[Europe/Oslo]',
+    ]);
+    assertDates({rule}, [
+      '2023-03-25T08:00:00.000Z',
+      '2023-04-08T07:00:00.000Z',
+      '2023-04-22T07:00:00.000Z',
+      '2023-05-06T07:00:00.000Z',
+    ]);
+    expect(rule.toString()).toEqual('DTSTART;TZID=Europe/Oslo:20230325T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4');
+  });
+  it('always use timezone specified in dtstart', () => {
+    const timezone = 'Australia/Sydney';
+    const rruleString = 'DTSTART;TZID=Europe/Oslo:20230325T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4';
+    const rule = new RRuleTemporal({rruleString, tzid: timezone});
+    assertDates({rule, print: format('Europe/Oslo')}, [
+      '2023-03-25T09:00:00+01:00[Europe/Oslo]',
+      '2023-04-08T09:00:00+02:00[Europe/Oslo]',
+      '2023-04-22T09:00:00+02:00[Europe/Oslo]',
+      '2023-05-06T09:00:00+02:00[Europe/Oslo]',
+    ]);
+    assertDates({rule}, [
+      '2023-03-25T08:00:00.000Z',
+      '2023-04-08T07:00:00.000Z',
+      '2023-04-22T07:00:00.000Z',
+      '2023-05-06T07:00:00.000Z',
+    ]);
+    expect(rule.toString()).toEqual('DTSTART;TZID=Europe/Oslo:20230325T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4');
+  });
+});
+
 describe('Additional smoke tests', () => {
   // Cover some scenarios not tested in the iCalendar.org examples, in particular bySecond, and
   // integration tests to make sure invalid inputs get ignored gracefully

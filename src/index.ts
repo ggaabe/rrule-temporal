@@ -1,5 +1,5 @@
 // rrule-temporal.ts
-import { Temporal } from "@js-temporal/polyfill";
+import {Temporal} from '@js-temporal/polyfill';
 
 // Allowed frequency values
 type Freq =
@@ -106,9 +106,7 @@ function parseDateValues(
       const iso =
         `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
         `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
-      dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
-        tzid || "UTC"
-      ));
+      dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || "UTC"));
     } else {
       const isoDate =
         `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
@@ -123,10 +121,7 @@ function parseDateValues(
 /**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts
  */
-function parseRRuleString(
-  input: string,
-  fallbackDtstart?: Temporal.ZonedDateTime
-): ManualOpts {
+function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
   // Unfold the input according to RFC 5545 specification
   const unfoldedInput = unfoldLine(input).trim();
 
@@ -144,13 +139,11 @@ function parseRRuleString(
     const exLines = lines.filter(line => line.match(/^EXDATE/i));
     const rLines = lines.filter(line => line.match(/^RDATE/i));
 
-    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/i);
+    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6}Z?)/i);
     if (!m) throw new Error("Invalid DTSTART in ICS snippet");
-    tzid = m[1] || tzid;
-    const isoDate =
-      `${m[2]!.slice(0, 4)}-${m[2]!.slice(4, 6)}-${m[2]!.slice(6, 8)}` +
-      `T${m[2]!.slice(9)}`;
-    dtstart = Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid);
+    tzid = m[1] ?? targetTimezone ?? tzid;
+    dtstart = parseDateValues([m[2]!],tzid)[0]!
+
     rruleLine = rrLine!;
 
     // Parse EXDATE lines
@@ -173,12 +166,7 @@ function parseRRuleString(
       }
     }
   } else {
-    // Only RRULE line; require fallback
-    if (!fallbackDtstart)
       throw new Error("dtstart required when parsing RRULE alone");
-    dtstart = fallbackDtstart;
-    tzid = fallbackDtstart.timeZoneId;
-    rruleLine = unfoldedInput.replace(/^RRULE:/i, "RRULE:");
   }
 
   // Parse RRULE
@@ -312,12 +300,13 @@ export class RRuleTemporal {
   private maxIterations: number;
   private includeDtstart: boolean;
 
-  constructor(params: { rruleString: string } | ManualOpts) {
+  constructor(params: ({ rruleString: string } & BaseOpts) | ManualOpts) {
     let manual: ManualOpts;
     if ("rruleString" in params) {
-      manual = {...params,...parseRRuleString(params.rruleString)};
-      this.tzid = manual.tzid || "UTC";
-      this.originalDtstart = manual.dtstart as Temporal.ZonedDateTime;
+      const parsed = parseRRuleString(params.rruleString, params.tzid)
+      this.tzid = parsed.tzid ?? params.tzid ?? "UTC";
+      this.originalDtstart = parsed.dtstart as Temporal.ZonedDateTime;
+      manual = {...params,...parsed};
     } else {
       manual = { ...params };
       if (typeof manual.dtstart === "string") {

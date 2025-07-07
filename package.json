@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Recurrence rule processing using Temporal PlainDate/PlainDateTime",
   "types": "dist/index.d.ts",
+  "main": "dist/index.js",
   "type": "module",
   "exports": {
     ".": {
