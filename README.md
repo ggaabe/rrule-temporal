@@ -30,6 +30,9 @@ rule.all().forEach(dt => console.log(dt.toString()));
 // 2025-01-01T09:00:00[UTC]
 // 2025-01-02T09:00:00[UTC]
 // 2025-01-03T09:00:00[UTC]
+
+// Only the first 10 events
+const firstTen = rule.all((_, i) => i < 10);
 ```
 
 ## Creating a rule with options
@@ -74,9 +77,18 @@ const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 ## Converting back to text
 
 ```typescript
+import { toText } from "rrule-temporal/totext";
+
 rule.toString();          // DTSTART and RRULE lines
-toText(rule);             // human readable description
+// "DTSTART;TZID=UTC:20250101T090000\nRRULE:FREQ=DAILY;COUNT=3"
+toText(rule);             // uses the runtime locale, defaults to English
+toText(rule, "es");      // Spanish description
 ```
+
+`toText()` currently ships translations for **English (`en`)**,
+**Spanish (`es`)**, **Hindi (`hi`)** and **Cantonese (`yue`)**. At build time you
+can reduce bundle size by defining the `TOTEXT_LANGS` environment variable, e.g.
+`TOTEXT_LANGS=en,es`.
 
 ## API
 
@@ -88,7 +100,7 @@ toText(rule);             // human readable description
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(rule, locale?)` | English description of the rule. |
+| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`). |
 | `options()` | Return the normalized options object. |
 
 ## Further examples
@@ -117,4 +129,31 @@ const ruleB = new RRuleTemporal({
   dtstart
 });
 ruleB.all().forEach(dt => console.log(dt.toString()));
+```
+
+### Working with extra and excluded dates
+
+```typescript
+import { Temporal } from "@js-temporal/polyfill";
+
+const start = Temporal.ZonedDateTime.from({
+  year: 2025, month: 1, day: 1, hour: 12, timeZone: "UTC"
+});
+const ruleC = new RRuleTemporal({
+  freq: "WEEKLY",
+  count: 5,
+  rDate: [start.add({ days: 1 })],           // add one extra day
+  exDate: [start.add({ weeks: 2 })],         // skip the third week
+  dtstart: start
+});
+
+// First five occurrences (with rDate/exDate accounted for)
+ruleC.all((_, i) => i < 5).forEach(dt => console.log(dt.toString()));
+
+// Occurrences within a window
+const hits = ruleC.between(
+  new Date("2025-01-01T00:00Z"),
+  new Date("2025-02-01T00:00Z"),
+  true
+);
 ```
