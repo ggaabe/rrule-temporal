@@ -1,0 +1,110 @@
+import {RRuleTemporal} from '../index';
+import {toText} from '../totext';
+import {Temporal} from '@js-temporal/polyfill';
+
+function make(ruleStr: string): RRuleTemporal {
+  const dtstart = Temporal.ZonedDateTime.from({
+    year: 2025,
+    month: 6,
+    day: 1,
+    hour: 0,
+    minute: 0,
+    timeZone: 'America/New_York',
+  });
+  const dt = dtstart.toPlainDateTime().toString().replace(/[-:]/g, '');
+  const ics = `DTSTART;TZID=${dtstart.timeZoneId}:${dt}\n${ruleStr}`;
+  return new RRuleTemporal({rruleString: ics});
+}
+
+const cases = [
+  'RRULE:FREQ=DAILY',
+  'RRULE:FREQ=DAILY;BYHOUR=10,12,17',
+  'RRULE:FREQ=WEEKLY;BYDAY=SU;BYHOUR=10,12,17',
+  'RRULE:FREQ=WEEKLY',
+  'RRULE:FREQ=HOURLY',
+  'RRULE:INTERVAL=4;FREQ=HOURLY',
+  'RRULE:FREQ=WEEKLY;BYDAY=TU',
+  'RRULE:FREQ=WEEKLY;BYDAY=MO,WE',
+  'RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+  'RRULE:INTERVAL=2;FREQ=WEEKLY',
+  'RRULE:FREQ=MONTHLY',
+  'RRULE:INTERVAL=6;FREQ=MONTHLY',
+  'RRULE:FREQ=YEARLY',
+  'RRULE:FREQ=YEARLY;BYDAY=+1FR',
+  'RRULE:FREQ=YEARLY;BYDAY=+13FR',
+  'RRULE:FREQ=DAILY;BYHOUR=17;BYMINUTE=30',
+  'RRULE:FREQ=WEEKLY;BYDAY=MO,WE;BYHOUR=10,16',
+  'RRULE:FREQ=WEEKLY;BYDAY=TU,TH;BYHOUR=9,15;BYMINUTE=30',
+];
+
+const expected = {
+  es: [
+    'cada día',
+    'cada día a las 10 AM, 12 PM y 5 PM EDT',
+    'cada semana en domingo a las 10 AM, 12 PM y 5 PM EDT',
+    'cada semana',
+    'cada hora',
+    'cada 4 horas',
+    'cada semana en martes',
+    'cada semana en lunes y miércoles',
+    'cada día de la semana',
+    'cada 2 semanas',
+    'cada mes',
+    'cada 6 meses',
+    'cada año',
+    'cada año en 1º viernes',
+    'cada año en 13º viernes',
+    'cada día a las 5:30 PM EDT',
+    'cada semana en lunes y miércoles a las 10 AM y 4 PM EDT',
+    'cada semana en martes y jueves a las 9:30 AM y 3:30 PM EDT',
+  ],
+  hi: [
+    'हर दिन',
+    'हर दिन पर 10 AM, 12 PM और 5 PM EDT',
+    'हर सप्ताह को रविवार पर 10 AM, 12 PM और 5 PM EDT',
+    'हर सप्ताह',
+    'हर घंटा',
+    'हर 4 घंटे',
+    'हर सप्ताह को मंगलवार',
+    'हर सप्ताह को सोमवार और बुधवार',
+    'हर सप्ताह का दिन',
+    'हर 2 सप्ताह',
+    'हर महीना',
+    'हर 6 महीने',
+    'हर साल',
+    'हर साल को 1वां शुक्रवार',
+    'हर साल को 13वां शुक्रवार',
+    'हर दिन पर 5:30 PM EDT',
+    'हर सप्ताह को सोमवार और बुधवार पर 10 AM और 4 PM EDT',
+    'हर सप्ताह को मंगलवार और गुरुवार पर 9:30 AM और 3:30 PM EDT',
+  ],
+  yue: [
+    '每 日',
+    '每 日 在 10 AM, 12 PM 和 5 PM EDT',
+    '每 週 在 星期日 在 10 AM, 12 PM 和 5 PM EDT',
+    '每 週',
+    '每 小時',
+    '每 4 小時',
+    '每 週 在 星期二',
+    '每 週 在 星期一 和 星期三',
+    '每 平日',
+    '每 2 週',
+    '每 月',
+    '每 6 月',
+    '每 年',
+    '每 年 在 第1 星期五',
+    '每 年 在 第13 星期五',
+    '每 日 在 5:30 PM EDT',
+    '每 週 在 星期一 和 星期三 在 10 AM 和 4 PM EDT',
+    '每 週 在 星期二 和 星期四 在 9:30 AM 和 3:30 PM EDT',
+  ],
+};
+
+describe('toText i18n basic cases', () => {
+  for (const lang of Object.keys(expected) as (keyof typeof expected)[]) {
+    test.each(cases.map((r, i) => [expected[lang][i], r]))('%s', (text, ruleStr) => {
+      const rule = make(ruleStr);
+      expect(toText(rule, lang).toLowerCase()).toBe(text.toLowerCase());
+    });
+  }
+});

@@ -1,9 +1,51 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { RRuleTemporal } from "./index";
 
+interface UnitStrings {
+  singular: string;
+  plural: string;
+}
+
 interface LocaleData {
   weekdayNames: string[];
   monthNames: string[];
+  units: {
+    year: UnitStrings;
+    month: UnitStrings;
+    week: UnitStrings;
+    day: UnitStrings;
+    hour: UnitStrings;
+    minute: UnitStrings;
+    second: UnitStrings;
+  };
+  words: {
+    every: string;
+    weekday: string;
+    on: string;
+    in: string;
+    on_the: string;
+    day_of_month: string;
+    day_of_year: string;
+    in_week: string;
+    at: string;
+    at_minute: string;
+    at_second: string;
+    until: string;
+    for: string;
+    time: string;
+    times: string;
+    instance: string;
+    week_starts_on: string;
+    with: string;
+    additional_date: string;
+    additional_dates: string;
+    excluding: string;
+    date: string;
+    dates: string;
+    and: string;
+    last: string;
+  };
+  ordinal?: (n: number) => string;
 }
 
 const en: LocaleData = {
@@ -30,9 +72,222 @@ const en: LocaleData = {
     "November",
     "December",
   ],
+  units: {
+    year: { singular: "year", plural: "years" },
+    month: { singular: "month", plural: "months" },
+    week: { singular: "week", plural: "weeks" },
+    day: { singular: "day", plural: "days" },
+    hour: { singular: "hour", plural: "hours" },
+    minute: { singular: "minute", plural: "minutes" },
+    second: { singular: "second", plural: "seconds" },
+  },
+  words: {
+    every: "every",
+    weekday: "weekday",
+    on: "on",
+    in: "in",
+    on_the: "on the",
+    day_of_month: "day of the month",
+    day_of_year: "day of the year",
+    in_week: "in week",
+    at: "at",
+    at_minute: "at minute",
+    at_second: "at second",
+    until: "until",
+    for: "for",
+    time: "time",
+    times: "times",
+    instance: "instance",
+    week_starts_on: "week starts on",
+    with: "with",
+    additional_date: "additional date",
+    additional_dates: "additional dates",
+    excluding: "excluding",
+    date: "date",
+    dates: "dates",
+    and: "and",
+    last: "last",
+  },
+  ordinal: (n: number) => {
+    const abs = Math.abs(n);
+    const suffix =
+      abs % 10 === 1 && abs % 100 !== 11
+        ? "st"
+        : abs % 10 === 2 && abs % 100 !== 12
+        ? "nd"
+        : abs % 10 === 3 && abs % 100 !== 13
+        ? "rd"
+        : "th";
+    return n < 0 ? `last` : `${abs}${suffix}`;
+  },
 };
 
-const ALL_LOCALES: Record<string, LocaleData> = { en };
+const es: LocaleData = {
+  weekdayNames: ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"],
+  monthNames: [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+  ],
+  units: {
+    year: { singular: "año", plural: "años" },
+    month: { singular: "mes", plural: "meses" },
+    week: { singular: "semana", plural: "semanas" },
+    day: { singular: "día", plural: "días" },
+    hour: { singular: "hora", plural: "horas" },
+    minute: { singular: "minuto", plural: "minutos" },
+    second: { singular: "segundo", plural: "segundos" },
+  },
+  words: {
+    every: "cada",
+    weekday: "día de la semana",
+    on: "en",
+    in: "en",
+    on_the: "el",
+    day_of_month: "día del mes",
+    day_of_year: "día del año",
+    in_week: "en la semana",
+    at: "a las",
+    at_minute: "en el minuto",
+    at_second: "en el segundo",
+    until: "hasta",
+    for: "durante",
+    time: "vez",
+    times: "veces",
+    instance: "ocasión",
+    week_starts_on: "la semana comienza el",
+    with: "con",
+    additional_date: "fecha adicional",
+    additional_dates: "fechas adicionales",
+    excluding: "excluyendo",
+    date: "fecha",
+    dates: "fechas",
+    and: "y",
+    last: "último",
+  },
+  ordinal: (n: number) => (n < 0 ? "último" : `${Math.abs(n)}º`),
+};
+
+const hi: LocaleData = {
+  weekdayNames: ["सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार", "रविवार"],
+  monthNames: [
+    "जनवरी",
+    "फरवरी",
+    "मार्च",
+    "अप्रैल",
+    "मई",
+    "जून",
+    "जुलाई",
+    "अगस्त",
+    "सितंबर",
+    "अक्टूबर",
+    "नवंबर",
+    "दिसंबर",
+  ],
+  units: {
+    year: { singular: "साल", plural: "साल" },
+    month: { singular: "महीना", plural: "महीने" },
+    week: { singular: "सप्ताह", plural: "सप्ताह" },
+    day: { singular: "दिन", plural: "दिन" },
+    hour: { singular: "घंटा", plural: "घंटे" },
+    minute: { singular: "मिनट", plural: "मिनट" },
+    second: { singular: "सेकंड", plural: "सेकंड" },
+  },
+  words: {
+    every: "हर",
+    weekday: "सप्ताह का दिन",
+    on: "को",
+    in: "में",
+    on_the: "को",
+    day_of_month: "महीने का दिन",
+    day_of_year: "साल का दिन",
+    in_week: "सप्ताह",
+    at: "पर",
+    at_minute: "मिनट पर",
+    at_second: "सेकंड पर",
+    until: "तक",
+    for: "के लिए",
+    time: "बार",
+    times: "बार",
+    instance: "बार",
+    week_starts_on: "सप्ताह शुरू होता है",
+    with: "साथ",
+    additional_date: "अतिरिक्त तारीख",
+    additional_dates: "अतिरिक्त तारीखें",
+    excluding: "को छोड़कर",
+    date: "तारीख",
+    dates: "तारीखें",
+    and: "और",
+    last: "आखिरी",
+  },
+  ordinal: (n: number) => (n < 0 ? "आखिरी" : `${Math.abs(n)}वां`),
+};
+
+const yue: LocaleData = {
+  weekdayNames: ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"],
+  monthNames: [
+    "一月",
+    "二月",
+    "三月",
+    "四月",
+    "五月",
+    "六月",
+    "七月",
+    "八月",
+    "九月",
+    "十月",
+    "十一月",
+    "十二月",
+  ],
+  units: {
+    year: { singular: "年", plural: "年" },
+    month: { singular: "月", plural: "月" },
+    week: { singular: "週", plural: "週" },
+    day: { singular: "日", plural: "日" },
+    hour: { singular: "小時", plural: "小時" },
+    minute: { singular: "分鐘", plural: "分鐘" },
+    second: { singular: "秒", plural: "秒" },
+  },
+  words: {
+    every: "每",
+    weekday: "平日",
+    on: "在",
+    in: "於",
+    on_the: "在",
+    day_of_month: "月的日子",
+    day_of_year: "年的日子",
+    in_week: "第",
+    at: "在",
+    at_minute: "在第",
+    at_second: "在第",
+    until: "直到",
+    for: "共",
+    time: "次",
+    times: "次",
+    instance: "次",
+    week_starts_on: "星期開始於",
+    with: "帶有",
+    additional_date: "額外日期",
+    additional_dates: "額外日期",
+    excluding: "排除",
+    date: "日期",
+    dates: "日期",
+    and: "和",
+    last: "最後",
+  },
+  ordinal: (n: number) => (n < 0 ? "最後" : `第${Math.abs(n)}`),
+};
+
+const ALL_LOCALES: Record<string, LocaleData> = { en, es, hi, yue };
 const env = process.env.TOTEXT_LANGS;
 const active = env ? env.split(',').map(s => s.trim()).filter(Boolean) : Object.keys(ALL_LOCALES);
 const LOCALES: Record<string, LocaleData> = {};
@@ -40,7 +295,7 @@ for (const l of active) {
   if (ALL_LOCALES[l]) LOCALES[l] = ALL_LOCALES[l];
 }
 
-function ordinal(n: number): string {
+function defaultOrdinal(n: number): string {
   const abs = Math.abs(n);
   const suffix =
     abs % 10 === 1 && abs % 100 !== 11
@@ -53,10 +308,14 @@ function ordinal(n: number): string {
   return n < 0 ? `last` : `${abs}${suffix}`;
 }
 
+function ordinal(n: number, locale: LocaleData): string {
+  return locale.ordinal ? locale.ordinal(n) : defaultOrdinal(n);
+}
+
 function list(
   arr: (string | number)[],
   mapFn: (x: string | number) => string = (x) => `${x}`,
-  final = "and"
+  final: string
 ): string {
   const mapped = arr.map(mapFn);
   if (mapped.length === 1) return mapped[0]!;
@@ -80,8 +339,8 @@ function formatByDayToken(tok: string | number, locale: LocaleData): string {
   const idx = weekdayMap[m[2] as keyof typeof weekdayMap];
   const name = locale.weekdayNames[idx!];
   if (ord === 0) return name!;
-  if (ord === -1) return `last ${name}`;
-  return `${ordinal(ord)} ${name}`;
+  if (ord === -1) return `${locale.words.last} ${name}`;
+  return `${ordinal(ord, locale)} ${name}`;
 }
 
 function formatTime(hour: number, minute = 0, second = 0): string {
@@ -135,9 +394,9 @@ export function toText(
     exDate,
   } = opts;
 
-  const parts: string[] = ["every"];
+  const parts: string[] = [data.words.every];
 
-  const base = {
+  const baseKey = {
     YEARLY: "year",
     MONTHLY: "month",
     WEEKLY: "week",
@@ -145,7 +404,8 @@ export function toText(
     HOURLY: "hour",
     MINUTELY: "minute",
     SECONDLY: "second",
-  }[freq];
+  }[freq] as keyof LocaleData["units"];
+  const base = data.units[baseKey];
 
   const daysNormalized = byDay?.map((d) => d.toUpperCase());
   const isWeekdays =
@@ -158,37 +418,37 @@ export function toText(
     ["MO", "TU", "WE", "TH", "FR", "SA", "SU"].every((d) => daysNormalized.includes(d));
 
   if (freq === "WEEKLY" && interval === 1 && isWeekdays) {
-    parts.push("weekday");
+    parts.push(data.words.weekday);
   } else if (freq === "WEEKLY" && interval === 1 && isEveryday) {
-    parts.push("day");
+    parts.push(data.units.day.singular);
   } else {
     if (interval !== 1) {
-      parts.push(interval.toString(), base + "s");
+      parts.push(interval.toString(), base.plural);
     } else {
-      parts.push(base);
+      parts.push(base.singular);
     }
   }
 
   if (freq === "WEEKLY" && byDay && !isWeekdays && !isEveryday) {
-    parts.push("on", list(byDay, (t) => formatByDayToken(t, data)));
+    parts.push(data.words.on, list(byDay, (t) => formatByDayToken(t, data), data.words.and));
   } else if (byDay && freq !== "WEEKLY") {
-    parts.push("on", list(byDay, (t) => formatByDayToken(t, data)));
+    parts.push(data.words.on, list(byDay, (t) => formatByDayToken(t, data), data.words.and));
   }
 
   if (byMonth) {
-    parts.push("in", list(byMonth, (m) => data.monthNames[(m as number) - 1]!));
+    parts.push(data.words.in, list(byMonth, (m) => data.monthNames[(m as number) - 1]!, data.words.and));
   }
 
   if (byMonthDay) {
-    parts.push("on the", list(byMonthDay, (d) => ordinal(d as number)), "day of the month");
+    parts.push(data.words.on_the, list(byMonthDay, (d) => ordinal(d as number, data), data.words.and), data.words.day_of_month);
   }
 
   if (byYearDay) {
-    parts.push("on the", list(byYearDay, (d) => ordinal(d as number)), "day of the year");
+    parts.push(data.words.on_the, list(byYearDay, (d) => ordinal(d as number, data), data.words.and), data.words.day_of_year);
   }
 
   if (byWeekNo) {
-    parts.push("in week", list(byWeekNo, (n) => n.toString()));
+    parts.push(data.words.in_week, list(byWeekNo, (n) => n.toString(), data.words.and));
   }
 
   if (byHour) {
@@ -197,40 +457,40 @@ export function toText(
     const times = byHour.flatMap((h) =>
       minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s)))
     );
-    parts.push("at", list(times));
+    parts.push(data.words.at, list(times, undefined, data.words.and));
     parts.push(tzAbbreviation(opts.dtstart));
   }
 
   if (!byHour && byMinute) {
-    parts.push("at minute", list(byMinute));
+    parts.push(data.words.at_minute, list(byMinute, undefined, data.words.and));
   }
 
   if (!byHour && !byMinute && bySecond) {
-    parts.push("at second", list(bySecond));
+    parts.push(data.words.at_second, list(bySecond, undefined, data.words.and));
   }
 
   if (until) {
     const monthName = data.monthNames[until.month - 1]!;
-    parts.push("until", `${monthName} ${until.day}, ${until.year}`);
+    parts.push(data.words.until, `${monthName} ${until.day}, ${until.year}`);
   } else if (count !== undefined) {
-    parts.push("for", count.toString(), count === 1 ? "time" : "times");
+    parts.push(data.words.for, count.toString(), count === 1 ? data.words.time : data.words.times);
   }
 
   if (bySetPos) {
-    parts.push("on the", list(bySetPos, (n) => ordinal(n as number)), "instance");
+    parts.push(data.words.on_the, list(bySetPos, (n) => ordinal(n as number, data), data.words.and), data.words.instance);
   }
 
   if (wkst) {
     const wkName = formatByDayToken(wkst, data);
-    parts.push("week starts on", wkName);
+    parts.push(data.words.week_starts_on, wkName);
   }
 
   if (rDate && rDate.length) {
-    parts.push("with", `${rDate.length}`, rDate.length === 1 ? "additional date" : "additional dates");
+    parts.push(data.words.with, `${rDate.length}`, rDate.length === 1 ? data.words.additional_date : data.words.additional_dates);
   }
 
   if (exDate && exDate.length) {
-    parts.push("excluding", `${exDate.length}`, exDate.length === 1 ? "date" : "dates");
+    parts.push(data.words.excluding, `${exDate.length}`, exDate.length === 1 ? data.words.date : data.words.dates);
   }
 
   return parts.join(" ");
