@@ -1527,7 +1527,7 @@ export class RRuleTemporal {
       .toString({ smallestUnit: "second" })
       .replace(/[-:]/g, "");
     const dtLine = `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
-    const parts: string[] = [];
+    const rule: string[] = [];
     const {
       freq,
       interval,
@@ -1535,25 +1535,48 @@ export class RRuleTemporal {
       until,
       byHour,
       byMinute,
+      bySecond,
       byDay,
       byMonth,
       byMonthDay,
+      bySetPos,
+      byWeekNo,
+      byYearDay,
+      wkst,
+      rDate,
+      exDate
     } = this.opts;
 
-    parts.push(`FREQ=${freq}`);
-    if (interval !== 1) parts.push(`INTERVAL=${interval}`);
-    if (count !== undefined) parts.push(`COUNT=${count}`);
+    rule.push(`FREQ=${freq}`);
+    if (interval !== 1) rule.push(`INTERVAL=${interval}`);
+    if (count !== undefined) rule.push(`COUNT=${count}`);
     if (until) {
       const u = until.toInstant().toString().replace(/[-:]/g, "");
-      parts.push(`UNTIL=${u.slice(0, 15)}Z`);
+      rule.push(`UNTIL=${u.slice(0, 15)}Z`);
     }
-    if (byHour) parts.push(`BYHOUR=${byHour.join(",")}`);
-    if (byMinute) parts.push(`BYMINUTE=${byMinute.join(",")}`);
-    if (byDay) parts.push(`BYDAY=${byDay.join(",")}`);
-    if (byMonth) parts.push(`BYMONTH=${byMonth.join(",")}`);
-    if (byMonthDay) parts.push(`BYMONTHDAY=${byMonthDay.join(",")}`);
+    if (byHour) rule.push(`BYHOUR=${byHour.join(",")}`);
+    if (byMinute) rule.push(`BYMINUTE=${byMinute.join(",")}`);
+    if (bySecond) rule.push(`BYSECOND=${bySecond.join(",")}`);
+    if (byDay) rule.push(`BYDAY=${byDay.join(",")}`);
+    if (byMonth) rule.push(`BYMONTH=${byMonth.join(",")}`);
+    if (byMonthDay) rule.push(`BYMONTHDAY=${byMonthDay.join(",")}`);
+    if (bySetPos) rule.push(`BYSETPOS=${bySetPos.join(",")}`);
+    if (byWeekNo) rule.push(`BYWEEKNO=${byWeekNo.join(",")}`);
+    if (byYearDay) rule.push(`BYYEARDAY=${byYearDay.join(",")}`);
+    if (wkst) rule.push(`WKST=${wkst}`);
 
-    return [dtLine, `RRULE:${parts.join(";")}`].join("\n");
+    const lines = [dtLine, `RRULE:${rule.join(";")}`];
+    if(rDate){
+      lines.push(`RDATE:${this.joinDates(rDate)}`);
+    }
+    if(exDate){
+      lines.push(`EXDATE:${this.joinDates(exDate)}`);
+    }
+    return lines.join("\n");
+  }
+
+  private joinDates(dates:Temporal.ZonedDateTime[]){
+    return dates.map(d => d.toInstant().toString().replace(/[-:]/g, "").slice(0,15)+'Z');
   }
 
   /**

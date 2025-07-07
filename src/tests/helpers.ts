@@ -21,7 +21,7 @@ export const format = (tz: string) => (d: IDateTime) => d?.withTimeZone(tz).toSt
 
 export const formatUTC = (d: IDateTime) => toTimezone('UTC')(d)?.toUTCString();
 
-const formatISO = (d: IDateTime) => toTimezone('UTC')(d)?.toISOString();
+export const formatISO = (d: IDateTime) => toTimezone('UTC')(d)?.toISOString();
 
 type ParseOptions = Pick<RRuleOptions, 'maxIterations' | 'includeDtstart'>;
 export const parse = (rruleString: string, opts?: ParseOptions) => new RRuleTemporal({rruleString, ...opts});

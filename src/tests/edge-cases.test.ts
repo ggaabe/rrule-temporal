@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
-import {assertDates, format, limit, parse, zdt} from './helpers';
+import {assertDates, format, formatISO, limit, parse, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 const DATE_2019 = zdt(2019, 1, 1, 0, 'UTC');
@@ -44,6 +44,21 @@ describe('timezone default for rrules', function () {
       '2023-05-06T07:00:00.000Z',
     ]);
     expect(rule.toString()).toEqual('DTSTART;TZID=Europe/Oslo:20230325T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4');
+  });
+  it('Every 2nd Sunday every month 5 times for Sydney', function () {
+    const timezone = 'Australia/Sydney';
+    const rruleString = 'DTSTART:20240201T080000Z\nRRULE:FREQ=MONTHLY;BYSETPOS=2;BYDAY=SU;INTERVAL=1;COUNT=5';
+    const rule = new RRuleTemporal({rruleString, tzid: timezone});
+    assertDates({rule}, [
+      '2024-02-11T08:00:00.000Z',
+      '2024-03-10T08:00:00.000Z',
+      '2024-04-14T09:00:00.000Z',
+      '2024-05-12T09:00:00.000Z',
+      '2024-06-09T09:00:00.000Z',
+    ]);
+    expect(rule.toString()).toEqual(
+      'DTSTART;TZID=Australia/Sydney:20240201T190000\nRRULE:FREQ=MONTHLY;COUNT=5;BYDAY=SU;BYSETPOS=2',
+    );
   });
 });
 
