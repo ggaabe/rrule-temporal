@@ -287,7 +287,89 @@ const yue: LocaleData = {
   ordinal: (n: number) => (n < 0 ? "最後" : `第${Math.abs(n)}`),
 };
 
-const ALL_LOCALES: Record<string, LocaleData> = { en, es, hi, yue };
+const ar: LocaleData = {
+  weekdayNames: [
+    "الاثنين",
+    "الثلاثاء",
+    "الأربعاء",
+    "الخميس",
+    "الجمعة",
+    "السبت",
+    "الأحد",
+  ],
+  monthNames: [
+    "يناير",
+    "فبراير",
+    "مارس",
+    "أبريل",
+    "مايو",
+    "يونيو",
+    "يوليو",
+    "أغسطس",
+    "سبتمبر",
+    "أكتوبر",
+    "نوفمبر",
+    "ديسمبر",
+  ],
+  units: {
+    year: { singular: "سنة", plural: "سنوات" },
+    month: { singular: "شهر", plural: "أشهر" },
+    week: { singular: "أسبوع", plural: "أسابيع" },
+    day: { singular: "يوم", plural: "أيام" },
+    hour: { singular: "ساعة", plural: "ساعات" },
+    minute: { singular: "دقيقة", plural: "دقائق" },
+    second: { singular: "ثانية", plural: "ثواني" },
+  },
+  words: {
+    every: "كل",
+    weekday: "يوم من أيام الأسبوع",
+    on: "في",
+    in: "في",
+    on_the: "في الـ",
+    day_of_month: "يوم من الشهر",
+    day_of_year: "يوم من السنة",
+    in_week: "في الأسبوع",
+    at: "عند",
+    at_minute: "في الدقيقة",
+    at_second: "في الثانية",
+    until: "حتى",
+    for: "لمدة",
+    time: "مرة",
+    times: "مرات",
+    instance: "مرة",
+    week_starts_on: "يبدأ الأسبوع يوم",
+    with: "مع",
+    additional_date: "تاريخ إضافي",
+    additional_dates: "تواريخ إضافية",
+    excluding: "باستثناء",
+    date: "تاريخ",
+    dates: "تواريخ",
+    and: "و",
+    last: "الأخير",
+  },
+  ordinal: (n: number) => {
+    if (n < 0) return "الأخير";
+    const abs = Math.abs(n);
+    const map: Record<number, string> = {
+      1: "الأول",
+      2: "الثاني",
+      3: "الثالث",
+      4: "الرابع",
+      5: "الخامس",
+      6: "السادس",
+      7: "السابع",
+      8: "الثامن",
+      9: "التاسع",
+      10: "العاشر",
+      11: "الحادي عشر",
+      12: "الثاني عشر",
+      13: "الثالث عشر",
+    };
+    return map[abs] || abs.toString();
+  },
+};
+
+const ALL_LOCALES: Record<string, LocaleData> = { en, es, hi, yue, ar };
 const env = process.env.TOTEXT_LANGS;
 const active = env ? env.split(',').map(s => s.trim()).filter(Boolean) : Object.keys(ALL_LOCALES);
 const LOCALES: Record<string, LocaleData> = {};
