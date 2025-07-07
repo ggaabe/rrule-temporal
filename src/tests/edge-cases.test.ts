@@ -866,6 +866,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
     ]);
   });
 
+  // TODO
   it.skip('should handle yearly recurrence by negative week number', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -878,6 +879,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
     expect(dates.every((d) => d.hour === 12)).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYWEEKNO with BYDAY', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -893,6 +895,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
 });
 
 describe('RRuleTemporal - BYYEARDAY Rules', () => {
+  // TODO
   it.skip('should handle positive year days', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -905,6 +908,7 @@ describe('RRuleTemporal - BYYEARDAY Rules', () => {
     expect(dates.map((d) => d.dayOfYear)).toEqual([1, 100, 365, 1, 100, 365]);
   });
 
+  // TODO
   it.skip('should handle negative year days', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -917,6 +921,7 @@ describe('RRuleTemporal - BYYEARDAY Rules', () => {
     expect(dates.every((d) => d.hour === 12)).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYYEARDAY in leap year', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -932,6 +937,7 @@ describe('RRuleTemporal - BYYEARDAY Rules', () => {
 });
 
 describe('RRuleTemporal - Complex Time Patterns', () => {
+  // TODO
   it.skip('should handle MINUTELY with multiple BYHOUR', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
@@ -945,6 +951,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
     expect(dates.map((d) => d.hour)).toEqual([9, 9, 14, 14, 17, 17]);
   });
 
+  // TODO
   it.skip('should handle HOURLY with single BYHOUR to prevent infinite loop', () => {
     const rule = new RRuleTemporal({
       freq: 'HOURLY',
@@ -958,6 +965,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
     expect(dates.map((d) => d.day)).toEqual([1, 2, 3]);
   });
 
+  // TODO
   it.skip('should handle WEEKLY frequency raw advancement', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
@@ -970,6 +978,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
     expect(dates.map((d) => d.day)).toEqual([1, 15, 29]);
   });
 
+  // TODO
   it.skip('should handle MINUTELY with BYDAY constraint', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
@@ -986,6 +995,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
 });
 
 describe('RRuleTemporal - Advanced BYSETPOS', () => {
+  // TODO
   it.skip('should handle BYSETPOS with MONTHLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'MONTHLY',
@@ -999,6 +1009,7 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
     expect(dates.every((d) => [1, 2, 3, 4, 5].includes(d.dayOfWeek))).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYSETPOS with YEARLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -1014,6 +1025,7 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
 });
 
 describe('RRuleTemporal - BYMONTH with different frequencies', () => {
+  // TODO
   it.skip('should handle BYMONTH with DAILY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
@@ -1026,6 +1038,7 @@ describe('RRuleTemporal - BYMONTH with different frequencies', () => {
     expect(dates.every((d) => [1, 6, 12].includes(d.month))).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYMONTH with WEEKLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
@@ -1040,6 +1053,7 @@ describe('RRuleTemporal - BYMONTH with different frequencies', () => {
 });
 
 describe('RRuleTemporal - Complex BYDAY patterns', () => {
+  // TODO
   it.skip('should handle BYDAY with DAILY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
@@ -1052,6 +1066,7 @@ describe('RRuleTemporal - Complex BYDAY patterns', () => {
     expect(dates.every((d) => [1, 3, 5].includes(d.dayOfWeek))).toBe(true);
   });
 
+  // TODO
   it.skip('should handle ordinal BYDAY with YEARLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',

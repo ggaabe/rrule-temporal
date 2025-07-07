@@ -20,7 +20,7 @@
     "build": "tsup",
     "test": "jest --coverage=false",
     "coverage": "jest",
-    "format": "./node_modules/.bin/prettier --write 'src/tests/{rrule.test,edge-cases.test,helpers}.ts'",
+    "format": "./node_modules/.bin/prettier --write 'src/tests/*.ts'",
     "prepare": "npm run build"
   },
   "repository": {
