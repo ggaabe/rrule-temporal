@@ -18,8 +18,7 @@
  */
 
 import {RRuleTemporal} from '../index';
-import {Temporal} from '@js-temporal/polyfill';
-import {assertBetweenDates, formatISO, formatUTC, limit, zdt} from './helpers';
+import {assertDates, formatUTC, IAssertDates, limit, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 
@@ -120,8 +119,8 @@ describe('RRule class methods', () => {
 
   describe('between', () => {
     it('returns all occurrences between two specified dates', () => {
-      const r = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
-      assertBetweenDates(rule, r[0]!, r[1]!, formatUTC, [
+      const between = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
+      assertDates({rule, between, print: formatUTC}, [
         'Sat, 06 Sep 1997 13:00:00 GMT',
         'Sun, 07 Sep 1997 13:00:00 GMT',
         'Mon, 08 Sep 1997 13:00:00 GMT',
@@ -132,8 +131,8 @@ describe('RRule class methods', () => {
 
     describe('if the specified start date is a occurrence', () => {
       it('includes only occurrences after the specified date by default', () => {
-        const r = [new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
-        assertBetweenDates(rule, r[0]!, r[1]!, formatUTC, [
+        const between = [new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
+        assertDates({rule, between, inc: false, print: formatUTC}, [
           'Sat, 06 Sep 1997 13:00:00 GMT',
           'Sun, 07 Sep 1997 13:00:00 GMT',
           'Mon, 08 Sep 1997 13:00:00 GMT',
@@ -143,24 +142,22 @@ describe('RRule class methods', () => {
       });
 
       it('returns the specified date when passed inclusive: true', () => {
-        const r = [new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
-        expect(rule.between(r[0]!, r[1]!, true).map(formatUTC)).toMatchInlineSnapshot(`
-          [
-            "Fri, 05 Sep 1997 13:00:00 GMT",
-            "Sat, 06 Sep 1997 13:00:00 GMT",
-            "Sun, 07 Sep 1997 13:00:00 GMT",
-            "Mon, 08 Sep 1997 13:00:00 GMT",
-            "Tue, 09 Sep 1997 13:00:00 GMT",
-            "Wed, 10 Sep 1997 13:00:00 GMT",
-          ]
-        `);
+        const between = [new Date('1997-09-05T09:00:00.000-04:00'), new Date('1997-09-10T20:00:00.000-04:00')];
+        assertDates({rule, between, inc: true, print: formatUTC}, [
+          'Fri, 05 Sep 1997 13:00:00 GMT',
+          'Sat, 06 Sep 1997 13:00:00 GMT',
+          'Sun, 07 Sep 1997 13:00:00 GMT',
+          'Mon, 08 Sep 1997 13:00:00 GMT',
+          'Tue, 09 Sep 1997 13:00:00 GMT',
+          'Wed, 10 Sep 1997 13:00:00 GMT',
+        ]);
       });
     });
 
     describe('if the specified end date is a occurrence', () => {
       it('includes only occurrences after the specified date by default', () => {
-        const r = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00')];
-        assertBetweenDates(rule, r[0]!, r[1]!, formatUTC, [
+        const between = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00')];
+        assertDates({rule, between, inc: false, print: formatUTC}, [
           'Sat, 06 Sep 1997 13:00:00 GMT',
           'Sun, 07 Sep 1997 13:00:00 GMT',
           'Mon, 08 Sep 1997 13:00:00 GMT',
@@ -169,16 +166,14 @@ describe('RRule class methods', () => {
       });
 
       it('returns the specified date when passed inclusive: true', () => {
-        const r = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00')];
-        expect(rule.between(r[0]!, r[1]!, true).map(formatUTC)).toMatchInlineSnapshot(`
-          [
-            "Sat, 06 Sep 1997 13:00:00 GMT",
-            "Sun, 07 Sep 1997 13:00:00 GMT",
-            "Mon, 08 Sep 1997 13:00:00 GMT",
-            "Tue, 09 Sep 1997 13:00:00 GMT",
-            "Wed, 10 Sep 1997 13:00:00 GMT",
-          ]
-        `);
+        const between = [new Date('1997-09-05T20:00:00.000-04:00'), new Date('1997-09-10T09:00:00.000-04:00')];
+        assertDates({rule, between, inc: true, print: formatUTC}, [
+          'Sat, 06 Sep 1997 13:00:00 GMT',
+          'Sun, 07 Sep 1997 13:00:00 GMT',
+          'Mon, 08 Sep 1997 13:00:00 GMT',
+          'Tue, 09 Sep 1997 13:00:00 GMT',
+          'Wed, 10 Sep 1997 13:00:00 GMT',
+        ]);
       });
     });
 
@@ -194,31 +189,13 @@ describe('RRule class methods', () => {
   });
 });
 
-type ITestRRule = {
-  rule: RRuleTemporal;
-  rrule: string;
-  dates: string[];
-  print?: (d: Temporal.ZonedDateTime | null) => string | undefined;
-  between?: (Date | Temporal.ZonedDateTime)[];
-  limit?: number;
-};
-
-function expectdates({rule, dates, between, limit: max, print = formatUTC}: Omit<ITestRRule, 'rrule'>) {
-  if (between && between.length >= 2) {
-    expect(rule.between(between[0]!, between[1]!, true).map(print)).toEqual(dates);
-  } else if (max) {
-    expect(rule.all(limit(max)).map(print)).toEqual(dates);
-  } else {
-    expect(rule.all().map(print)).toEqual(dates);
-  }
-}
-
-function testWithConstructorAndRRule({rule, rrule, dates, between, limit: max, print = formatUTC}: ITestRRule) {
+type IAssertRules = Omit<IAssertDates, 'print'> & {rrule: string; dates: string[]};
+function assertRules({rule, rrule, dates, between, limit}: IAssertRules) {
   it('using constructor', function () {
-    expectdates({rule, dates, between, limit: max, print});
+    assertDates({rule, between, limit, print: formatUTC}, dates);
   });
   it('using rrule', function () {
-    expectdates({rule: new RRuleTemporal({rruleString: rrule}), dates, between, limit: max, print});
+    assertDates({rule: new RRuleTemporal({rruleString: rrule}), between, limit, print: formatUTC}, dates);
   });
 }
 
@@ -246,7 +223,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Wed, 10 Sep 1997 13:00:00 GMT',
       'Thu, 11 Sep 1997 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Daily until December 24, 1997', () => {
@@ -372,7 +349,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Mon, 22 Dec 1997 14:00:00 GMT',
       'Tue, 23 Dec 1997 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every other day, forever', () => {
@@ -433,7 +410,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Mon, 01 Dec 1997 14:00:00 GMT',
       'Wed, 03 Dec 1997 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('Every 10 days, 5 occurrences', () => {
@@ -452,7 +429,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Thu, 02 Oct 1997 13:00:00 GMT',
       'Sun, 12 Oct 1997 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every day in January, for 3 years', () => {
@@ -570,8 +547,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Sun, 30 Jan 2000 14:00:00 GMT',
       'Mon, 31 Jan 2000 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates});
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates});
+    assertRules({rule: rule1, rrule: rrule1, dates});
+    assertRules({rule: rule2, rrule: rrule2, dates});
   });
 
   describe('Weekly for 10 occurrences', () => {
@@ -594,7 +571,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 28 Oct 1997 14:00:00 GMT',
       'Tue, 04 Nov 1997 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Weekly until December 24, 1997', () => {
@@ -624,7 +601,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 16 Dec 1997 14:00:00 GMT',
       'Tue, 23 Dec 1997 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every other week, forever', () => {
@@ -651,7 +628,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 03 Feb 1998 14:00:00 GMT',
       'Tue, 17 Feb 1998 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('Weekly on Tuesday and Thursday for five weeks', () => {
@@ -687,8 +664,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 30 Sep 1997 13:00:00 GMT',
       'Thu, 02 Oct 1997 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates});
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates});
+    assertRules({rule: rule1, rrule: rrule1, dates});
+    assertRules({rule: rule2, rrule: rrule2, dates});
   });
 
   describe('Every other week on Monday, Wednesday, and Friday until December 24, 1997, starting on Monday, September 1, 1997', () => {
@@ -730,7 +707,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Fri, 12 Dec 1997 14:00:00 GMT',
       'Mon, 22 Dec 1997 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every other week on Tuesday and Thursday, for 8 occurrences', () => {
@@ -754,7 +731,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 14 Oct 1997 13:00:00 GMT',
       'Thu, 16 Oct 1997 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Monthly on the first Friday for 10 occurrences', () => {
@@ -778,7 +755,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Fri, 01 May 1998 13:00:00 GMT',
       'Fri, 05 Jun 1998 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Monthly on the first Friday until December 24, 1997', () => {
@@ -796,7 +773,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Fri, 07 Nov 1997 14:00:00 GMT',
       'Fri, 05 Dec 1997 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every other month on the first and last Sunday of the month for 10 occurrences', () => {
@@ -822,7 +799,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Sun, 03 May 1998 13:00:00 GMT',
       'Sun, 31 May 1998 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Monthly on the second-to-last Monday of the month for 6 months', () => {
@@ -842,7 +819,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Mon, 19 Jan 1998 14:00:00 GMT',
       'Mon, 16 Feb 1998 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Monthly on the third-to-the-last day of the month, forever:', () => {
@@ -854,14 +831,14 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970928T090000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-3';
     const dates = [
-      '1997-09-28T13:00:00.000Z',
-      '1997-10-29T14:00:00.000Z',
-      '1997-11-28T14:00:00.000Z',
-      '1997-12-29T14:00:00.000Z',
-      '1998-01-29T14:00:00.000Z',
-      '1998-02-26T14:00:00.000Z',
+      'Sun, 28 Sep 1997 13:00:00 GMT',
+      'Wed, 29 Oct 1997 14:00:00 GMT',
+      'Fri, 28 Nov 1997 14:00:00 GMT',
+      'Mon, 29 Dec 1997 14:00:00 GMT',
+      'Thu, 29 Jan 1998 14:00:00 GMT',
+      'Thu, 26 Feb 1998 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, limit: 6, print: formatISO});
+    assertRules({rule, rrule, dates, limit: 6});
   });
 
   describe('Monthly on the 2nd and 15th of the month for 10 occurrences', () => {
@@ -885,7 +862,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Fri, 02 Jan 1998 14:00:00 GMT',
       'Thu, 15 Jan 1998 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Monthly on the first and last day of the month for 10 occurrences', () => {
@@ -909,7 +886,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Sun, 01 Feb 1998 14:00:00 GMT',
       'Sat, 28 Feb 1998 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every 18 months on the 10th thru 15th of the month for 10 occurrences', () => {
@@ -936,7 +913,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Fri, 12 Mar 1999 14:00:00 GMT',
       'Sat, 13 Mar 1999 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every Tuesday, every other month', () => {
@@ -969,7 +946,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 24 Mar 1998 14:00:00 GMT',
       'Tue, 31 Mar 1998 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('Yearly in June and July for 10 occurrences', () => {
@@ -993,7 +970,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Sun, 10 Jun 2001 13:00:00 GMT',
       'Tue, 10 Jul 2001 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every other year on January, February, and March for 10 occurrences', () => {
@@ -1018,7 +995,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Mon, 10 Feb 2003 14:00:00 GMT',
       'Mon, 10 Mar 2003 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every third year on the 1st, 100th, and 200th day for 10 occurrences', () => {
@@ -1044,7 +1021,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Sat, 19 Jul 2003 13:00:00 GMT',
       'Sun, 01 Jan 2006 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every 20th Monday of the year, forever', () => {
@@ -1056,7 +1033,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970519T090000\nRRULE:FREQ=YEARLY;BYDAY=20MO';
     const dates = ['Mon, 19 May 1997 13:00:00 GMT', 'Mon, 18 May 1998 13:00:00 GMT', 'Mon, 17 May 1999 13:00:00 GMT'];
-    testWithConstructorAndRRule({rule, rrule, dates, limit: 3});
+    assertRules({rule, rrule, dates, limit: 3});
   });
 
   describe('Monday of week number 20 (where the default start of the week is Monday), forever', () => {
@@ -1069,7 +1046,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970512T090000\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO';
     const dates = ['Mon, 12 May 1997 13:00:00 GMT', 'Mon, 11 May 1998 13:00:00 GMT', 'Mon, 10 May 1999 13:00:00 GMT'];
-    testWithConstructorAndRRule({rule, rrule, dates, limit: 3});
+    assertRules({rule, rrule, dates, limit: 3});
   });
 
   describe('Every Thursday in March, forever:', () => {
@@ -1095,7 +1072,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Thu, 18 Mar 1999 14:00:00 GMT',
       'Thu, 25 Mar 1999 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('Every Thursday, but only during June, July, and August, forever', () => {
@@ -1148,7 +1125,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Thu, 19 Aug 1999 13:00:00 GMT',
       'Thu, 26 Aug 1999 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('Every Friday the 13th, forever:', () => {
@@ -1168,7 +1145,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Fri, 13 Aug 1999 13:00:00 GMT',
       'Fri, 13 Oct 2000 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('The first Saturday that follows the first Sunday of the month, forever', () => {
@@ -1194,7 +1171,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Sat, 09 May 1998 13:00:00 GMT',
       'Sat, 13 Jun 1998 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('Every 4 years, the first Tuesday after a Monday in November, forever (U.S. Presidential Election day)', () => {
@@ -1221,7 +1198,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 03 Nov 2020 14:00:00 GMT',
       'Tue, 05 Nov 2024 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, between});
+    assertRules({rule, rrule, dates, between});
   });
 
   describe('The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months', () => {
@@ -1235,7 +1212,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970904T090000\nRRULE:FREQ=MONTHLY;COUNT=3;BYDAY=TU,WE,TH;BYSETPOS=3';
     const dates = ['Thu, 04 Sep 1997 13:00:00 GMT', 'Tue, 07 Oct 1997 13:00:00 GMT', 'Thu, 06 Nov 1997 14:00:00 GMT'];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('The second last weekday of the month', () => {
@@ -1256,7 +1233,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Thu, 26 Feb 1998 14:00:00 GMT',
       'Mon, 30 Mar 1998 14:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates, limit: 7});
+    assertRules({rule, rrule, dates, limit: 7});
   });
 
   describe('Every 3 hours from 9:00 AM to 5:00 PM on a specific day', () => {
@@ -1270,7 +1247,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     // see https://www.rfc-editor.org/errata/eid3883
     const rrule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=HOURLY;INTERVAL=3;UNTIL=19970902T210000Z';
     const dates = ['Tue, 02 Sep 1997 13:00:00 GMT', 'Tue, 02 Sep 1997 16:00:00 GMT', 'Tue, 02 Sep 1997 19:00:00 GMT'];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every 15 minutes for 6 occurrences', () => {
@@ -1290,7 +1267,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 02 Sep 1997 14:00:00 GMT',
       'Tue, 02 Sep 1997 14:15:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every hour and a half for 4 occurrences', () => {
@@ -1308,7 +1285,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 02 Sep 1997 16:00:00 GMT',
       'Tue, 02 Sep 1997 17:30:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
 
   describe('Every 20 minutes from 9:00 AM to 4:40 PM every day', () => {
@@ -1350,8 +1327,8 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 02 Sep 1997 17:40:00 GMT',
       'Tue, 02 Sep 1997 18:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates, limit: 16});
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates, limit: 16});
+    assertRules({rule: rule1, rrule: rrule1, dates, limit: 16});
+    assertRules({rule: rule2, rrule: rrule2, dates, limit: 16});
   });
 
   describe('An example where an invalid date (i.e. February 30) is ignored', () => {
@@ -1370,7 +1347,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Thu, 15 Mar 2007 13:00:00 GMT',
       'Fri, 30 Mar 2007 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule, rrule, dates});
+    assertRules({rule, rrule, dates});
   });
   describe('An example where the days generated makes a difference because of WKST', () => {
     const rule1 = new RRuleTemporal({
@@ -1390,7 +1367,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 19 Aug 1997 13:00:00 GMT',
       'Sun, 24 Aug 1997 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule: rule1, rrule: rrule1, dates: dates1});
+    assertRules({rule: rule1, rrule: rrule1, dates: dates1});
     const rule2 = new RRuleTemporal({
       dtstart: zdt(1997, 8, 5, 9),
       tzid: RFC_TEST_TZID,
@@ -1408,6 +1385,6 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Tue, 19 Aug 1997 13:00:00 GMT',
       'Sun, 31 Aug 1997 13:00:00 GMT',
     ];
-    testWithConstructorAndRRule({rule: rule2, rrule: rrule2, dates: dates2});
+    assertRules({rule: rule2, rrule: rrule2, dates: dates2});
   });
 });
