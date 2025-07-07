@@ -1,5 +1,5 @@
 // rrule-temporal.ts
-import { Temporal } from "@js-temporal/polyfill";
+import {Temporal} from '@js-temporal/polyfill';
 
 // Allowed frequency values
 type Freq =
@@ -106,9 +106,7 @@ function parseDateValues(
       const iso =
         `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
         `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
-      dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(
-        tzid || "UTC"
-      ));
+      dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || "UTC"));
     } else {
       const isoDate =
         `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
@@ -123,12 +121,9 @@ function parseDateValues(
 /**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts
  */
-function parseRRuleString(
-  input: string,
-  fallbackDtstart?: Temporal.ZonedDateTime
-): ManualOpts {
+function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
   // Unfold the input according to RFC 5545 specification
-  const unfoldedInput = unfoldLine(input);
+  const unfoldedInput = unfoldLine(input).trim();
 
   let dtstart: Temporal.ZonedDateTime;
   let tzid: string = "UTC";
@@ -138,19 +133,17 @@ function parseRRuleString(
 
   if (/^DTSTART/mi.test(unfoldedInput)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
-    const lines = unfoldedInput.split(/\r?\n/);
+    const lines = unfoldedInput.split(/\s+/);
     const dtLine = lines[0];
     const rrLine = lines.find(line => line.match(/^RRULE:/i));
     const exLines = lines.filter(line => line.match(/^EXDATE/i));
     const rLines = lines.filter(line => line.match(/^RDATE/i));
 
-    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6})/i);
+    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6}Z?)/i);
     if (!m) throw new Error("Invalid DTSTART in ICS snippet");
-    tzid = m[1] || tzid;
-    const isoDate =
-      `${m[2]!.slice(0, 4)}-${m[2]!.slice(4, 6)}-${m[2]!.slice(6, 8)}` +
-      `T${m[2]!.slice(9)}`;
-    dtstart = Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid);
+    tzid = m[1] ?? targetTimezone ?? tzid;
+    dtstart = parseDateValues([m[2]!],tzid)[0]!
+
     rruleLine = rrLine!;
 
     // Parse EXDATE lines
@@ -173,12 +166,7 @@ function parseRRuleString(
       }
     }
   } else {
-    // Only RRULE line; require fallback
-    if (!fallbackDtstart)
       throw new Error("dtstart required when parsing RRULE alone");
-    dtstart = fallbackDtstart;
-    tzid = fallbackDtstart.timeZoneId;
-    rruleLine = unfoldedInput.replace(/^RRULE:/i, "RRULE:");
   }
 
   // Parse RRULE
@@ -312,12 +300,13 @@ export class RRuleTemporal {
   private maxIterations: number;
   private includeDtstart: boolean;
 
-  constructor(params: { rruleString: string } | ManualOpts) {
+  constructor(params: ({ rruleString: string } & BaseOpts) | ManualOpts) {
     let manual: ManualOpts;
     if ("rruleString" in params) {
-      manual = {...params,...parseRRuleString(params.rruleString)};
-      this.tzid = manual.tzid || "UTC";
-      this.originalDtstart = manual.dtstart as Temporal.ZonedDateTime;
+      const parsed = parseRRuleString(params.rruleString, params.tzid)
+      this.tzid = parsed.tzid ?? params.tzid ?? "UTC";
+      this.originalDtstart = parsed.dtstart as Temporal.ZonedDateTime;
+      manual = {...params,...parsed};
     } else {
       manual = { ...params };
       if (typeof manual.dtstart === "string") {
@@ -757,10 +746,12 @@ export class RRuleTemporal {
         }
 
         const occs = this.generateMonthlyOccurrences(monthCursor);
-        // Skip this month entirely if **any** occurrence precedes DTSTART.
+        // Skip this month entirely if **any** occurrence precedes DTSTART AND
+        // DTSTART matches the rule (i.e., DTSTART is in the occurrences list).
         if (
           monthCursor.month === start.month &&
-          occs.some((o) => Temporal.ZonedDateTime.compare(o, start) < 0)
+          occs.some((o) => Temporal.ZonedDateTime.compare(o, start) < 0) &&
+          occs.some((o) => Temporal.ZonedDateTime.compare(o, start) === 0)
         ) {
           monthCursor = monthCursor.add({ months: this.opts.interval! });
           continue outer_month;
@@ -1538,7 +1529,7 @@ export class RRuleTemporal {
       .toString({ smallestUnit: "second" })
       .replace(/[-:]/g, "");
     const dtLine = `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
-    const parts: string[] = [];
+    const rule: string[] = [];
     const {
       freq,
       interval,
@@ -1546,25 +1537,48 @@ export class RRuleTemporal {
       until,
       byHour,
       byMinute,
+      bySecond,
       byDay,
       byMonth,
       byMonthDay,
+      bySetPos,
+      byWeekNo,
+      byYearDay,
+      wkst,
+      rDate,
+      exDate
     } = this.opts;
 
-    parts.push(`FREQ=${freq}`);
-    if (interval !== 1) parts.push(`INTERVAL=${interval}`);
-    if (count !== undefined) parts.push(`COUNT=${count}`);
+    rule.push(`FREQ=${freq}`);
+    if (interval !== 1) rule.push(`INTERVAL=${interval}`);
+    if (count !== undefined) rule.push(`COUNT=${count}`);
     if (until) {
       const u = until.toInstant().toString().replace(/[-:]/g, "");
-      parts.push(`UNTIL=${u.slice(0, 15)}Z`);
+      rule.push(`UNTIL=${u.slice(0, 15)}Z`);
     }
-    if (byHour) parts.push(`BYHOUR=${byHour.join(",")}`);
-    if (byMinute) parts.push(`BYMINUTE=${byMinute.join(",")}`);
-    if (byDay) parts.push(`BYDAY=${byDay.join(",")}`);
-    if (byMonth) parts.push(`BYMONTH=${byMonth.join(",")}`);
-    if (byMonthDay) parts.push(`BYMONTHDAY=${byMonthDay.join(",")}`);
+    if (byHour) rule.push(`BYHOUR=${byHour.join(",")}`);
+    if (byMinute) rule.push(`BYMINUTE=${byMinute.join(",")}`);
+    if (bySecond) rule.push(`BYSECOND=${bySecond.join(",")}`);
+    if (byDay) rule.push(`BYDAY=${byDay.join(",")}`);
+    if (byMonth) rule.push(`BYMONTH=${byMonth.join(",")}`);
+    if (byMonthDay) rule.push(`BYMONTHDAY=${byMonthDay.join(",")}`);
+    if (bySetPos) rule.push(`BYSETPOS=${bySetPos.join(",")}`);
+    if (byWeekNo) rule.push(`BYWEEKNO=${byWeekNo.join(",")}`);
+    if (byYearDay) rule.push(`BYYEARDAY=${byYearDay.join(",")}`);
+    if (wkst) rule.push(`WKST=${wkst}`);
 
-    return [dtLine, `RRULE:${parts.join(";")}`].join("\n");
+    const lines = [dtLine, `RRULE:${rule.join(";")}`];
+    if(rDate){
+      lines.push(`RDATE:${this.joinDates(rDate)}`);
+    }
+    if(exDate){
+      lines.push(`EXDATE:${this.joinDates(exDate)}`);
+    }
+    return lines.join("\n");
+  }
+
+  private joinDates(dates:Temporal.ZonedDateTime[]){
+    return dates.map(d => d.toInstant().toString().replace(/[-:]/g, "").slice(0,15)+'Z');
   }
 
   /**

@@ -1,21 +1,66 @@
 import {RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
-import {
-  assertAllDates,
-  assertAllDatesWithFormat,
-  assertBetweenDates,
-  format,
-  formatISO,
-  limit,
-  parse,
-  zdt,
-} from './helpers';
+import {assertDates, format, formatISO, formatUTC, limit, parse, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 const DATE_2019 = zdt(2019, 1, 1, 0, 'UTC');
 const DATE_2019_DECEMBER_19 = zdt(2019, 12, 19, 0, 'UTC');
 const DATE_2020 = zdt(2020, 1, 1, 0, 'UTC');
 const DATE_2023_JAN_6_11PM = zdt(2023, 1, 6, 23, 'UTC');
+
+describe('timezone default for rrules', function () {
+  it('tzid provides default timezone if not specified in dtstart', () => {
+    const timezone = 'Europe/Oslo';
+    const rruleString = 'DTSTART:20230325T080000Z\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4';
+    const rule = new RRuleTemporal({rruleString, tzid: timezone});
+    assertDates({rule, print: format(timezone)}, [
+      '2023-03-25T09:00:00+01:00[Europe/Oslo]',
+      '2023-04-08T09:00:00+02:00[Europe/Oslo]',
+      '2023-04-22T09:00:00+02:00[Europe/Oslo]',
+      '2023-05-06T09:00:00+02:00[Europe/Oslo]',
+    ]);
+    assertDates({rule}, [
+      '2023-03-25T08:00:00.000Z',
+      '2023-04-08T07:00:00.000Z',
+      '2023-04-22T07:00:00.000Z',
+      '2023-05-06T07:00:00.000Z',
+    ]);
+    expect(rule.toString()).toEqual('DTSTART;TZID=Europe/Oslo:20230325T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4');
+  });
+  it('always use timezone specified in dtstart', () => {
+    const timezone = 'Australia/Sydney';
+    const rruleString = 'DTSTART;TZID=Europe/Oslo:20230325T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4';
+    const rule = new RRuleTemporal({rruleString, tzid: timezone});
+    assertDates({rule, print: format('Europe/Oslo')}, [
+      '2023-03-25T09:00:00+01:00[Europe/Oslo]',
+      '2023-04-08T09:00:00+02:00[Europe/Oslo]',
+      '2023-04-22T09:00:00+02:00[Europe/Oslo]',
+      '2023-05-06T09:00:00+02:00[Europe/Oslo]',
+    ]);
+    assertDates({rule}, [
+      '2023-03-25T08:00:00.000Z',
+      '2023-04-08T07:00:00.000Z',
+      '2023-04-22T07:00:00.000Z',
+      '2023-05-06T07:00:00.000Z',
+    ]);
+    expect(rule.toString()).toEqual('DTSTART;TZID=Europe/Oslo:20230325T090000\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4');
+  });
+  it('Every 2nd Sunday every month 5 times for Sydney', function () {
+    const timezone = 'Australia/Sydney';
+    const rruleString = 'DTSTART:20240201T080000Z\nRRULE:FREQ=MONTHLY;BYSETPOS=2;BYDAY=SU;INTERVAL=1;COUNT=5';
+    const rule = new RRuleTemporal({rruleString, tzid: timezone});
+    assertDates({rule}, [
+      '2024-02-11T08:00:00.000Z',
+      '2024-03-10T08:00:00.000Z',
+      '2024-04-14T09:00:00.000Z',
+      '2024-05-12T09:00:00.000Z',
+      '2024-06-09T09:00:00.000Z',
+    ]);
+    expect(rule.toString()).toEqual(
+      'DTSTART;TZID=Australia/Sydney:20240201T190000\nRRULE:FREQ=MONTHLY;COUNT=5;BYDAY=SU;BYSETPOS=2',
+    );
+  });
+});
 
 describe('Additional smoke tests', () => {
   // Cover some scenarios not tested in the iCalendar.org examples, in particular bySecond, and
@@ -29,7 +74,7 @@ describe('Additional smoke tests', () => {
         interval: 1,
         tzid: 'UTC',
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 12}, [
         '2023-01-06T23:00:00.000Z',
         '2023-01-06T23:00:01.000Z',
         '2023-01-06T23:00:02.000Z',
@@ -52,7 +97,7 @@ describe('Additional smoke tests', () => {
         interval: 15,
         tzid: 'UTC',
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 12}, [
         '2023-01-06T23:00:00.000Z',
         '2023-01-06T23:00:15.000Z',
         '2023-01-06T23:00:30.000Z',
@@ -78,7 +123,7 @@ describe('Additional smoke tests', () => {
         tzid: 'Europe/Madrid',
         byDay: ['SA'],
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 12}, [
         '2023-01-07T23:00:00.000Z',
         '2023-01-14T23:00:00.000Z',
         '2023-01-21T23:00:00.000Z',
@@ -100,7 +145,7 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         byDay: ['SA'],
       });
-      assertAllDates(rule2, [
+      assertDates({rule: rule2, limit: 12}, [
         '2023-01-07T23:00:00.000Z',
         '2023-01-14T23:00:00.000Z',
         '2023-01-21T23:00:00.000Z',
@@ -125,7 +170,7 @@ describe('Additional smoke tests', () => {
         // @ts-expect-error Expect invalid values
         byDay: ['TH', 0, -2],
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 14}, [
         '2019-12-19T00:00:00.000Z',
         '2019-12-26T00:00:00.000Z',
         '2020-01-02T00:00:00.000Z',
@@ -151,7 +196,7 @@ describe('Additional smoke tests', () => {
         byDay: ['SA', 'SU', 'MO', 0],
       });
 
-      assertAllDates(rule2, [
+      assertDates({rule: rule2, limit: 9}, [
         '2019-01-05T00:00:00.000Z',
         '2019-01-06T00:00:00.000Z',
         '2019-01-07T00:00:00.000Z',
@@ -174,7 +219,7 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         byMonth: [0],
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 14}, [
         '2019-12-19T00:00:00.000Z',
         '2020-12-19T00:00:00.000Z',
         '2021-12-19T00:00:00.000Z',
@@ -204,7 +249,7 @@ describe('Additional smoke tests', () => {
         byMinute: [30],
         bySecond: [0, 15],
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 14}, [
         '2019-12-19T14:30:00.000Z',
         '2019-12-19T14:30:15.000Z',
         '2019-12-20T14:30:00.000Z',
@@ -231,7 +276,7 @@ describe('Additional smoke tests', () => {
         byMinute: [15, 30],
         bySecond: [30, 0],
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 14}, [
         '2019-12-19T00:15:00.000Z',
         '2019-12-19T00:15:30.000Z',
         '2019-12-19T00:30:00.000Z',
@@ -257,7 +302,7 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         bySecond: [10, 30, 58],
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 14}, [
         '2019-12-19T00:00:10.000Z',
         '2019-12-19T00:00:30.000Z',
         '2019-12-19T00:00:58.000Z',
@@ -283,7 +328,7 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
         bySecond: [10, 30, 58],
       });
-      assertAllDates(rule, [
+      assertDates({rule, limit: 14}, [
         '2019-12-19T00:00:10.000Z',
         '2019-12-19T00:00:30.000Z',
         '2019-12-19T00:00:58.000Z',
@@ -303,12 +348,20 @@ describe('Additional smoke tests', () => {
 
     it('Property names are are case-insensitive', function () {
       const rule = 'dtstart:19970902T090000Z\nrrule:freq=yearly;count=3';
-      assertAllDates(parse(rule), ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z', '1999-09-02T09:00:00.000Z']);
+      assertDates({rule: parse(rule)}, [
+        '1997-09-02T09:00:00.000Z',
+        '1998-09-02T09:00:00.000Z',
+        '1999-09-02T09:00:00.000Z',
+      ]);
     });
 
     it('Unfold strings before processing', function () {
       const rule = 'dtstart:19970902T090000Z\nrrule:FREQ=YEA\n RLY;COUNT=3\n';
-      assertAllDates(parse(rule), ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z', '1999-09-02T09:00:00.000Z']);
+      assertDates({rule: parse(rule)}, [
+        '1997-09-02T09:00:00.000Z',
+        '1998-09-02T09:00:00.000Z',
+        '1999-09-02T09:00:00.000Z',
+      ]);
     });
   });
 
@@ -322,7 +375,7 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
       });
 
-      assertAllDates(rule3, [
+      assertDates({rule: rule3, limit: 10}, [
         '2020-04-01T00:00:00.000Z',
         '2021-04-02T00:00:00.000Z',
         '2022-04-02T00:00:00.000Z',
@@ -345,7 +398,7 @@ describe('Additional smoke tests', () => {
         tzid: 'UTC',
       });
 
-      assertAllDates(rule, [
+      assertDates({rule, limit: 10}, [
         '2020-12-31T00:00:00.000Z',
         '2021-12-31T00:00:00.000Z',
         '2022-12-31T00:00:00.000Z',
@@ -442,7 +495,7 @@ describe('DST timezones and repeat', () => {
       interval: 1,
       tzid: tz,
     });
-    assertAllDatesWithFormat(rule, format(tz), [
+    assertDates({rule, print: format(tz), limit: 20}, [
       '2024-03-12T22:00:00+11:00[Australia/Sydney]',
       '2024-04-12T22:00:00+10:00[Australia/Sydney]',
       '2024-05-12T22:00:00+10:00[Australia/Sydney]',
@@ -464,7 +517,7 @@ describe('DST timezones and repeat', () => {
       '2025-09-12T22:00:00+10:00[Australia/Sydney]',
       '2025-10-12T22:00:00+11:00[Australia/Sydney]',
     ]);
-    assertAllDates(rule, [
+    assertDates({rule, limit: 20}, [
       '2024-03-12T11:00:00.000Z',
       '2024-04-12T12:00:00.000Z',
       '2024-05-12T12:00:00.000Z',
@@ -499,7 +552,7 @@ describe('includeDtstart option', () => {
       byMonth: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
       includeDtstart: true,
     });
-    assertAllDates(rule, [
+    assertDates({rule, limit: 5}, [
       '2019-12-19T00:00:00.000Z',
       '2020-01-19T00:00:00.000Z',
       '2020-02-19T00:00:00.000Z',
@@ -518,13 +571,21 @@ describe('includeDtstart option', () => {
     };
     const rule1 = new RRuleTemporal({...config}); // default includeDtstart: false
     const rule2 = new RRuleTemporal({...config, includeDtstart: true});
-    assertAllDates(rule1, ['2020-01-19T00:00:00.000Z', '2020-02-19T00:00:00.000Z', '2020-03-19T00:00:00.000Z']);
-    assertAllDates(rule2, ['2019-12-19T00:00:00.000Z', '2020-01-19T00:00:00.000Z', '2020-02-19T00:00:00.000Z']);
+    assertDates({rule: rule1, limit: 3}, [
+      '2020-01-19T00:00:00.000Z',
+      '2020-02-19T00:00:00.000Z',
+      '2020-03-19T00:00:00.000Z',
+    ]);
+    assertDates({rule: rule2, limit: 3}, [
+      '2019-12-19T00:00:00.000Z',
+      '2020-01-19T00:00:00.000Z',
+      '2020-02-19T00:00:00.000Z',
+    ]);
   });
 
   it('includeDtstart=true with rrule string, respects COUNT', function () {
     const rule = 'DTSTART;TZID=Europe/Berlin:20240530T200000\nRRULE:FREQ=WEEKLY;COUNT=3;INTERVAL=1;BYDAY=WE';
-    assertAllDates(parse(rule, {includeDtstart: true}), [
+    assertDates({rule: parse(rule, {includeDtstart: true})}, [
       '2024-05-30T18:00:00.000Z',
       '2024-06-05T18:00:00.000Z',
       '2024-06-12T18:00:00.000Z',
@@ -533,7 +594,7 @@ describe('includeDtstart option', () => {
 
   it('includeDtstart=false with rrule string', function () {
     const rule = 'DTSTART;TZID=Europe/Berlin:20240530T200000\nRRULE:FREQ=WEEKLY;COUNT=3;INTERVAL=1;BYDAY=WE';
-    assertAllDates(parse(rule, {includeDtstart: false}), [
+    assertDates({rule: parse(rule, {includeDtstart: false})}, [
       '2024-06-05T18:00:00.000Z',
       '2024-06-12T18:00:00.000Z',
       '2024-06-19T18:00:00.000Z',
@@ -546,7 +607,7 @@ describe('includeDtstart option', () => {
       'DTSTART;TZID=Europe/Berlin:20240530T200000\n' +
       'RDATE;TZID=Europe/Berlin:20240530T200000\n' +
       'RRULE:FREQ=DAILY;COUNT=3';
-    assertAllDates(parse(rule, {includeDtstart: true}), [
+    assertDates({rule: parse(rule, {includeDtstart: true})}, [
       '2024-05-30T18:00:00.000Z',
       '2024-05-31T18:00:00.000Z',
       '2024-06-01T18:00:00.000Z',
@@ -558,7 +619,11 @@ describe('includeDtstart option', () => {
 describe('Tests from rust package', function () {
   it('every 2 months on the last Monday', function () {
     const rule = 'DTSTART;TZID=Europe/London:20231030T140000\nRRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1MO';
-    assertAllDates(parse(rule), ['2023-10-30T14:00:00.000Z', '2023-12-25T14:00:00.000Z', '2024-02-26T14:00:00.000Z']);
+    assertDates({rule: parse(rule), limit: 3}, [
+      '2023-10-30T14:00:00.000Z',
+      '2023-12-25T14:00:00.000Z',
+      '2024-02-26T14:00:00.000Z',
+    ]);
   });
 
   describe('Monthly on 31st or -31st of the month', function () {
@@ -568,7 +633,7 @@ describe('Tests from rust package', function () {
     // part of the recurrence set.
     it('Monthly on the 31st of the month', function () {
       const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=31';
-      assertAllDates(parse(rule), [
+      assertDates({rule: parse(rule)}, [
         '1997-10-31T14:00:00.000Z',
         '1997-12-31T14:00:00.000Z',
         '1998-01-31T14:00:00.000Z',
@@ -584,7 +649,7 @@ describe('Tests from rust package', function () {
 
     it('Monthly on the 31th-to-last of the month', function () {
       const rule = 'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=-31';
-      assertAllDates(parse(rule), [
+      assertDates({rule: parse(rule)}, [
         '1997-10-01T13:00:00.000Z',
         '1997-12-01T14:00:00.000Z',
         '1998-01-01T14:00:00.000Z',
@@ -604,9 +669,9 @@ describe('Tests from rust package', function () {
     const tz = 'Europe/London';
     const rule = `DTSTART;TZID=${tz}:20240330T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
     const Y2024_03_31_UTC = 1711843200000;
-    const r = [new Date(Y2024_03_31_UTC - FOUR_HOURS_MS), new Date(Y2024_03_31_UTC + FOUR_HOURS_MS)];
+    const between = [new Date(Y2024_03_31_UTC - FOUR_HOURS_MS), new Date(Y2024_03_31_UTC + FOUR_HOURS_MS)];
 
-    assertBetweenDates(parse(rule), r[0]!, r[1]!, format(tz), [
+    assertDates({rule: parse(rule), between, print: format(tz)}, [
       '2024-03-31T00:00:00+00:00[Europe/London]',
       '2024-03-31T00:30:00+00:00[Europe/London]',
       // change over at 1am, have gaps
@@ -617,7 +682,7 @@ describe('Tests from rust package', function () {
       '2024-03-31T04:00:00+01:00[Europe/London]',
       '2024-03-31T04:30:00+01:00[Europe/London]',
     ]);
-    assertBetweenDates(parse(rule), r[0]!, r[1]!, formatISO, [
+    assertDates({rule: parse(rule), between}, [
       '2024-03-31T00:00:00.000Z',
       '2024-03-31T00:30:00.000Z',
       '2024-03-31T01:00:00.000Z',
@@ -633,9 +698,9 @@ describe('Tests from rust package', function () {
     const tz = 'Europe/London';
     const rule = `DTSTART;TZID=${tz}:20241026T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
     const Y2024_10_27_UTC = 1729987200000;
-    const r = [new Date(Y2024_10_27_UTC - FOUR_HOURS_MS), new Date(Y2024_10_27_UTC + FOUR_HOURS_MS)];
+    const between = [new Date(Y2024_10_27_UTC - FOUR_HOURS_MS), new Date(Y2024_10_27_UTC + FOUR_HOURS_MS)];
     // should have no gaps
-    assertBetweenDates(parse(rule), r[0]!, r[1]!, format(tz), [
+    assertDates({rule: parse(rule), between, inc: false, print: format(tz)}, [
       '2024-10-27T00:00:00+01:00[Europe/London]',
       '2024-10-27T00:30:00+01:00[Europe/London]',
       '2024-10-27T01:00:00+01:00[Europe/London]',
@@ -645,7 +710,7 @@ describe('Tests from rust package', function () {
       '2024-10-27T03:00:00+00:00[Europe/London]',
       '2024-10-27T03:30:00+00:00[Europe/London]',
     ]);
-    assertBetweenDates(parse(rule), r[0]!, r[1]!, formatISO, [
+    assertDates({rule: parse(rule), inc: false, between}, [
       '2024-10-26T23:00:00.000Z',
       '2024-10-26T23:30:00.000Z',
       '2024-10-27T00:00:00.000Z',
@@ -662,8 +727,8 @@ describe('Tests from rust package', function () {
 describe('exDate', function () {
   it('Multiple exDate', function () {
     const rule = 'DTSTART:20201114T000000Z\nRRULE:FREQ=DAILY\nEXDATE;TZID=UTC:20201121T000000,20201128T000000Z';
-    const r = [new Date('2020-11-14T00:00:00.000Z'), new Date('2020-11-30T00:00:00.000Z')];
-    assertBetweenDates(parse(rule), r[0]!, r[1]!, formatISO, [
+    const between = [new Date('2020-11-14T00:00:00.000Z'), new Date('2020-11-30T00:00:00.000Z')];
+    assertDates({rule: parse(rule), between, inc: false}, [
       '2020-11-15T00:00:00.000Z',
       '2020-11-16T00:00:00.000Z',
       '2020-11-17T00:00:00.000Z',
@@ -691,7 +756,7 @@ describe('rDate', () => {
       count: 10,
       rDate: [zdt(2020, 5, 14, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
     });
-    assertAllDates(rule, [
+    assertDates({rule}, [
       '2019-12-19T00:00:00.000Z',
       '2020-02-19T00:00:00.000Z',
       '2020-04-19T00:00:00.000Z',
@@ -714,7 +779,7 @@ describe('rDate', () => {
       count: 10,
       rDate: [zdt(2020, 4, 19, 0, 'UTC'), zdt(2020, 5, 15, 0, 'UTC'), zdt(2020, 7, 18, 0, 'UTC')],
     });
-    assertAllDates(rule, [
+    assertDates({rule}, [
       '2019-12-19T00:00:00.000Z',
       '2020-02-19T00:00:00.000Z',
       '2020-04-19T00:00:00.000Z',
@@ -733,7 +798,7 @@ describe('rDate', () => {
       'DTSTART:19970713T000000Z\nRRULE:FREQ=WEEKLY;COUNT=10\n' +
       'RDATE:19970714T000000Z\n' +
       'RDATE;TZID=America/New_York:19970715T000000';
-    assertAllDates(parse(rule), [
+    assertDates({rule: parse(rule)}, [
       '1997-07-13T00:00:00.000Z',
       '1997-07-14T00:00:00.000Z',
       '1997-07-15T04:00:00.000Z',
@@ -788,7 +853,7 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     const ics = `DTSTART;TZID=America/Chicago:20250320T170000
 RRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
     const rule = new RRuleTemporal({rruleString: ics});
-    assertAllDates(rule, [
+    assertDates({rule}, [
       '2025-03-20T22:00:00.000Z',
       '2025-03-21T22:00:00.000Z',
       '2025-03-22T22:00:00.000Z',
@@ -845,7 +910,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
     // TODO: should it include 2025-01-01?
-    assertAllDates(rule, [
+    assertDates({rule}, [
       '2025-06-23T12:00:00.000Z',
       '2025-12-22T12:00:00.000Z',
       '2025-12-29T12:00:00.000Z',
@@ -855,6 +920,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
     ]);
   });
 
+  // TODO
   it.skip('should handle yearly recurrence by negative week number', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -867,6 +933,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
     expect(dates.every((d) => d.hour === 12)).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYWEEKNO with BYDAY', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -882,6 +949,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
 });
 
 describe('RRuleTemporal - BYYEARDAY Rules', () => {
+  // TODO
   it.skip('should handle positive year days', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -894,6 +962,7 @@ describe('RRuleTemporal - BYYEARDAY Rules', () => {
     expect(dates.map((d) => d.dayOfYear)).toEqual([1, 100, 365, 1, 100, 365]);
   });
 
+  // TODO
   it.skip('should handle negative year days', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -906,6 +975,7 @@ describe('RRuleTemporal - BYYEARDAY Rules', () => {
     expect(dates.every((d) => d.hour === 12)).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYYEARDAY in leap year', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -921,6 +991,7 @@ describe('RRuleTemporal - BYYEARDAY Rules', () => {
 });
 
 describe('RRuleTemporal - Complex Time Patterns', () => {
+  // TODO
   it.skip('should handle MINUTELY with multiple BYHOUR', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
@@ -934,6 +1005,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
     expect(dates.map((d) => d.hour)).toEqual([9, 9, 14, 14, 17, 17]);
   });
 
+  // TODO
   it.skip('should handle HOURLY with single BYHOUR to prevent infinite loop', () => {
     const rule = new RRuleTemporal({
       freq: 'HOURLY',
@@ -947,6 +1019,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
     expect(dates.map((d) => d.day)).toEqual([1, 2, 3]);
   });
 
+  // TODO
   it.skip('should handle WEEKLY frequency raw advancement', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
@@ -959,6 +1032,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
     expect(dates.map((d) => d.day)).toEqual([1, 15, 29]);
   });
 
+  // TODO
   it.skip('should handle MINUTELY with BYDAY constraint', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
@@ -975,6 +1049,7 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
 });
 
 describe('RRuleTemporal - Advanced BYSETPOS', () => {
+  // TODO
   it.skip('should handle BYSETPOS with MONTHLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'MONTHLY',
@@ -988,6 +1063,7 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
     expect(dates.every((d) => [1, 2, 3, 4, 5].includes(d.dayOfWeek))).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYSETPOS with YEARLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -1003,6 +1079,7 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
 });
 
 describe('RRuleTemporal - BYMONTH with different frequencies', () => {
+  // TODO
   it.skip('should handle BYMONTH with DAILY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
@@ -1015,6 +1092,7 @@ describe('RRuleTemporal - BYMONTH with different frequencies', () => {
     expect(dates.every((d) => [1, 6, 12].includes(d.month))).toBe(true);
   });
 
+  // TODO
   it.skip('should handle BYMONTH with WEEKLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
@@ -1029,6 +1107,7 @@ describe('RRuleTemporal - BYMONTH with different frequencies', () => {
 });
 
 describe('RRuleTemporal - Complex BYDAY patterns', () => {
+  // TODO
   it.skip('should handle BYDAY with DAILY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
@@ -1041,6 +1120,7 @@ describe('RRuleTemporal - Complex BYDAY patterns', () => {
     expect(dates.every((d) => [1, 3, 5].includes(d.dayOfWeek))).toBe(true);
   });
 
+  // TODO
   it.skip('should handle ordinal BYDAY with YEARLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
