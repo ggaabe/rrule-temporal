@@ -85,10 +85,22 @@ toText(rule);             // uses the runtime locale, defaults to English
 toText(rule, "es");      // Spanish description
 ```
 
-`toText()` currently ships translations for **English (`en`)**,
-**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)** and **Arabic (`ar`)**. At build time you
-can reduce bundle size by defining the `TOTEXT_LANGS` environment variable, e.g.
-`TOTEXT_LANGS=en,es,ar`.
+`toText()` currently ships translations for **English (`en`)**, 
+**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
+**Hebrew (`he`)** and **Mandarin (`zh`)**. At build time you can reduce bundle size by
+defining the `TOTEXT_LANGS` environment variable, e.g. `TOTEXT_LANGS=en,es,ar`.
+
+### `toText` supported languages
+
+| Code | Language |
+| ---- | -------- |
+| en | English |
+| es | Spanish |
+| hi | Hindi |
+| yue | Cantonese |
+| ar | Arabic |
+| he | Hebrew |
+| zh | Mandarin |
 
 ## API
 
@@ -100,7 +112,7 @@ can reduce bundle size by defining the `TOTEXT_LANGS` environment variable, e.g.
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`). |
+| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`). |
 | `options()` | Return the normalized options object. |
 
 ## Further examples
