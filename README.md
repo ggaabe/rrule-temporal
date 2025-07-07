@@ -86,9 +86,9 @@ toText(rule, "es");      // Spanish description
 ```
 
 `toText()` currently ships translations for **English (`en`)**,
-**Spanish (`es`)**, **Hindi (`hi`)** and **Cantonese (`yue`)**. At build time you
+**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)** and **Arabic (`ar`)**. At build time you
 can reduce bundle size by defining the `TOTEXT_LANGS` environment variable, e.g.
-`TOTEXT_LANGS=en,es`.
+`TOTEXT_LANGS=en,es,ar`.
 
 ## API
 
@@ -100,7 +100,7 @@ can reduce bundle size by defining the `TOTEXT_LANGS` environment variable, e.g.
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`). |
+| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`). |
 | `options()` | Return the normalized options object. |
 
 ## Further examples
