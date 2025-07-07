@@ -27,21 +27,27 @@ describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', 
       assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z', '1999-09-02T09:00:00.000Z']);
     });
 
-    it.skip('testStrSpaces', () => {
+    it('testStrSpaces', () => {
       const rruleString = ' DTSTART:19970902T090000  RRULE:FREQ=YEARLY;COUNT=3 ';
       const rule = parse(rruleString);
       assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z', '1999-09-02T09:00:00.000Z']);
     });
 
-    it.skip('testStrSpacesAndLines', () => {
+    it('testStrSpacesAndLines', () => {
       const rruleString = ' DTSTART:19970902T090000 \n \n RRULE:FREQ=YEARLY;COUNT=3 \n';
-      const rule = parse(rruleString);
-      assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z', '1999-09-02T09:00:00.000Z']);
+      assertDates({rule: parse(rruleString)}, [
+        '1997-09-02T09:00:00.000Z',
+        '1998-09-02T09:00:00.000Z',
+        '1999-09-02T09:00:00.000Z',
+      ]);
     });
 
-    it.skip('testStrKeywords', () => {
+    it('testStrKeywords', () => {
       const rruleString =
-        'DTSTART:19970902T090000\nRRULE:FREQ=YEARLY;COUNT=3;INTERVAL=3;BYMONTH=3;BYWEEKDAY=TH;BYMONTHDAY=3;BYHOUR=3;BYMINUTE=3;BYSECOND=3';
+        'DTSTART:19970902T090000\n' +
+        'RRULE:FREQ=YEARLY;COUNT=3;INTERVAL=3;' +
+        'BYMONTH=3;BYWEEKDAY=TH;BYMONTHDAY=3;' +
+        'BYHOUR=3;BYMINUTE=3;BYSECOND=3\n';
       const rule = parse(rruleString);
       assertDates({rule}, ['2033-03-03T03:03:03.000Z', '2039-03-03T03:03:03.000Z', '2072-03-03T03:03:03.000Z']);
     });

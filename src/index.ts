@@ -128,7 +128,7 @@ function parseRRuleString(
   fallbackDtstart?: Temporal.ZonedDateTime
 ): ManualOpts {
   // Unfold the input according to RFC 5545 specification
-  const unfoldedInput = unfoldLine(input);
+  const unfoldedInput = unfoldLine(input).trim();
 
   let dtstart: Temporal.ZonedDateTime;
   let tzid: string = "UTC";
@@ -138,7 +138,7 @@ function parseRRuleString(
 
   if (/^DTSTART/mi.test(unfoldedInput)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
-    const lines = unfoldedInput.split(/\r?\n/);
+    const lines = unfoldedInput.split(/\s+/);
     const dtLine = lines[0];
     const rrLine = lines.find(line => line.match(/^RRULE:/i));
     const exLines = lines.filter(line => line.match(/^EXDATE/i));
