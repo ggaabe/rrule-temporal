@@ -1,6 +1,7 @@
 import {RRuleTemporal} from '../index';
 import {assertDates, parse, zdt} from './helpers';
 
+// https://github.com/dateutil/dateutil/blob/master/tests/test_rrule.py
 describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', () => {
   describe('String parsing tests', () => {
     it('testStr', () => {

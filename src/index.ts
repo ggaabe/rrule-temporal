@@ -746,10 +746,12 @@ export class RRuleTemporal {
         }
 
         const occs = this.generateMonthlyOccurrences(monthCursor);
-        // Skip this month entirely if **any** occurrence precedes DTSTART.
+        // Skip this month entirely if **any** occurrence precedes DTSTART AND
+        // DTSTART matches the rule (i.e., DTSTART is in the occurrences list).
         if (
           monthCursor.month === start.month &&
-          occs.some((o) => Temporal.ZonedDateTime.compare(o, start) < 0)
+          occs.some((o) => Temporal.ZonedDateTime.compare(o, start) < 0) &&
+          occs.some((o) => Temporal.ZonedDateTime.compare(o, start) === 0)
         ) {
           monthCursor = monthCursor.add({ months: this.opts.interval! });
           continue outer_month;

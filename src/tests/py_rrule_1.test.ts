@@ -1,6 +1,7 @@
 import {RRuleTemporal} from '../index';
 import {assertDates, zdt} from './helpers';
 
+// https://github.com/dateutil/dateutil/blob/master/tests/test_rrule.py
 describe('RRuleTemporal - Python compatibility tests 1', () => {
   describe('Yearly frequency tests', () => {
     it('testYearly', () => {
@@ -345,7 +346,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1998-01-02T09:00:00.000Z', '1998-03-02T09:00:00.000Z', '1999-01-02T09:00:00.000Z']);
     });
 
-    it.skip('testMonthlyByMonthDay', () => {
+    it('testMonthlyByMonthDay', () => {
       const rule = new RRuleTemporal({
         freq: 'MONTHLY',
         count: 3,

@@ -1,6 +1,7 @@
 import {RRuleTemporal} from '../index';
 import {assertDates, zdt} from './helpers';
 
+// https://github.com/dateutil/dateutil/blob/master/tests/test_rrule.py
 describe('RRuleTemporal - Python compatibility tests 2', () => {
   describe('Daily frequency tests', () => {
     it('testDaily', () => {
