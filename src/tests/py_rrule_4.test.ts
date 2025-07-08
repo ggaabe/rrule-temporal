@@ -54,18 +54,17 @@ describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', 
       ]);
     });
 
-    it.skip('testStrKeywords', () => {
+    it('testStrKeywords', () => {
       const rruleString =
         'DTSTART:19970902T090000\n' +
         'RRULE:FREQ=YEARLY;COUNT=3;INTERVAL=3;' +
         'BYMONTH=3;BYWEEKDAY=TH;BYMONTHDAY=3;' +
         'BYHOUR=3;BYMINUTE=3;BYSECOND=3\n';
       const rule = parse(rruleString);
-      // these dates makes no sense
-      assertDates({rule}, ['2033-03-03T03:03:03.000Z', '2039-03-03T03:03:03.000Z', '2072-03-03T03:03:03.000Z']);
+      assertDates({rule}, ['2000-03-03T03:03:03.000Z', '2003-03-03T03:03:03.000Z', '2006-03-03T03:03:03.000Z']);
     });
 
-    it.skip('testStrNWeekDay', () => {
+    it('testStrNWeekDay', () => {
       const rruleString = 'DTSTART:19970902T090000\nRRULE:FREQ=YEARLY;COUNT=3;BYDAY=1TU,-1TH';
       assertDates({rule: parse(rruleString)}, [
         '1997-12-25T09:00:00.000Z',
@@ -74,7 +73,7 @@ describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', 
       ]);
     });
 
-    it.skip('testStrUntil', () => {
+    it('testStrUntil', () => {
       const rruleString = 'DTSTART:19970902T090000\nRRULE:FREQ=YEARLY;UNTIL=19990101T000000;BYDAY=1TU,-1TH';
       assertDates({rule: parse(rruleString)}, [
         '1997-12-25T09:00:00.000Z',

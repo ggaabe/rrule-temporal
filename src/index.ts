@@ -1763,7 +1763,8 @@ export class RRuleTemporal {
 
     let occs: Temporal.ZonedDateTime[] = [];
 
-    if (this.opts.byDay && this.opts.byDay.some((t) => /\d{2}/.test(t))) {
+    const hasOrdinalByDay = this.opts.byDay && this.opts.byDay.some(t => /^[+-]?\d/.test(t));
+    if (hasOrdinalByDay && !this.opts.byMonth) {
       // nth weekday of year
       const dayMap: Record<string, number> = {
         MO: 1,
