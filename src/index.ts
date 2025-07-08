@@ -568,15 +568,16 @@ export class RRuleTemporal {
     // then your existing BYHOUR/BYMINUTE override logic:
     const { byHour, byMinute, bySecond } = this.opts;
     if (byHour || byMinute || bySecond) {
-      zdt = this.applyTimeOverride(zdt);
-      if (
-        Temporal.Instant.compare(
-          zdt.toInstant(),
-          this.originalDtstart.toInstant()
-        ) < 0
-      ) {
-        zdt = this.applyTimeOverride(this.rawAdvance(this.originalDtstart));
+      const candidates = this.expandByTime(zdt);
+      for (const candidate of candidates) {
+        if (Temporal.ZonedDateTime.compare(candidate, this.originalDtstart) >= 0) {
+          return candidate;
+        }
       }
+
+      // No candidates found on the start date that are >= dtstart.
+      // Advance to the next interval and return the first possible time.
+      zdt = this.applyTimeOverride(this.rawAdvance(zdt));
     }
 
     return zdt;

@@ -214,7 +214,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       ]);
     });
 
-    it.skip('testYearlyByHour', () => {
+    it('testYearlyByHour', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -244,7 +244,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T09:00:06.000Z', '1997-09-02T09:00:18.000Z', '1998-09-02T09:00:06.000Z']);
     });
 
-    it.skip('testYearlyByHourAndMinute', () => {
+    it('testYearlyByHourAndMinute', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -255,7 +255,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T18:06:00.000Z', '1997-09-02T18:18:00.000Z', '1998-09-02T06:06:00.000Z']);
     });
 
-    it.skip('testYearlyByHourAndSecond', () => {
+    it('testYearlyByHourAndSecond', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -277,7 +277,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T09:06:06.000Z', '1997-09-02T09:06:18.000Z', '1997-09-02T09:18:06.000Z']);
     });
 
-    it.skip('testYearlyByHourAndMinuteAndSecond', () => {
+    it('testYearlyByHourAndMinuteAndSecond', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -511,7 +511,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       ]);
     });
 
-    it.skip('testMonthlyByHour', () => {
+    it('testMonthlyByHour', () => {
       const rule = new RRuleTemporal({
         freq: 'MONTHLY',
         count: 3,
@@ -541,7 +541,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T09:00:06.000Z', '1997-09-02T09:00:18.000Z', '1997-10-02T09:00:06.000Z']);
     });
 
-    it.skip('testMonthlyByHourAndMinute', () => {
+    it('testMonthlyByHourAndMinute', () => {
       const rule = new RRuleTemporal({
         freq: 'MONTHLY',
         count: 3,
@@ -552,7 +552,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T18:06:00.000Z', '1997-09-02T18:18:00.000Z', '1997-10-02T06:06:00.000Z']);
     });
 
-    it.skip('testMonthlyByHourAndSecond', () => {
+    it('testMonthlyByHourAndSecond', () => {
       const rule = new RRuleTemporal({
         freq: 'MONTHLY',
         count: 3,
@@ -574,7 +574,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T09:06:06.000Z', '1997-09-02T09:06:18.000Z', '1997-09-02T09:18:06.000Z']);
     });
 
-    it.skip('testMonthlyByHourAndMinuteAndSecond', () => {
+    it('testMonthlyByHourAndMinuteAndSecond', () => {
       const rule = new RRuleTemporal({
         freq: 'MONTHLY',
         count: 3,
