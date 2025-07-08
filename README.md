@@ -104,14 +104,37 @@ const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 
 ## Converting back to text
 
+The `toText` helper converts a rule into a human readable description.
+
 ```typescript
+import { Temporal } from "@js-temporal/polyfill";
+import { RRuleTemporal } from "rrule-temporal";
 import { toText } from "rrule-temporal/totext";
 
-rule.toString();          // DTSTART and RRULE lines
+const rule = new RRuleTemporal({
+  rruleString: `DTSTART;TZID=UTC:20250101T090000\nRRULE:FREQ=DAILY;COUNT=3`
+});
+
+rule.toString();
 // "DTSTART;TZID=UTC:20250101T090000\nRRULE:FREQ=DAILY;COUNT=3"
 toText(rule);             // uses the runtime locale, defaults to English
 toText(rule, "es");      // Spanish description
-```
+toText(rule);
+// "every day for 3 times"
+
+const weekly = new RRuleTemporal({
+  freq: "WEEKLY",
+  byDay: ["SU"],
+  byHour: [10],
+  dtstart: Temporal.ZonedDateTime.from({
+    year: 2025, month: 1, day: 1, hour: 10, timeZone: "UTC"
+  })
+});
+
+toText(weekly);
+// "every week on Sunday at 10 AM UTC"
+toText(weekly, "es");
+// "cada semana en domingo a las 10 AM UTC"
 
 `toText()` currently ships translations for **English (`en`)**, 
 **Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
