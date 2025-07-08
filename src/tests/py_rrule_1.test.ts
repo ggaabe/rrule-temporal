@@ -43,10 +43,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1998-01-02T09:00:00.000Z', '1998-03-02T09:00:00.000Z', '1999-01-02T09:00:00.000Z']);
     });
 
-    // TODO
-    // Limit if BYYEARDAY or BYMONTHDAY is present; otherwise, special expand for WEEKLY if BYWEEKNO present;
-    // otherwise, special expand for MONTHLY if BYMONTH present; otherwise, special expand for YEARLY.
-    it.skip('testYearlyByMonthDay', () => {
+    it('testYearlyByMonthDay', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -77,10 +74,8 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1997-09-04T09:00:00.000Z', '1997-09-09T09:00:00.000Z']);
     });
 
-    // TODO
-    // Limit if BYYEARDAY or BYMONTHDAY is present; otherwise, special expand for WEEKLY if BYWEEKNO present;
-    // otherwise, special expand for MONTHLY if BYMONTH present; otherwise, special expand for YEARLY.
-    it.skip('testYearlyByNWeekDay', () => {
+
+    it('testYearlyByNWeekDay', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -90,7 +85,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-12-25T09:00:00.000Z', '1998-01-06T09:00:00.000Z', '1998-12-31T09:00:00.000Z']);
     });
 
-    it.skip('testYearlyByNWeekDayLarge', () => {
+    it('testYearlyByNWeekDayLarge', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -133,7 +128,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1998-01-15T09:00:00.000Z', '1998-01-20T09:00:00.000Z', '1998-03-12T09:00:00.000Z']);
     });
 
-    it.skip('testYearlyByMonthDayAndWeekDay', () => {
+    it('testYearlyByMonthDayAndWeekDay', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
@@ -293,7 +288,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T18:06:06.000Z', '1997-09-02T18:06:18.000Z', '1997-09-02T18:18:06.000Z']);
     });
 
-    it.skip('testYearlyBySetPos', () => {
+    it('testYearlyBySetPos', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 3,
