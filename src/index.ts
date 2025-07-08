@@ -96,22 +96,29 @@ function unfoldLine(foldedLine: string): string {
  */
 function parseDateValues(
   dateValues: string[],
-  tzid: string
+  tzid: string,
+  valueType?: string
 ): Temporal.ZonedDateTime[] {
   const dates: Temporal.ZonedDateTime[] = [];
 
   for (const dateValue of dateValues) {
-    // Handle Z suffix like UNTIL does
-    if (/Z$/.test(dateValue)) {
-      const iso =
-        `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
-        `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
-      dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || "UTC"));
-    } else {
-      const isoDate =
-        `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
-        `T${dateValue.slice(9)}`;
-      dates.push(Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid));
+    const isDate = valueType === 'DATE' || !dateValue.includes('T');
+
+    if (isDate) {
+      const isoDate = `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}`;
+      dates.push(Temporal.PlainDate.from(isoDate).toZonedDateTime({ timeZone: tzid }));
+    } else { // DATE-TIME
+      if (/Z$/.test(dateValue)) {
+        const iso =
+          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
+          `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
+        dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || "UTC"));
+      } else {
+        const isoDate =
+          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
+          `T${dateValue.slice(9)}`;
+        dates.push(Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid));
+      }
     }
   }
 
@@ -134,35 +141,39 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
   if (/^DTSTART/mi.test(unfoldedInput)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
     const lines = unfoldedInput.split(/\s+/);
-    const dtLine = lines[0];
+    const dtLine = lines.find(line => line.match(/^DTSTART/i))!;
     const rrLine = lines.find(line => line.match(/^RRULE:/i));
     const exLines = lines.filter(line => line.match(/^EXDATE/i));
     const rLines = lines.filter(line => line.match(/^RDATE/i));
 
-    const m = dtLine?.match(/DTSTART(?:;TZID=([^:]+))?:(\d{8}T\d{6}Z?)/i);
-    if (!m) throw new Error("Invalid DTSTART in ICS snippet");
-    tzid = m[1] ?? targetTimezone ?? tzid;
-    dtstart = parseDateValues([m[2]!],tzid)[0]!
+    const dtMatch = dtLine.match(/DTSTART(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)/i);
+    if (!dtMatch) throw new Error("Invalid DTSTART in ICS snippet");
+
+    const [, valueType, dtTzid, dtValue] = dtMatch;
+    tzid = dtTzid ?? targetTimezone ?? tzid;
+    dtstart = parseDateValues([dtValue!], tzid, valueType)[0]!;
 
     rruleLine = rrLine!;
 
     // Parse EXDATE lines
     for (const exLine of exLines) {
-      const exMatch = exLine.match(/EXDATE(?:;TZID=([^:]+))?:(.+)/i);
+      const exMatch = exLine.match(/EXDATE(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)/i);
       if (exMatch) {
-        const exTzid = exMatch[1] || tzid;
-        const dateValues = exMatch[2]!.split(',');
-        exDate.push(...parseDateValues(dateValues, exTzid));
+        const [, valueType, exTzid, dateValuesStr] = exMatch;
+        const exTimezone = exTzid || tzid;
+        const dateValues = dateValuesStr!.split(',');
+        exDate.push(...parseDateValues(dateValues, exTimezone, valueType));
       }
     }
 
     // Parse RDATE lines
     for (const rLine of rLines) {
-      const rMatch = rLine.match(/RDATE(?:;TZID=([^:]+))?:(.+)/i);
+      const rMatch = rLine.match(/RDATE(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)/i);
       if (rMatch) {
-        const rTzid = rMatch[1] || tzid;
-        const dateValues = rMatch[2]!.split(',');
-        rDate.push(...parseDateValues(dateValues, rTzid));
+        const [, valueType, rTzid, dateValuesStr] = rMatch;
+        const rTimezone = rTzid || tzid;
+        const dateValues = dateValuesStr!.split(',');
+        rDate.push(...parseDateValues(dateValues, rTimezone, valueType));
       }
     }
   } else {
