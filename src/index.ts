@@ -858,7 +858,7 @@ export class RRuleTemporal {
         ? [...this.opts.byDay]
         : [Object.entries(dayMap).find(([, d]) => d === start.dayOfWeek)![0]];
       const dows = tokens
-        .map((tok) => dayMap[tok])
+        .map((tok) => dayMap[tok.slice(-2) as keyof typeof dayMap])
         .filter((d): d is number => d !== undefined)
         .sort((a, b) => a - b);
 
