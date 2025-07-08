@@ -1,6 +1,6 @@
 # rrule-temporal
 
-Recurrence rule (RFC&nbsp;5545) processing built on the Temporal API.
+The first and only fully compliant Recurrence rule (RFC&nbsp;5545) processing JS/TS library built on the Temporal API.
 The library accepts the familiar `RRULE` format and returns
 `Temporal.ZonedDateTime` instances for easy time‑zone aware scheduling.
 
