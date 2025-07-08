@@ -782,6 +782,54 @@ export class RRuleTemporal {
 
     // --- 2) WEEKLY + BYDAY (or default to DTSTART’s weekday) ---
     if (this.opts.freq === "WEEKLY") {
+      if (this.opts.byYearDay && this.opts.byYearDay.length > 0) {
+        const start = this.originalDtstart;
+
+        // Include dtstart even if it doesn't match the rule when includeDtstart is true
+        if (this.includeDtstart && !this.matchesAll(start)) {
+          if (iterator && !iterator(start, 0)) {
+            return this.applyCountLimitAndMergeRDates(dates, iterator);
+          }
+          dates.push(start);
+          if (this.shouldBreakForCountLimit(1)) {
+            return this.applyCountLimitAndMergeRDates(dates, iterator);
+          }
+        }
+
+        let yearCursor = start.with({ month: 1, day: 1 });
+        let matchCount = dates.length;
+
+        outer_year_for_weekly: while (true) {
+          if (++iterationCount > this.maxIterations) {
+            throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+          }
+
+          const occs = this.generateYearlyOccurrences(yearCursor);
+          for (const occ of occs) {
+            if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
+            if (
+              this.opts.until &&
+              Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
+            ) {
+              break outer_year_for_weekly;
+            }
+            if (iterator && !iterator(occ, matchCount)) {
+              break outer_year_for_weekly;
+            }
+            dates.push(occ);
+            matchCount++;
+            if (this.shouldBreakForCountLimit(matchCount)) {
+              break outer_year_for_weekly;
+            }
+          }
+          if (this.opts.until && yearCursor.year > this.opts.until.year) {
+            break;
+          }
+          yearCursor = yearCursor.add({ years: 1 });
+        }
+
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
+      }
       const start = this.originalDtstart;
 
       // Include dtstart even if it doesn't match the rule when includeDtstart is true
