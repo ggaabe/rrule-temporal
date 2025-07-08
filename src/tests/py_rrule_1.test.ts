@@ -2,6 +2,7 @@ import {RRuleTemporal} from '../index';
 import {assertDates, zdt} from './helpers';
 
 // https://github.com/dateutil/dateutil/blob/master/tests/test_rrule.py
+// to verify https://recurrence-expansion-service.appspot.com/
 describe('RRuleTemporal - Python compatibility tests 1', () => {
   describe('Yearly frequency tests', () => {
     it('testYearly', () => {
@@ -181,7 +182,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       ]);
     });
 
-    it.skip('testYearlyByMonthAndYearDay', () => {
+    it('testYearlyByMonthAndYearDay', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 4,
@@ -197,7 +198,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       ]);
     });
 
-    it.skip('testYearlyByMonthAndYearDayNeg', () => {
+    it('testYearlyByMonthAndYearDayNeg', () => {
       const rule = new RRuleTemporal({
         freq: 'YEARLY',
         count: 4,

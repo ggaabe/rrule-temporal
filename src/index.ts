@@ -1011,7 +1011,9 @@ export class RRuleTemporal {
       this.opts.freq === "YEARLY" &&
       this.opts.byMonth &&
       !this.opts.byDay &&
-      !this.opts.byMonthDay
+      !this.opts.byMonthDay &&
+      !this.opts.byYearDay &&
+      !this.opts.byWeekNo
     ) {
       const start = this.originalDtstart;
 
