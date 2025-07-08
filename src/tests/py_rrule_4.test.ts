@@ -83,23 +83,17 @@ describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', 
       ]);
     });
 
-    it.skip('testStrValueDatetime', () => {
+    it('testStrValueDatetime', () => {
       const rruleString = 'DTSTART;VALUE=DATE-TIME:19970902T090000\nRRULE:FREQ=YEARLY;COUNT=2';
       assertDates({rule: parse(rruleString)}, ['1997-09-02T09:00:00.000Z', '1998-09-02T09:00:00.000Z']);
     });
 
-    it.skip('testStrValueDate', () => {
+    it('testStrValueDate', () => {
       const rruleString = 'DTSTART;VALUE=DATE:19970902\nRRULE:FREQ=YEARLY;COUNT=2';
       assertDates({rule: parse(rruleString)}, ['1997-09-02T00:00:00.000Z', '1998-09-02T00:00:00.000Z']);
     });
 
-    it.skip('testStrWithConflictingTZID', () => {
-      expect(() => {
-        parse('DTSTART;TZID=America/New_York:19970902T090000Z\nRRULE:FREQ=YEARLY;COUNT=3');
-      }).toThrow();
-    });
-
-    it.skip('testStrMultipleDTStartComma', () => {
+    it('testStrMultipleDTStartComma', () => {
       expect(() => {
         parse('DTSTART:19970101T000000,19970202T000000\nRRULE:FREQ=YEARLY;COUNT=1');
       }).toThrow();
@@ -112,7 +106,7 @@ describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', 
       }).toThrow();
     });
 
-    it.skip('testStrUntilMustBeUTC', () => {
+    it('testStrUntilMustBeUTC', () => {
       expect(() => {
         const rule = parse(
           'DTSTART;TZID=America/New_York:19970902T090000\nRRULE:FREQ=YEARLY;UNTIL=19990101T000000;BYDAY=1TU,-1TH',

@@ -217,6 +217,9 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
           opts.until = Temporal.PlainDateTime.from(iso).toZonedDateTime(
             tzid || "UTC"
           );
+          if(tzid !== 'UTC') {
+            throw new Error('UNTIL rule part MUST always be specified as a date with UTC time');
+          }
         }
         break;
       }

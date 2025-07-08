@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
-import {assertDates, format, formatISO, formatUTC, limit, parse, zdt} from './helpers';
+import {assertDates, format, limit, parse, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 const DATE_2019 = zdt(2019, 1, 1, 0, 'UTC');
@@ -849,17 +849,9 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     }).toThrow('interval must be greater than 0');
   });
 
-  it('should handle non-UTC UNTIL values', () => {
-    const ics = `DTSTART;TZID=America/Chicago:20250320T170000
-RRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
-    const rule = new RRuleTemporal({rruleString: ics});
-    assertDates({rule}, [
-      '2025-03-20T22:00:00.000Z',
-      '2025-03-21T22:00:00.000Z',
-      '2025-03-22T22:00:00.000Z',
-      '2025-03-23T22:00:00.000Z',
-      '2025-03-24T22:00:00.000Z',
-    ]);
+  it('should throw non-UTC UNTIL values', () => {
+    const ics = `DTSTART;TZID=America/Chicago:20250320T170000\nRRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
+    expect(() => new RRuleTemporal({rruleString: ics})).toThrow();
   });
 });
 
