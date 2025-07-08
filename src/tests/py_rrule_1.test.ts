@@ -866,7 +866,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T18:06:06.000Z', '1997-09-02T18:06:18.000Z', '1997-09-02T18:18:06.000Z']);
     });
 
-    it.skip('testWeeklyBySetPos', () => {
+    it('testWeeklyBySetPos', () => {
       const rule = new RRuleTemporal({
         freq: 'WEEKLY',
         count: 3,

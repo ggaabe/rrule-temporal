@@ -837,13 +837,15 @@ export class RRuleTemporal {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
 
-        const occs = dows
+        let occs = dows
           .flatMap((dw) => {
             const delta = (dw - wkstDay + 7) % 7;
             const sameDate = weekCursor.add({ days: delta });
             return this.expandByTime(sameDate);
           })
           .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+
+        occs = this.applyBySetPos(occs);
 
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
