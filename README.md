@@ -59,6 +59,34 @@ const rule = new RRuleTemporal({
 rule.all().forEach(dt => console.log(dt.toString()));
 ```
 
+### Manual options
+
+When creating a rule with individual fields you can specify any of the options
+below. These correspond to the recurrence rule parts defined in RFC&nbsp;5545:
+
+| Option | Description |
+| ------ | ----------- |
+| `freq` | Recurrence frequency (`"YEARLY"`, `"MONTHLY"`, `"WEEKLY"`, `"DAILY"`, `"HOURLY"`, `"MINUTELY"`, `"SECONDLY"`). |
+| `interval` | Interval between each occurrence of `freq`. |
+| `count` | Total number of occurrences. |
+| `until` | Last possible occurrence as `Temporal.ZonedDateTime`. |
+| `byHour` | Hours to include (0&ndash;23). |
+| `byMinute` | Minutes to include (0&ndash;59). |
+| `bySecond` | Seconds to include (0&ndash;59). |
+| `byDay` | List of weekday codes, e.g. `["MO", "WE", "FR"]`. |
+| `byMonth` | Months of the year (1&ndash;12). |
+| `byMonthDay` | Days of the month (1&ndash;31 or negative from end). |
+| `byYearDay` | Days of the year (1&ndash;366 or negative from end). |
+| `byWeekNo` | ISO week numbers (1&ndash;53 or negative from end). |
+| `bySetPos` | Select n-th occurrence(s) after other filters. |
+| `wkst` | Weekday on which the week starts (`"MO"`..`"SU"`). |
+| `rDate` | Additional dates to include. |
+| `exDate` | Exception dates to exclude. |
+| `tzid` | Time zone identifier for interpreting dates. |
+| `maxIterations` | Safety cap when generating occurrences. |
+| `includeDtstart` | Include `DTSTART` even if it does not match the pattern. |
+| `dtstart` | First occurrence as `Temporal.ZonedDateTime`. |
+
 ## Querying occurrences
 
 Use the provided methods to enumerate or search for occurrences:
