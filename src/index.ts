@@ -375,6 +375,9 @@ export class RRuleTemporal {
       if (opts.bySecond.length === 0) delete opts.bySecond;
     }
     if (opts.bySetPos) {
+      if (opts.bySetPos.some(p => p === 0)) {
+        throw new Error("bySetPos may not contain 0");
+      }
       opts.bySetPos = opts.bySetPos.filter((n) => Number.isInteger(n) && n !== 0);
       if (opts.bySetPos.length === 0) delete opts.bySetPos;
     }

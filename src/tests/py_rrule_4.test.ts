@@ -143,7 +143,7 @@ describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', 
   });
 
   describe('RRule validation tests', () => {
-    it.skip('testBadBySetPos', () => {
+    it('testBadBySetPos', () => {
       expect(() => {
         new RRuleTemporal({
           freq: 'MONTHLY',
@@ -154,7 +154,7 @@ describe('RRuleTemporal - Python compatibility tests 4 (rrule string parsing)', 
       }).toThrow();
     });
 
-    it.skip('testBadBySetPosMany', () => {
+    it('testBadBySetPosMany', () => {
       expect(() => {
         new RRuleTemporal({
           freq: 'MONTHLY',
