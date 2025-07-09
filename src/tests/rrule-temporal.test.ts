@@ -909,4 +909,3 @@ describe('Regression - MINUTELY freq with BYDAY and single BYMINUTE', () => {
     ]);
   });
 });
-

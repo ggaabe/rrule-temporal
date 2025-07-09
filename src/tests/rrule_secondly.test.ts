@@ -32,7 +32,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1997-09-03T10:01:01.000Z', '1997-09-04T11:02:02.000Z']);
   });
 
-  it.skip('testSecondlyByMonth', () => {
+  it('testSecondlyByMonth', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -42,7 +42,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:00:01.000Z', '1998-01-01T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByMonthDay', () => {
+  it('testSecondlyByMonthDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -52,7 +52,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-03T00:00:00.000Z', '1997-09-03T00:00:01.000Z', '1997-09-03T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByMonthAndMonthDay', () => {
+  it('testSecondlyByMonthAndMonthDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -63,7 +63,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1998-01-05T00:00:00.000Z', '1998-01-05T00:00:01.000Z', '1998-01-05T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByWeekDay', () => {
+  it('testSecondlyByWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -73,7 +73,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1997-09-02T09:00:01.000Z', '1997-09-02T09:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByNWeekDay', () => {
+  it('testSecondlyByNWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -83,7 +83,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1997-09-02T09:00:01.000Z', '1997-09-02T09:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByMonthAndWeekDay', () => {
+  it('testSecondlyByMonthAndWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -105,7 +105,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:00:01.000Z', '1998-01-01T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByMonthDayAndWeekDay', () => {
+  it('testSecondlyByMonthDayAndWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -116,7 +116,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:00:01.000Z', '1998-01-01T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByMonthAndMonthDayAndWeekDay', () => {
+  it('testSecondlyByMonthAndMonthDayAndWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -158,7 +158,7 @@ describe('Secondly frequency tests', () => {
     ]);
   });
 
-  it.skip('testSecondlyByMonthAndYearDay', () => {
+  it('testSecondlyByMonthAndYearDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 4,
@@ -174,7 +174,7 @@ describe('Secondly frequency tests', () => {
     ]);
   });
 
-  it.skip('testSecondlyByMonthAndYearDayNeg', () => {
+  it('testSecondlyByMonthAndYearDayNeg', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 4,
@@ -296,7 +296,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T18:00:06.000Z', '1997-09-02T18:00:18.000Z', '1997-09-02T18:01:06.000Z']);
   });
 
-  it.skip('testSecondlyByMinuteAndSecond', () => {
+  it('testSecondlyByMinuteAndSecond', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -307,7 +307,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T09:06:06.000Z', '1997-09-02T09:06:18.000Z', '1997-09-02T09:18:06.000Z']);
   });
 
-  it.skip('testSecondlyByHourAndMinuteAndSecond', () => {
+  it('testSecondlyByHourAndMinuteAndSecond', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
