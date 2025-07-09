@@ -1246,8 +1246,57 @@ export class RRuleTemporal {
     }
 
     // --- 7) fallback: step + filter ---
+    // Handle HOURLY frequency with BYSETPOS - need to group occurrences by hour
+    if (this.opts.freq === 'HOURLY' && this.opts.bySetPos) {
+      let start = this.originalDtstart;
+      let matchCount = 0;
+
+      // Include dtstart even if it doesn't match the rule when includeDtstart is true
+      if (this.includeDtstart && !this.matchesAll(start)) {
+        if (iterator && !iterator(start, matchCount)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+        dates.push(start);
+        matchCount++;
+        if (this.shouldBreakForCountLimit(matchCount)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+      }
+
+      let hourCursor = start.with({minute: 0, second: 0, microsecond: 0, nanosecond: 0});
+
+      outer_hourly: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        // Generate all occurrences for this hour
+        let hourOccs = this.expandByTime(hourCursor);
+        hourOccs = hourOccs.filter((occ) => this.matchesAll(occ));
+        hourOccs = this.applyBySetPos(hourOccs);
+
+        for (const occ of hourOccs) {
+          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
+          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
+            break outer_hourly;
+          }
+          if (iterator && !iterator(occ, matchCount)) {
+            break outer_hourly;
+          }
+          dates.push(occ);
+          matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            break outer_hourly;
+          }
+        }
+        hourCursor = hourCursor.add({hours: this.opts.interval!});
+        if (this.opts.until && Temporal.ZonedDateTime.compare(hourCursor, this.opts.until) > 0) {
+          break outer_hourly;
+        }
+      }
+    }
     // Handle DAILY frequency with BYSETPOS - need to group occurrences by day
-    if (this.opts.freq === 'DAILY' && this.opts.bySetPos) {
+    else if (this.opts.freq === 'DAILY' && this.opts.bySetPos) {
       let start = this.originalDtstart;
       let matchCount = 0;
 
@@ -1290,6 +1339,9 @@ export class RRuleTemporal {
           }
         }
         dayCursor = dayCursor.add({days: this.opts.interval!});
+        if (this.opts.until && Temporal.ZonedDateTime.compare(dayCursor, this.opts.until) > 0) {
+          break outer_daily;
+        }
       }
     } else {
       let current = this.computeFirst();
