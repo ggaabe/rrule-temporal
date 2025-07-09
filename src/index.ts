@@ -432,6 +432,12 @@ export class RRuleTemporal {
         });
       }
     }
+
+    // For HOURLY frequency with BYHOUR, after exhausting same-day hours,
+    // advance to the next day and use the first BYHOUR
+    if (freq === 'HOURLY' && byHour && byHour.length > 1) {
+      return this.applyTimeOverride(zdt.add({days: 1}));
+    }
     // we were already at the last BYHOUR/BYMINUTE/BYSECOND -> advance the date
     return this.applyTimeOverride(this.rawAdvance(zdt));
   }
