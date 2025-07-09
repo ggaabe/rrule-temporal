@@ -640,8 +640,13 @@ export class RRuleTemporal {
 
       const wd = dayMap[weekday]; // no more "undefined index" error
 
+      if (freq === 'DAILY') {
+        if (zdt.dayOfWeek === wd) return true;
+        continue;
+      }
+
       // no ordinal → simple weekday match
-      if (ord === 0 || freq === 'DAILY') {
+      if (ord === 0) {
         if (zdt.dayOfWeek === wd) return true;
         continue;
       }

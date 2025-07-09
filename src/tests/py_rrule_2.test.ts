@@ -95,7 +95,7 @@ describe('RRuleTemporal - Python compatibility tests 2', () => {
       assertDates({rule}, ['1998-01-01T09:00:00.000Z', '1998-01-06T09:00:00.000Z', '1998-01-08T09:00:00.000Z']);
     });
 
-    it.skip('testDailyByMonthAndNWeekDay', () => {
+    it('testDailyByMonthAndNWeekDay', () => {
       const rule = new RRuleTemporal({
         freq: 'DAILY',
         count: 3,
@@ -103,7 +103,7 @@ describe('RRuleTemporal - Python compatibility tests 2', () => {
         byDay: ['1TU', '-1TH'],
         dtstart: zdt(1997, 9, 2, 9, 'UTC'),
       });
-      assertDates({rule}, ['1998-01-01T09:00:00.000Z', '1998-01-06T09:00:00.000Z', '1998-01-8T09:00:00.000Z']);
+      assertDates({rule}, ['1998-01-01T09:00:00.000Z', '1998-01-06T09:00:00.000Z', '1998-01-08T09:00:00.000Z']);
     });
 
     it('testDailyByMonthDayAndWeekDay', () => {
