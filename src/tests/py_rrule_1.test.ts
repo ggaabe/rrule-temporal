@@ -638,7 +638,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1998-01-06T09:00:00.000Z', '1998-01-13T09:00:00.000Z', '1998-01-20T09:00:00.000Z']);
     });
 
-    it.skip('testWeeklyByMonthDay', () => {
+    it('testWeeklyByMonthDay', () => {
       const rule = new RRuleTemporal({
         freq: 'WEEKLY',
         count: 3,
@@ -648,7 +648,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-03T09:00:00.000Z', '1997-10-01T09:00:00.000Z', '1997-10-03T09:00:00.000Z']);
     });
 
-    it.skip('testWeeklyByMonthAndMonthDay', () => {
+    it('testWeeklyByMonthAndMonthDay', () => {
       const rule = new RRuleTemporal({
         freq: 'WEEKLY',
         count: 3,
@@ -679,7 +679,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1997-09-04T09:00:00.000Z', '1997-09-09T09:00:00.000Z']);
     });
 
-    it.skip('testWeeklyByMonthAndWeekDay', () => {
+    it('testWeeklyByMonthAndWeekDay', () => {
       const rule = new RRuleTemporal({
         freq: 'WEEKLY',
         count: 3,
@@ -690,7 +690,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1998-01-01T09:00:00.000Z', '1998-01-06T09:00:00.000Z', '1998-01-08T09:00:00.000Z']);
     });
 
-    it.skip('testWeeklyByMonthAndNWeekDay', () => {
+    it('testWeeklyByMonthAndNWeekDay', () => {
       const rule = new RRuleTemporal({
         freq: 'WEEKLY',
         count: 3,
@@ -701,7 +701,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1998-01-01T09:00:00.000Z', '1998-01-06T09:00:00.000Z', '1998-01-08T09:00:00.000Z']);
     });
 
-    it.skip('testWeeklyByMonthDayAndWeekDay', () => {
+    it('testWeeklyByMonthDayAndWeekDay', () => {
       const rule = new RRuleTemporal({
         freq: 'WEEKLY',
         count: 3,
@@ -712,7 +712,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       assertDates({rule}, ['1998-01-01T09:00:00.000Z', '1998-02-03T09:00:00.000Z', '1998-03-03T09:00:00.000Z']);
     });
 
-    it.skip('testWeeklyByMonthAndMonthDayAndWeekDay', () => {
+    it('testWeeklyByMonthAndMonthDayAndWeekDay', () => {
       const rule = new RRuleTemporal({
         freq: 'WEEKLY',
         count: 3,

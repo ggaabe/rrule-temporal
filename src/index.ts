@@ -874,7 +874,9 @@ export class RRuleTemporal {
       // If no BYDAY, default to DTSTART’s weekday token
       const tokens = this.opts.byDay
         ? [...this.opts.byDay]
-        : [Object.entries(dayMap).find(([, d]) => d === start.dayOfWeek)![0]];
+        : (this.opts.byMonthDay && this.opts.byMonthDay.length > 0)
+          ? Object.keys(dayMap)
+          : [Object.entries(dayMap).find(([, d]) => d === start.dayOfWeek)![0]];
       const dows = tokens
         .map((tok) => dayMap[tok.slice(-2) as keyof typeof dayMap])
         .filter((d): d is number => d !== undefined)
@@ -922,6 +924,9 @@ export class RRuleTemporal {
             break outer_week;
           }
           if (!this.matchesByMonth(occ)) {
+            continue;
+          }
+          if (!this.matchesByMonthDay(occ)) {
             continue;
           }
           if (iterator && !iterator(occ, matchCount)) {
