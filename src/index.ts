@@ -1308,44 +1308,94 @@ export class RRuleTemporal {
     }
 
     // --- 7) fallback: step + filter ---
-    let current = this.computeFirst();
-    let matchCount = 0;
+    // Handle DAILY frequency with BYSETPOS - need to group occurrences by day
+    if (this.opts.freq === "DAILY" && this.opts.bySetPos) {
+      let start = this.originalDtstart;
+      let matchCount = 0;
 
-    // Include dtstart even if it doesn't match the rule when includeDtstart is true
-    if (this.includeDtstart && Temporal.ZonedDateTime.compare(current, this.originalDtstart) > 0) {
-      // dtstart doesn't match the rule, but we should include it in non-strict mode
-      if (iterator && !iterator(this.originalDtstart, matchCount)) {
-        return this.applyCountLimitAndMergeRDates(dates, iterator);
-      }
-      dates.push(this.originalDtstart);
-      matchCount++;
-      if (this.shouldBreakForCountLimit(matchCount)) {
-        return this.applyCountLimitAndMergeRDates(dates, iterator);
-      }
-    }
-
-    while (true) {
-      if (++iterationCount > this.maxIterations) {
-        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
-      }
-
-      if (
-        this.opts.until &&
-        Temporal.ZonedDateTime.compare(current, this.opts.until) > 0
-      ) {
-        break;
-      }
-      if (this.matchesAll(current)) {
-        if (iterator && !iterator(current, matchCount)) {
-          break;
+      // Include dtstart even if it doesn't match the rule when includeDtstart is true
+      if (this.includeDtstart && !this.matchesAll(start)) {
+        if (iterator && !iterator(start, matchCount)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
         }
-        dates.push(current);
+        dates.push(start);
         matchCount++;
         if (this.shouldBreakForCountLimit(matchCount)) {
-          break;
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
         }
       }
-      current = this.nextCandidateSameDate(current);
+
+      let dayCursor = start.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
+      
+      outer_daily: while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        // Generate all occurrences for this day
+        let dayOccs = this.expandByTime(dayCursor);
+        dayOccs = dayOccs.filter(occ => this.matchesAll(occ));
+        dayOccs = this.applyBySetPos(dayOccs);
+
+        for (const occ of dayOccs) {
+          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
+          if (
+            this.opts.until &&
+            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
+          ) {
+            break outer_daily;
+          }
+          if (iterator && !iterator(occ, matchCount)) {
+            break outer_daily;
+          }
+          dates.push(occ);
+          matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            break outer_daily;
+          }
+        }
+        dayCursor = dayCursor.add({ days: this.opts.interval! });
+      }
+    } else {
+      let current = this.computeFirst();
+      let matchCount = 0;
+
+      // Include dtstart even if it doesn't match the rule when includeDtstart is true
+      if (this.includeDtstart && Temporal.ZonedDateTime.compare(current, this.originalDtstart) > 0) {
+        // dtstart doesn't match the rule, but we should include it in non-strict mode
+        if (iterator && !iterator(this.originalDtstart, matchCount)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+        dates.push(this.originalDtstart);
+        matchCount++;
+        if (this.shouldBreakForCountLimit(matchCount)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+      }
+
+      while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        if (
+          this.opts.until &&
+          Temporal.ZonedDateTime.compare(current, this.opts.until) > 0
+        ) {
+          break;
+        }
+        if (this.matchesAll(current)) {
+          if (iterator && !iterator(current, matchCount)) {
+            break;
+          }
+          dates.push(current);
+          matchCount++;
+          if (this.shouldBreakForCountLimit(matchCount)) {
+            break;
+          }
+        }
+        current = this.nextCandidateSameDate(current);
+      }
     }
 
     return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1923,7 +1973,7 @@ export class RRuleTemporal {
         SA: 6,
         SU: 7,
       };
-      for (const tok of this.opts.byDay) {
+      for (const tok of this.opts.byDay!) {
         const m = tok.match(/^([+-]?\d{1,2})(MO|TU|WE|TH|FR|SA|SU)$/);
         if (!m) continue;
         const ord = parseInt(m[1]!, 10);
@@ -1938,9 +1988,8 @@ export class RRuleTemporal {
           const delta = (dec31.dayOfWeek - wd + 7) % 7;
           dt = dec31.subtract({ days: delta + 7 * (-ord - 1) });
         }
-        if (!this.opts.byMonth || this.opts.byMonth.includes(dt.month)) {
-          occs.push(...this.expandByTime(dt));
-        }
+        // byMonth is already checked to be falsy in the outer condition
+        occs.push(...this.expandByTime(dt));
       }
     } else if (!this.opts.byYearDay && !this.opts.byWeekNo) {
       occs = months.flatMap((m) => {
@@ -1956,7 +2005,7 @@ export class RRuleTemporal {
         const dt = sample
           .with({ month: 1, day: 1 })
           .add({ days: dayNum - 1 });
-        if (!this.opts.byMonth || this.opts.byMonth.includes(dt.month)) {
+        if (!this.opts.byMonth || this.opts.byMonth!.includes(dt.month)) {
           occs.push(...this.expandByTime(dt));
         }
       }
@@ -1993,7 +2042,7 @@ export class RRuleTemporal {
           if (!tok) continue;
           const targetDow = dayMap[tok as keyof typeof dayMap]!;
           const inst = weekStart.add({ days: (targetDow - wkst + 7) % 7 });
-          if (!this.opts.byMonth || this.opts.byMonth.includes(inst.month)) {
+          if (!this.opts.byMonth || this.opts.byMonth!.includes(inst.month)) {
             occs.push(...this.expandByTime(inst));
           }
         }

@@ -67,10 +67,10 @@ this is described in separate notes below the table.
 |BYSETPOS  |Limit   |Limit   |Limit  |Limit  |Limit |Limit  |Limit |
 +----------+--------+--------+-------+-------+------+-------+------+
 
-BYDAY has some special behavior depending on the FREQ value 
-equals to MONTHLY and YEARLY. 
+BYDAY has some special behavior depending on the FREQ value
+equals to MONTHLY and YEARLY.
 
-For MONTHLY, the days should limit if BYMONTHDAY is present; 
+For MONTHLY, the days should limit if BYMONTHDAY is present;
 otherwise, special expand for MONTHLY.
 
 For YEARLY, limit if BYYEARDAY or BYMONTHDAY is present; otherwise,
@@ -98,3 +98,21 @@ every other year".  Similarly, if the BYMINUTE, BYHOUR, BYDAY,
 BYMONTHDAY, or BYMONTH rule part were missing, the appropriate
 minute, hour, day, or month would have been retrieved from the
 "DTSTART" property.
+
+The BYSETPOS rule part specifies a COMMA-separated list of values
+that corresponds to the nth occurrence within the set of
+recurrence instances specified by the rule.  BYSETPOS operates on
+a set of recurrence instances in one interval of the recurrence
+rule.  For example, in a WEEKLY rule, the interval would be one
+week A set of recurrence instances starts at the beginning of the
+interval defined by the FREQ rule part.  Valid values are 1 to 366
+or -366 to -1.  It MUST only be used in conjunction with another
+BYxxx rule part.  For example "the last work day of the month"
+could be represented as:
+
+FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1
+
+Each BYSETPOS value can include a positive (+n) or negative (-n)
+integer.  If present, this indicates the nth occurrence of the
+specific occurrence within the set of occurrences specified by the
+rule.
