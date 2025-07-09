@@ -478,7 +478,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       ]);
     });
 
-    it.skip('testMonthlyByMonthAndYearDay', () => {
+    it('testMonthlyByMonthAndYearDay', () => {
       const rule = new RRuleTemporal({
         freq: 'MONTHLY',
         count: 4,
@@ -494,7 +494,7 @@ describe('RRuleTemporal - Python compatibility tests 1', () => {
       ]);
     });
 
-    it.skip('testMonthlyByMonthAndYearDayNeg', () => {
+    it('testMonthlyByMonthAndYearDayNeg', () => {
       const rule = new RRuleTemporal({
         freq: 'MONTHLY',
         count: 4,
