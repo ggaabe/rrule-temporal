@@ -1,4 +1,3 @@
-// rrule-temporal.ts
 import {Temporal} from '@js-temporal/polyfill';
 
 // Allowed frequency values
@@ -11,18 +10,6 @@ type Freq =
   | "MINUTELY"
   | "SECONDLY";
 
-// interface RRuleOptions {
-//   freq: Freq;
-//   interval: number;
-//   count?: number;
-//   until?: Temporal.ZonedDateTime;
-//   byHour?: number[];
-//   byMinute?: number[];
-//   dtstart: Temporal.ZonedDateTime;
-//   tzid?: string;
-// }
-
-// Extended ManualOpts to include BYDAY and BYMONTH
 /**
  * Shared options for all rule constructors.
  */
@@ -37,7 +24,7 @@ interface BaseOpts {
 
 /**
  * Manual rule definition following the recurrence rule parts defined in
- * RFC&nbsp;5545 §3.3.10.
+ * RFC 5545 §3.3.10.
  */
 interface ManualOpts extends BaseOpts {
   /** FREQ: recurrence frequency */
@@ -75,9 +62,11 @@ interface ManualOpts extends BaseOpts {
   /** DTSTART: first occurrence */
   dtstart: Temporal.ZonedDateTime;
 }
+
 interface IcsOpts extends BaseOpts {
   rruleString: string; // full "DTSTART...\nRRULE..." snippet
 }
+
 export type RRuleOptions = ManualOpts | IcsOpts;
 
 /**
@@ -93,11 +82,7 @@ function unfoldLine(foldedLine: string): string {
 /**
  * Parse date values from EXDATE or RDATE lines
  */
-function parseDateValues(
-  dateValues: string[],
-  tzid: string,
-  valueType?: string
-): Temporal.ZonedDateTime[] {
+function parseDateValues(dateValues: string[], tzid: string, valueType?: string): Temporal.ZonedDateTime[] {
   const dates: Temporal.ZonedDateTime[] = [];
 
   for (const dateValue of dateValues) {
@@ -267,45 +252,6 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
   return opts;
 }
 
-// function joinList(items: string[]): string {
-//   if (items.length === 1) return items[0]!;
-//   const last = items[items.length - 1];
-//   return items.slice(0, -1).join(", ") + " and " + last;
-// }
-
-// function nth(n: number): string {
-//   if (n === -1) return "last";
-//   const abs = Math.abs(n);
-//   const suffix =
-//     abs % 10 === 1 && abs % 100 !== 11
-//       ? "st"
-//       : abs % 10 === 2 && abs % 100 !== 12
-//       ? "nd"
-//       : abs % 10 === 3 && abs % 100 !== 13
-//       ? "rd"
-//       : "th";
-//   return n < 0 ? `${abs}${suffix} last` : `${abs}${suffix}`;
-// }
-
-// function formatDay(token: string): string {
-//   const m = token.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
-//   if (!m) return token;
-//   const ord = m[1] ? parseInt(m[1], 10) : 0;
-//   const map = {
-//     MO: 0,
-//     TU: 1,
-//     WE: 2,
-//     TH: 3,
-//     FR: 4,
-//     SA: 5,
-//     SU: 6,
-//   } as const;
-//   const idx = map[m[2] as keyof typeof map]!;
-//   const name = WEEKDAY_NAMES[idx]!;
-//   return ord ? `${nth(ord)} ${name}` : name;
-// }
-
-
 export class RRuleTemporal {
   private tzid: string;
   private originalDtstart: Temporal.ZonedDateTime;
@@ -428,9 +374,7 @@ export class RRuleTemporal {
     return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 
-  private nextCandidateSameDate(
-    zdt: Temporal.ZonedDateTime
-  ): Temporal.ZonedDateTime {
+  private nextCandidateSameDate(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
     const { freq, interval = 1, byHour, byMinute, bySecond } = this.opts;
 
     // Special case: HOURLY frequency with a single BYHOUR token would
@@ -512,9 +456,7 @@ export class RRuleTemporal {
     return this.applyTimeOverride(this.rawAdvance(zdt));
   }
 
-  private applyTimeOverride(
-    zdt: Temporal.ZonedDateTime
-  ): Temporal.ZonedDateTime {
+  private applyTimeOverride(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
     const { byHour, byMinute, bySecond } = this.opts;
     let dt = zdt;
     if (byHour) dt = dt.with({ hour: byHour[0] });
@@ -721,9 +663,7 @@ export class RRuleTemporal {
    * @param iterator - An optional callback iterator function that can be used to filter or modify the occurrences.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
-  all(
-    iterator?: (date: Temporal.ZonedDateTime, i: number) => boolean
-  ): Temporal.ZonedDateTime[] {
+  all(iterator?: (date: Temporal.ZonedDateTime, i: number) => boolean): Temporal.ZonedDateTime[] {
     if (!this.opts.count && !this.opts.until && !iterator) {
       throw new Error("all() requires iterator when no COUNT/UNTIL");
     }
@@ -1497,10 +1437,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the start date.
    * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
    */
-  next(
-    after: Date | Temporal.ZonedDateTime = new Date(),
-    inc = false
-  ): Temporal.ZonedDateTime | null {
+  next(after: Date | Temporal.ZonedDateTime = new Date(), inc = false): Temporal.ZonedDateTime | null {
     const afterInst =
       after instanceof Date
         ? Temporal.Instant.from(after.toISOString())
@@ -1528,10 +1465,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the end date.
    * @returns The previous occurrence of the rule before the specified date or null if no occurrences are found.
    */
-  previous(
-    before: Date | Temporal.ZonedDateTime = new Date(),
-    inc = false
-  ): Temporal.ZonedDateTime | null {
+  previous(before: Date | Temporal.ZonedDateTime = new Date(), inc = false): Temporal.ZonedDateTime | null {
     const beforeInst =
       before instanceof Date
         ? Temporal.Instant.from(before.toISOString())
@@ -1612,9 +1546,7 @@ export class RRuleTemporal {
    * Given any date in a month, return all the ZonedDateTimes in that month
    * matching your opts.byDay and opts.byMonth (or the single "same day" if no BYDAY).
    */
-  private generateMonthlyOccurrences(
-    sample: Temporal.ZonedDateTime
-  ): Temporal.ZonedDateTime[] {
+  private generateMonthlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
     const { byDay, byMonth, byMonthDay } = this.opts;
 
     // 1) Skip whole month if BYMONTH says so
@@ -1715,9 +1647,7 @@ export class RRuleTemporal {
    * the BYDAY/BYMONTHDAY/BYMONTH constraints. Months default to DTSTART's month
    * if BYMONTH is not specified.
    */
-  private generateYearlyOccurrences(
-    sample: Temporal.ZonedDateTime
-  ): Temporal.ZonedDateTime[] {
+  private generateYearlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
     const months = this.opts.byMonth
       ? [...this.opts.byMonth].sort((a, b) => a - b)
       : this.opts.byMonthDay
