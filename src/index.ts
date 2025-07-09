@@ -1200,7 +1200,7 @@ export class RRuleTemporal {
           current = this.nextCandidateSameDate(current);
         } else {
           // Current date doesn't match constraints, find next candidate efficiently
-          current = this.findNextValidDateForMinutely(current);
+          current = this.findNextValidDate(current);
         }
       }
 
@@ -1251,7 +1251,7 @@ export class RRuleTemporal {
           current = this.nextCandidateSameDate(current);
         } else {
           // Current date doesn't match constraints, find next candidate efficiently
-          current = this.findNextValidDateForSecondly(current);
+          current = this.findNextValidDate(current);
         }
       }
 
@@ -1908,125 +1908,11 @@ export class RRuleTemporal {
   }
 
   /**
-   * Efficiently find the next valid date for MINUTELY frequency by jumping over
+   * Efficiently find the next valid date for MINUTELY and SECONDLY frequency by jumping over
    * large gaps when BYXXX constraints don't match.
    */
-  private findNextValidDateForMinutely(current: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
+  private findNextValidDate(current: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
     // Try to jump efficiently based on which constraints are failing
-
-    // Check BYMONTH first (largest potential jump)
-    if (this.opts.byMonth && !this.opts.byMonth.includes(current.month)) {
-      const months = [...this.opts.byMonth].sort((a, b) => a - b);
-      const nextMonth = months.find((m) => m > current.month) || months[0];
-      if (nextMonth && nextMonth > current.month) {
-        current = current.with({month: nextMonth, day: 1, hour: 0, minute: 0, second: 0});
-      } else {
-        // Move to next year and use first valid month
-        current = current.add({years: 1}).with({month: months[0], day: 1, hour: 0, minute: 0, second: 0});
-      }
-      current = this.applyTimeOverride(current);
-      return current;
-    }
-
-    // Check BYYEARDAY (can jump across months)
-    if (this.opts.byYearDay && !this.matchesByYearDay(current)) {
-      const yearDays = [...this.opts.byYearDay].sort((a, b) => a - b);
-      const currentYearDay = current.dayOfYear;
-      const lastDayOfYear = current.with({month: 12, day: 31}).dayOfYear;
-
-      let nextYearDay = yearDays.find((d) => {
-        const dayNum = d > 0 ? d : lastDayOfYear + d + 1;
-        return dayNum > currentYearDay;
-      });
-
-      if (nextYearDay) {
-        const dayNum = nextYearDay > 0 ? nextYearDay : lastDayOfYear + nextYearDay + 1;
-        current = current.with({month: 1, day: 1}).add({days: dayNum - 1});
-      } else {
-        // Move to next year and use first valid yearday
-        const nextYear = current.add({years: 1});
-        const nextYearLastDay = nextYear.with({month: 12, day: 31}).dayOfYear;
-        const firstYearDay = yearDays[0];
-        const dayNum = firstYearDay > 0 ? firstYearDay : nextYearLastDay + firstYearDay + 1;
-        current = nextYear.with({month: 1, day: 1}).add({days: dayNum - 1});
-      }
-      current = this.applyTimeOverride(current);
-      return current;
-    }
-
-    // Check BYWEEKNO (can jump across weeks/months)
-    if (this.opts.byWeekNo && !this.matchesByWeekNo(current)) {
-      // This is complex, so for now just advance by a week
-      current = current.add({weeks: 1}).with({hour: 0, minute: 0, second: 0});
-      current = this.applyTimeOverride(current);
-      return current;
-    }
-
-    // Check BYMONTHDAY (can jump within month)
-    if (this.opts.byMonthDay && !this.matchesByMonthDay(current)) {
-      const monthDays = [...this.opts.byMonthDay].sort((a, b) => a - b);
-      const lastDayOfMonth = current.with({day: 1}).add({months: 1}).subtract({days: 1}).day;
-      const currentDay = current.day;
-
-      let nextDay = monthDays.find((d) => {
-        const dayNum = d > 0 ? d : lastDayOfMonth + d + 1;
-        return dayNum > currentDay && dayNum <= lastDayOfMonth;
-      });
-
-      if (nextDay) {
-        const dayNum = nextDay > 0 ? nextDay : lastDayOfMonth + nextDay + 1;
-        current = current.with({day: dayNum, hour: 0, minute: 0, second: 0});
-      } else {
-        // Move to next month and use first valid day
-        const nextMonth = current.add({months: 1}).with({day: 1});
-        const nextMonthLastDay = nextMonth.add({months: 1}).subtract({days: 1}).day;
-        const firstMonthDay = monthDays[0];
-        const dayNum = firstMonthDay > 0 ? firstMonthDay : nextMonthLastDay + firstMonthDay + 1;
-        current = nextMonth.with({day: Math.max(1, Math.min(dayNum, nextMonthLastDay)), hour: 0, minute: 0, second: 0});
-      }
-      current = this.applyTimeOverride(current);
-      return current;
-    }
-
-    // Check BYDAY (can jump within week)
-    if (this.opts.byDay && !this.matchesByDay(current)) {
-      // For simple weekday constraints, jump to next matching day
-      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
-      const currentDow = current.dayOfWeek;
-
-      let nextDow = 8; // Invalid day to start with
-      for (const token of this.opts.byDay) {
-        const match = token.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
-        if (match && !match[1]) {
-          // Simple weekday without ordinal
-          const dow = dayMap[match[2]];
-          if (dow > currentDow) {
-            nextDow = Math.min(nextDow, dow);
-          }
-        }
-      }
-
-      if (nextDow <= 7) {
-        current = current.add({days: nextDow - currentDow}).with({hour: 0, minute: 0, second: 0});
-      } else {
-        // Jump to next week and try first matching day
-        current = current.add({days: 7 - currentDow + 1}).with({hour: 0, minute: 0, second: 0});
-      }
-      current = this.applyTimeOverride(current);
-      return current;
-    }
-
-    // If no specific constraint detected, just advance by the frequency
-    return this.nextCandidateSameDate(current);
-  }
-
-  /**
-   * Efficiently find the next valid date for SECONDLY frequency by jumping over
-   * large gaps when BYXXX constraints don't match.
-   */
-  private findNextValidDateForSecondly(current: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    // Similar logic to MINUTELY but for SECONDLY frequency
-    // The jumps can be the same since we're dealing with date-level constraints
 
     // Check BYMONTH first (largest potential jump)
     if (this.opts.byMonth && !this.opts.byMonth.includes(current.month)) {
