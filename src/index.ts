@@ -1167,6 +1167,95 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
+    // --- 6a) MONTHLY + BYYEARDAY (special case) ---
+    if (
+      this.opts.freq === "MONTHLY" &&
+      this.opts.byYearDay &&
+      this.opts.byYearDay.length > 0 &&
+      !this.opts.byDay &&
+      !this.opts.byMonthDay
+    ) {
+      const start = this.originalDtstart;
+      let matchCount = 0;
+
+      // Include dtstart even if it doesn't match the rule when includeDtstart is true
+      if (this.includeDtstart && !this.matchesAll(start)) {
+        if (iterator && !iterator(start, matchCount)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+        dates.push(start);
+        matchCount++;
+        if (this.shouldBreakForCountLimit(matchCount)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+      }
+
+      let year = start.year;
+      const yearDays = [...this.opts.byYearDay].sort((a, b) => a - b);
+      const interval = this.opts.interval!;
+      const startMonthAbs = start.year * 12 + start.month;
+
+      outer_loop: while (true) {
+        if (this.shouldBreakForCountLimit(matchCount)) {
+          break;
+        }
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        const yearStart = start.with({ year, month: 1, day: 1 });
+        const lastDayOfYear = yearStart.with({ month: 12, day: 31 }).dayOfYear;
+
+        for (const yd of yearDays) {
+          const dayNum = yd > 0 ? yd : lastDayOfYear + yd + 1;
+          if (dayNum <= 0 || dayNum > lastDayOfYear) continue;
+
+          const baseOcc = yearStart.add({ days: dayNum - 1 });
+
+          for (const occ of this.expandByTime(baseOcc)) {
+            if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
+            if (dates.some(d => Temporal.ZonedDateTime.compare(d, occ) === 0)) continue;
+
+            const occMonthAbs = occ.year * 12 + occ.month;
+            if ((occMonthAbs - startMonthAbs) % interval !== 0) {
+              continue;
+            }
+
+            if (!this.matchesByMonth(occ)) {
+              continue;
+            }
+
+            if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
+              break outer_loop;
+            }
+
+            if (iterator && !iterator(occ, matchCount)) {
+              break outer_loop;
+            }
+
+            dates.push(occ);
+            matchCount++;
+
+            if (this.shouldBreakForCountLimit(matchCount)) {
+              break outer_loop;
+            }
+          }
+        }
+
+        year++;
+        if (this.opts.until && year > this.opts.until.year + 2) {
+          break;
+        }
+        if (!this.opts.until && this.opts.count) {
+          const yearsToScan = Math.ceil(this.opts.count / (this.opts.byYearDay.length || 1)) * interval + 5;
+          if (year > start.year + yearsToScan) {
+            break;
+          }
+        }
+      }
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
     // --- 7) fallback: step + filter ---
     let current = this.computeFirst();
     let matchCount = 0;
