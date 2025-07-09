@@ -21,7 +21,7 @@
     "build": "tsup",
     "test": "jest --coverage=false",
     "coverage": "jest",
-    "format": "./node_modules/.bin/prettier --write 'src/tests/*.ts'",
+    "format": "./node_modules/.bin/prettier --write 'src/**/*.ts'",
     "prepare": "npm run build"
   },
   "repository": {

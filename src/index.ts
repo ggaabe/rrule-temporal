@@ -1,14 +1,7 @@
 import {Temporal} from '@js-temporal/polyfill';
 
 // Allowed frequency values
-type Freq =
-  | "YEARLY"
-  | "MONTHLY"
-  | "WEEKLY"
-  | "DAILY"
-  | "HOURLY"
-  | "MINUTELY"
-  | "SECONDLY";
+type Freq = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'HOURLY' | 'MINUTELY' | 'SECONDLY';
 
 /**
  * Shared options for all rule constructors.
@@ -90,17 +83,16 @@ function parseDateValues(dateValues: string[], tzid: string, valueType?: string)
 
     if (isDate) {
       const isoDate = `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}`;
-      dates.push(Temporal.PlainDate.from(isoDate).toZonedDateTime({ timeZone: tzid }));
-    } else { // DATE-TIME
+      dates.push(Temporal.PlainDate.from(isoDate).toZonedDateTime({timeZone: tzid}));
+    } else {
+      // DATE-TIME
       if (/Z$/.test(dateValue)) {
         const iso =
-          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` +
-          `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
-        dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || "UTC"));
+          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` + `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
+        dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || 'UTC'));
       } else {
         const isoDate =
-          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` +
-          `T${dateValue.slice(9)}`;
+          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` + `T${dateValue.slice(9)}`;
         dates.push(Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid));
       }
     }
@@ -117,21 +109,21 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
   const unfoldedInput = unfoldLine(input).trim();
 
   let dtstart: Temporal.ZonedDateTime;
-  let tzid: string = "UTC";
+  let tzid: string = 'UTC';
   let rruleLine: string;
   let exDate: Temporal.ZonedDateTime[] = [];
   let rDate: Temporal.ZonedDateTime[] = [];
 
-  if (/^DTSTART/mi.test(unfoldedInput)) {
+  if (/^DTSTART/im.test(unfoldedInput)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
     const lines = unfoldedInput.split(/\s+/);
-    const dtLine = lines.find(line => line.match(/^DTSTART/i))!;
-    const rrLine = lines.find(line => line.match(/^RRULE:/i));
-    const exLines = lines.filter(line => line.match(/^EXDATE/i));
-    const rLines = lines.filter(line => line.match(/^RDATE/i));
+    const dtLine = lines.find((line) => line.match(/^DTSTART/i))!;
+    const rrLine = lines.find((line) => line.match(/^RRULE:/i));
+    const exLines = lines.filter((line) => line.match(/^EXDATE/i));
+    const rLines = lines.filter((line) => line.match(/^RDATE/i));
 
     const dtMatch = dtLine.match(/DTSTART(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)/i);
-    if (!dtMatch) throw new Error("Invalid DTSTART in ICS snippet");
+    if (!dtMatch) throw new Error('Invalid DTSTART in ICS snippet');
 
     const [, valueType, dtTzid, dtValue] = dtMatch;
     tzid = dtTzid ?? targetTimezone ?? tzid;
@@ -161,89 +153,81 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
       }
     }
   } else {
-      throw new Error("dtstart required when parsing RRULE alone");
+    throw new Error('dtstart required when parsing RRULE alone');
   }
 
   // Parse RRULE
-  const parts = rruleLine ? rruleLine.replace(/^RRULE:/i, "").split(";") : [];
+  const parts = rruleLine ? rruleLine.replace(/^RRULE:/i, '').split(';') : [];
   const opts = {
     dtstart,
     tzid,
     exDate: exDate.length > 0 ? exDate : undefined,
-    rDate: rDate.length > 0 ? rDate : undefined
+    rDate: rDate.length > 0 ? rDate : undefined,
   } as ManualOpts;
   for (const part of parts) {
-    const [key, val] = part.split("=");
+    const [key, val] = part.split('=');
     if (!key) continue;
     switch (key.toUpperCase()) {
-      case "FREQ":
+      case 'FREQ':
         opts.freq = val!.toUpperCase() as Freq;
         break;
-      case "INTERVAL":
+      case 'INTERVAL':
         opts.interval = parseInt(val!, 10);
         break;
-      case "COUNT":
+      case 'COUNT':
         opts.count = parseInt(val!, 10);
         break;
-      case "UNTIL": {
+      case 'UNTIL': {
         // RFC5545 UNTIL is YYYYMMDDTHHMMSSZ or without Z
         if (/Z$/.test(val!)) {
-          const iso =
-            `${val!.slice(0, 4)}-${val!.slice(4, 6)}-` +
-            `${val!.slice(6, 8)}T${val!.slice(9, 15)}Z`;
-          opts.until = Temporal.Instant.from(iso).toZonedDateTimeISO(
-            tzid || "UTC"
-          );
+          const iso = `${val!.slice(0, 4)}-${val!.slice(4, 6)}-` + `${val!.slice(6, 8)}T${val!.slice(9, 15)}Z`;
+          opts.until = Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || 'UTC');
         } else {
-          const iso =
-            `${val!.slice(0, 4)}-${val!.slice(4, 6)}-` +
-            `${val!.slice(6, 8)}T${val!.slice(9, 15)}`;
-          opts.until = Temporal.PlainDateTime.from(iso).toZonedDateTime(
-            tzid || "UTC"
-          );
-          if(tzid !== 'UTC') {
+          const iso = `${val!.slice(0, 4)}-${val!.slice(4, 6)}-` + `${val!.slice(6, 8)}T${val!.slice(9, 15)}`;
+          opts.until = Temporal.PlainDateTime.from(iso).toZonedDateTime(tzid || 'UTC');
+          if (tzid !== 'UTC') {
             throw new Error('UNTIL rule part MUST always be specified as a date with UTC time');
           }
         }
         break;
       }
-      case "BYHOUR":
+      case 'BYHOUR':
         opts.byHour = val!
-          .split(",")
+          .split(',')
           .map((n) => parseInt(n, 10))
           .sort((a, b) => a - b);
         break;
-      case "BYMINUTE":
+      case 'BYMINUTE':
         opts.byMinute = val!
-          .split(",")
+          .split(',')
           .map((n) => parseInt(n, 10))
           .sort((a, b) => a - b);
         break;
-      case "BYDAY":
-        opts.byDay = val!.split(","); // e.g. ["MO","2FR","-1SU"]
+      case 'BYDAY':
+        opts.byDay = val!.split(','); // e.g. ["MO","2FR","-1SU"]
         break;
-      case "BYMONTH":
-        opts.byMonth = val!.split(",").map((n) => parseInt(n, 10));
+      case 'BYMONTH':
+        opts.byMonth = val!.split(',').map((n) => parseInt(n, 10));
         break;
-      case "BYMONTHDAY":
-        opts.byMonthDay = val!.split(",").map((n) => parseInt(n, 10));
+      case 'BYMONTHDAY':
+        opts.byMonthDay = val!.split(',').map((n) => parseInt(n, 10));
         break;
-      case "BYSECOND":
+      case 'BYSECOND':
         opts.bySecond = val!
-          .split(",")
+          .split(',')
           .map((n) => parseInt(n, 10))
           .sort((a, b) => a - b);
         break;
-      case "BYYEARDAY":
-        opts.byYearDay = val!.split(",").map((n) => parseInt(n, 10));
+      case 'BYYEARDAY':
+        opts.byYearDay = val!.split(',').map((n) => parseInt(n, 10));
         break;
-      case "BYWEEKNO":
-        opts.byWeekNo = val!.split(",").map((n) => parseInt(n, 10));
+      case 'BYWEEKNO':
+        opts.byWeekNo = val!.split(',').map((n) => parseInt(n, 10));
         break;
-      case "BYSETPOS":
-        opts.bySetPos = val!.split(",").map((n) => parseInt(n, 10));
+      case 'BYSETPOS':
+        opts.bySetPos = val!.split(',').map((n) => parseInt(n, 10));
         break;
-      case "WKST":
+      case 'WKST':
         opts.wkst = val!;
         break;
     }
@@ -259,29 +243,29 @@ export class RRuleTemporal {
   private maxIterations: number;
   private includeDtstart: boolean;
 
-  constructor(params: ({ rruleString: string } & BaseOpts) | ManualOpts) {
+  constructor(params: ({rruleString: string} & BaseOpts) | ManualOpts) {
     let manual: ManualOpts;
-    if ("rruleString" in params) {
-      const parsed = parseRRuleString(params.rruleString, params.tzid)
-      this.tzid = parsed.tzid ?? params.tzid ?? "UTC";
+    if ('rruleString' in params) {
+      const parsed = parseRRuleString(params.rruleString, params.tzid);
+      this.tzid = parsed.tzid ?? params.tzid ?? 'UTC';
       this.originalDtstart = parsed.dtstart as Temporal.ZonedDateTime;
-      manual = {...params,...parsed};
+      manual = {...params, ...parsed};
     } else {
-      manual = { ...params };
-      if (typeof manual.dtstart === "string") {
-        throw new Error("Manual dtstart must be a ZonedDateTime");
+      manual = {...params};
+      if (typeof manual.dtstart === 'string') {
+        throw new Error('Manual dtstart must be a ZonedDateTime');
       }
       manual.tzid = manual.tzid || manual.dtstart.timeZoneId;
       this.tzid = manual.tzid;
       this.originalDtstart = manual.dtstart as Temporal.ZonedDateTime;
     }
-    if (!manual.freq) throw new Error("RRULE must include FREQ");
+    if (!manual.freq) throw new Error('RRULE must include FREQ');
     manual.interval = manual.interval ?? 1;
     if (manual.interval <= 0) {
-      throw new Error("Cannot create RRule: interval must be greater than 0");
+      throw new Error('Cannot create RRule: interval must be greater than 0');
     }
     if (manual.until && !(manual.until instanceof Temporal.ZonedDateTime)) {
-      throw new Error("Manual until must be a ZonedDateTime");
+      throw new Error('Manual until must be a ZonedDateTime');
     }
     this.opts = this.sanitizeOpts(manual);
     this.maxIterations = manual.maxIterations ?? 10000;
@@ -323,8 +307,8 @@ export class RRuleTemporal {
       if (opts.bySecond.length === 0) delete opts.bySecond;
     }
     if (opts.bySetPos) {
-      if (opts.bySetPos.some(p => p === 0)) {
-        throw new Error("bySetPos may not contain 0");
+      if (opts.bySetPos.some((p) => p === 0)) {
+        throw new Error('bySetPos may not contain 0');
       }
       opts.bySetPos = opts.bySetPos.filter((n) => Number.isInteger(n) && n !== 0);
       if (opts.bySetPos.length === 0) delete opts.bySetPos;
@@ -333,22 +317,22 @@ export class RRuleTemporal {
   }
 
   private rawAdvance(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    const { freq, interval } = this.opts;
+    const {freq, interval} = this.opts;
     switch (freq) {
-      case "DAILY":
-        return zdt.add({ days: interval });
-      case "WEEKLY":
-        return zdt.add({ weeks: interval });
-      case "MONTHLY":
-        return zdt.add({ months: interval });
-      case "YEARLY":
-        return zdt.add({ years: interval });
-      case "HOURLY":
-        return zdt.add({ hours: interval });
-      case "MINUTELY":
-        return zdt.add({ minutes: interval });
-      case "SECONDLY":
-        return zdt.add({ seconds: interval });
+      case 'DAILY':
+        return zdt.add({days: interval});
+      case 'WEEKLY':
+        return zdt.add({weeks: interval});
+      case 'MONTHLY':
+        return zdt.add({months: interval});
+      case 'YEARLY':
+        return zdt.add({years: interval});
+      case 'HOURLY':
+        return zdt.add({hours: interval});
+      case 'MINUTELY':
+        return zdt.add({minutes: interval});
+      case 'SECONDLY':
+        return zdt.add({seconds: interval});
       default:
         throw new Error(`Unsupported FREQ: ${freq}`);
     }
@@ -367,7 +351,7 @@ export class RRuleTemporal {
     for (const h of hours) {
       for (const m of minutes) {
         for (const s of seconds) {
-          out.push(base.with({ hour: h, minute: m, second: s }));
+          out.push(base.with({hour: h, minute: m, second: s}));
         }
       }
     }
@@ -375,58 +359,54 @@ export class RRuleTemporal {
   }
 
   private nextCandidateSameDate(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    const { freq, interval = 1, byHour, byMinute, bySecond } = this.opts;
+    const {freq, interval = 1, byHour, byMinute, bySecond} = this.opts;
 
     // Special case: HOURLY frequency with a single BYHOUR token would
     // otherwise keep returning the same time (e.g. always 12:00).  When
     // BYDAY filters are also present this results in an infinite loop.
-    if (freq === "HOURLY" && byHour && byHour.length === 1) {
-      return this.applyTimeOverride(zdt.add({ days: interval }));
+    if (freq === 'HOURLY' && byHour && byHour.length === 1) {
+      return this.applyTimeOverride(zdt.add({days: interval}));
     }
 
     // MINUTELY frequency with a single BYMINUTE value would also repeat
     // the same time. Move forward a full hour before reapplying overrides.
-    if (freq === "MINUTELY" && byMinute && byMinute.length === 1) {
-      return this.applyTimeOverride(zdt.add({ hours: interval }));
+    if (freq === 'MINUTELY' && byMinute && byMinute.length === 1) {
+      return this.applyTimeOverride(zdt.add({hours: interval}));
     }
 
     // MINUTELY frequency with BYHOUR constraint but no BYMINUTE - advance by interval minutes
     // and check if we're still in an allowed hour, otherwise find the next allowed hour
-    if (freq === "MINUTELY" && byHour && byHour.length > 1 && !byMinute && interval > 1) {
-      const next = zdt.add({ minutes: interval });
+    if (freq === 'MINUTELY' && byHour && byHour.length > 1 && !byMinute && interval > 1) {
+      const next = zdt.add({minutes: interval});
       if (byHour.includes(next.hour)) {
         return next;
       }
       // Find next allowed hour
-      const nextHour = byHour.find(h => h > zdt.hour) || byHour[0];
+      const nextHour = byHour.find((h) => h > zdt.hour) || byHour[0];
       if (nextHour && nextHour > zdt.hour) {
-        return zdt.with({ hour: nextHour, minute: 0 });
+        return zdt.with({hour: nextHour, minute: 0});
       }
       // Move to next day and use first allowed hour
-      return this.applyTimeOverride(zdt.add({ days: 1 }));
+      return this.applyTimeOverride(zdt.add({days: 1}));
     }
 
-    if (freq === "SECONDLY" && bySecond && bySecond.length === 1) {
-      return this
-        .applyTimeOverride(zdt.add({ minutes: interval }))
-        .with({ second: bySecond[0] });
+    if (freq === 'SECONDLY' && bySecond && bySecond.length === 1) {
+      return this.applyTimeOverride(zdt.add({minutes: interval})).with({second: bySecond[0]});
     }
 
     // SECONDLY frequency with a single BYMINUTE value should emit every
     // second within that minute. When the minute rolls over, jump to the
     // next hour and reset seconds.
-    if (freq === "SECONDLY" && byMinute && byMinute.length === 1) {
-      const next = zdt.add({ seconds: interval });
+    if (freq === 'SECONDLY' && byMinute && byMinute.length === 1) {
+      const next = zdt.add({seconds: interval});
       if (next.minute === byMinute[0]) return next;
-      return this
-        .applyTimeOverride(zdt.add({ hours: interval }))
-        .with({ second: 0 });
+      return this.applyTimeOverride(zdt.add({hours: interval})).with({second: 0});
     }
 
     if (bySecond && bySecond.length > 1) {
       const idx = bySecond.indexOf(zdt.second);
       if (idx !== -1 && idx < bySecond.length - 1) {
-        return zdt.with({ second: bySecond[idx + 1] });
+        return zdt.with({second: bySecond[idx + 1]});
       }
     }
 
@@ -436,7 +416,7 @@ export class RRuleTemporal {
         // next minute within the same hour
         return zdt.with({
           minute: byMinute[idx + 1],
-          second: bySecond ? bySecond[0] : zdt.second
+          second: bySecond ? bySecond[0] : zdt.second,
         });
       }
     }
@@ -457,11 +437,11 @@ export class RRuleTemporal {
   }
 
   private applyTimeOverride(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    const { byHour, byMinute, bySecond } = this.opts;
+    const {byHour, byMinute, bySecond} = this.opts;
     let dt = zdt;
-    if (byHour) dt = dt.with({ hour: byHour[0] });
-    if (byMinute) dt = dt.with({ minute: byMinute[0] });
-    if (bySecond) dt = dt.with({ second: bySecond[0] });
+    if (byHour) dt = dt.with({hour: byHour[0]});
+    if (byMinute) dt = dt.with({minute: byMinute[0]});
+    if (bySecond) dt = dt.with({second: bySecond[0]});
     return dt;
   }
 
@@ -469,14 +449,15 @@ export class RRuleTemporal {
     let zdt = this.originalDtstart;
 
     // If BYWEEKNO is present with small frequencies, jump to the first matching week
-    if (this.opts.byWeekNo?.length && ["DAILY", "HOURLY", "MINUTELY", "SECONDLY"].includes(this.opts.freq)) {
+    if (this.opts.byWeekNo?.length && ['DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'].includes(this.opts.freq)) {
       let targetWeek = this.opts.byWeekNo[0]!;
       let targetYear = zdt.year;
 
       // Find the first year >= dtstart.year that has the target week
-      while (targetYear <= zdt.year + 10) { // reasonable upper bound
-        const jan1 = zdt.with({ year: targetYear, month: 1, day: 1 });
-        const dec31 = zdt.with({ year: targetYear, month: 12, day: 31 });
+      while (targetYear <= zdt.year + 10) {
+        // reasonable upper bound
+        const jan1 = zdt.with({year: targetYear, month: 1, day: 1});
+        const dec31 = zdt.with({year: targetYear, month: 12, day: 31});
 
         // Check if this year has the target week
         let hasTargetWeek = false;
@@ -492,37 +473,43 @@ export class RRuleTemporal {
           if (jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4) {
             maxWeek = 53;
           }
-          hasTargetWeek = (-targetWeek) <= maxWeek;
+          hasTargetWeek = -targetWeek <= maxWeek;
         }
 
         if (hasTargetWeek) {
           // Calculate the first day of the target week
-          const firstThursday = jan1.add({ days: (4 - jan1.dayOfWeek + 7) % 7 });
+          const firstThursday = jan1.add({days: (4 - jan1.dayOfWeek + 7) % 7});
           let weekStart: Temporal.ZonedDateTime;
 
           if (targetWeek > 0) {
-            weekStart = firstThursday.subtract({ days: 3 }).add({ weeks: targetWeek - 1 });
+            weekStart = firstThursday.subtract({days: 3}).add({weeks: targetWeek - 1});
           } else {
             const lastWeek = jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4 ? 53 : 52;
-            weekStart = firstThursday.subtract({ days: 3 }).add({ weeks: lastWeek + targetWeek });
+            weekStart = firstThursday.subtract({days: 3}).add({weeks: lastWeek + targetWeek});
           }
 
           // If we have BYDAY, find the specific day in that week
           if (this.opts.byDay?.length) {
             const dayMap: Record<string, number> = {
-              MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7,
+              MO: 1,
+              TU: 2,
+              WE: 3,
+              TH: 4,
+              FR: 5,
+              SA: 6,
+              SU: 7,
             };
 
             const targetDays = this.opts.byDay
-              .map(tok => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+              .map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
               .filter(Boolean)
-              .map(day => dayMap[day!]!)
+              .map((day) => dayMap[day!]!)
               .filter(Boolean);
 
             if (targetDays.length) {
-              const candidates = targetDays.map(dayOfWeek => {
+              const candidates = targetDays.map((dayOfWeek) => {
                 const delta = (dayOfWeek - weekStart.dayOfWeek + 7) % 7;
-                return weekStart.add({ days: delta });
+                return weekStart.add({days: delta});
               });
 
               const firstCandidate = candidates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b))[0];
@@ -562,12 +549,10 @@ export class RRuleTemporal {
 
       let deltas: number[] = [];
       if (
-        ["DAILY", "HOURLY", "MINUTELY", "SECONDLY"].includes(this.opts.freq) &&
+        ['DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'].includes(this.opts.freq) &&
         this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
       ) {
-        deltas = this.opts.byDay.map(
-          (tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7
-        );
+        deltas = this.opts.byDay.map((tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7);
       } else {
         deltas = this.opts.byDay
           .map((tok) => {
@@ -578,17 +563,23 @@ export class RRuleTemporal {
       }
 
       if (deltas.length) {
-        zdt = zdt.add({ days: Math.min(...deltas) });
+        zdt = zdt.add({days: Math.min(...deltas)});
       }
     }
 
     // Apply time overrides based on frequency and BYHOUR/BYMINUTE/BYSECOND
-    const { byHour, byMinute, bySecond } = this.opts;
+    const {byHour, byMinute, bySecond} = this.opts;
 
     // For HOURLY frequency without BYHOUR, start from 00:00 only if we jumped to a different date
-    if (this.opts.freq === "HOURLY" && !byHour &&
-        Temporal.ZonedDateTime.compare(zdt.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 }), this.originalDtstart) > 0) {
-      zdt = zdt.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
+    if (
+      this.opts.freq === 'HOURLY' &&
+      !byHour &&
+      Temporal.ZonedDateTime.compare(
+        zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0}),
+        this.originalDtstart,
+      ) > 0
+    ) {
+      zdt = zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
     }
 
     if (byHour || byMinute || bySecond) {
@@ -610,7 +601,7 @@ export class RRuleTemporal {
   // --- NEW: constraint checks ---
   // 2) Replace your matchesByDay with this:
   private matchesByDay(zdt: Temporal.ZonedDateTime): boolean {
-    const { byDay, freq } = this.opts;
+    const {byDay, freq} = this.opts;
     if (!byDay) return true;
 
     // map two‑letter to Temporal dayOfWeek (1=Mon … 7=Sun)
@@ -650,11 +641,11 @@ export class RRuleTemporal {
       // build all days in month with this weekday
       // const year = zdt.year;
       const month = zdt.month;
-      let dt = zdt.with({ day: 1 });
+      let dt = zdt.with({day: 1});
       const candidates: number[] = [];
       while (dt.month === month) {
         if (dt.dayOfWeek === wd) candidates.push(dt.day);
-        dt = dt.add({ days: 1 });
+        dt = dt.add({days: 1});
       }
 
       // pick the “ord-th” entry (supports negative ord)
@@ -666,21 +657,16 @@ export class RRuleTemporal {
   }
 
   private matchesByMonth(zdt: Temporal.ZonedDateTime): boolean {
-    const { byMonth } = this.opts;
+    const {byMonth} = this.opts;
     if (!byMonth) return true;
     return byMonth.includes(zdt.month);
   }
 
   private matchesByMonthDay(zdt: Temporal.ZonedDateTime): boolean {
-    const { byMonthDay } = this.opts;
+    const {byMonthDay} = this.opts;
     if (!byMonthDay) return true;
-    const lastDay = zdt
-      .with({ day: 1 })
-      .add({ months: 1 })
-      .subtract({ days: 1 }).day;
-    return byMonthDay.some((d) =>
-      d > 0 ? zdt.day === d : zdt.day === lastDay + d + 1
-    );
+    const lastDay = zdt.with({day: 1}).add({months: 1}).subtract({days: 1}).day;
+    return byMonthDay.some((d) => (d > 0 ? zdt.day === d : zdt.day === lastDay + d + 1));
   }
 
   private matchesAll(zdt: Temporal.ZonedDateTime): boolean {
@@ -694,41 +680,43 @@ export class RRuleTemporal {
   }
 
   private matchesByYearDay(zdt: Temporal.ZonedDateTime): boolean {
-    const { byYearDay } = this.opts;
+    const {byYearDay} = this.opts;
     if (!byYearDay) return true;
     const dayOfYear = zdt.dayOfYear;
-    const last = zdt.with({ month: 12, day: 31 }).dayOfYear;
+    const last = zdt.with({month: 12, day: 31}).dayOfYear;
     return byYearDay.some((d) => (d > 0 ? dayOfYear === d : dayOfYear === last + d + 1));
   }
 
-  private getIsoWeekInfo(zdt: Temporal.ZonedDateTime): { week: number, year: number } {
+  private getIsoWeekInfo(zdt: Temporal.ZonedDateTime): {week: number; year: number} {
     // Using ISO 8601 week date system. Week starts on Monday.
     // The week year is the year of the Thursday of that week.
-    const thursday = zdt.add({ days: 4 - zdt.dayOfWeek });
+    const thursday = zdt.add({days: 4 - zdt.dayOfWeek});
     const year = thursday.year;
 
     // The first Thursday of the year.
-    const firstThursday = thursday.with({ month: 1, day: 1 }).add({ days: (4 - thursday.with({ month: 1, day: 1 }).dayOfWeek + 7) % 7 });
+    const firstThursday = thursday
+      .with({month: 1, day: 1})
+      .add({days: (4 - thursday.with({month: 1, day: 1}).dayOfWeek + 7) % 7});
 
     const diffDays = thursday.toPlainDate().since(firstThursday.toPlainDate()).days;
     const week = Math.floor(diffDays / 7) + 1;
-    return { week, year };
+    return {week, year};
   }
 
   private matchesByWeekNo(zdt: Temporal.ZonedDateTime): boolean {
-    const { byWeekNo } = this.opts;
+    const {byWeekNo} = this.opts;
     if (!byWeekNo) return true;
 
-    const { week, year } = this.getIsoWeekInfo(zdt);
+    const {week, year} = this.getIsoWeekInfo(zdt);
 
-    const jan1 = zdt.with({ year, month: 1, day: 1 });
-    const dec31 = zdt.with({ year, month: 12, day: 31 });
+    const jan1 = zdt.with({year, month: 1, day: 1});
+    const dec31 = zdt.with({year, month: 12, day: 31});
     let lastWeek = 52;
     if (jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4) {
-        lastWeek = 53;
+      lastWeek = 53;
     }
 
-    return byWeekNo.some(wn => {
+    return byWeekNo.some((wn) => {
       if (wn > 0) {
         return week === wn;
       } else {
@@ -748,18 +736,15 @@ export class RRuleTemporal {
    */
   all(iterator?: (date: Temporal.ZonedDateTime, i: number) => boolean): Temporal.ZonedDateTime[] {
     if (!this.opts.count && !this.opts.until && !iterator) {
-      throw new Error("all() requires iterator when no COUNT/UNTIL");
+      throw new Error('all() requires iterator when no COUNT/UNTIL');
     }
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
 
     // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
-    if (
-      this.opts.freq === "MONTHLY" &&
-      (this.opts.byDay || this.opts.byMonthDay)
-    ) {
+    if (this.opts.freq === 'MONTHLY' && (this.opts.byDay || this.opts.byMonthDay)) {
       const start = this.originalDtstart;
-      let monthCursor = start.with({ day: 1 });
+      let monthCursor = start.with({day: 1});
       let matchCount = 0;
 
       // Include dtstart even if it doesn't match the rule when includeDtstart is true
@@ -788,16 +773,13 @@ export class RRuleTemporal {
           occs.some((o) => Temporal.ZonedDateTime.compare(o, start) < 0) &&
           occs.some((o) => Temporal.ZonedDateTime.compare(o, start) === 0)
         ) {
-          monthCursor = monthCursor.add({ months: this.opts.interval! });
+          monthCursor = monthCursor.add({months: this.opts.interval!});
           continue outer_month;
         }
 
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (
-            this.opts.until &&
-            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-          ) {
+          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
             break outer_month;
           }
           if (iterator && !iterator(occ, matchCount)) {
@@ -809,14 +791,14 @@ export class RRuleTemporal {
             break outer_month;
           }
         }
-        monthCursor = monthCursor.add({ months: this.opts.interval! });
+        monthCursor = monthCursor.add({months: this.opts.interval!});
       }
 
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
     // --- 2) WEEKLY + BYDAY (or default to DTSTART’s weekday) ---
-    if (this.opts.freq === "WEEKLY") {
+    if (this.opts.freq === 'WEEKLY') {
       if (this.opts.byYearDay && this.opts.byYearDay.length > 0) {
         const start = this.originalDtstart;
 
@@ -831,7 +813,7 @@ export class RRuleTemporal {
           }
         }
 
-        let yearCursor = start.with({ month: 1, day: 1 });
+        let yearCursor = start.with({month: 1, day: 1});
         let matchCount = dates.length;
 
         outer_year_for_weekly: while (true) {
@@ -842,10 +824,7 @@ export class RRuleTemporal {
           const occs = this.generateYearlyOccurrences(yearCursor);
           for (const occ of occs) {
             if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-            if (
-              this.opts.until &&
-              Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-            ) {
+            if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
               break outer_year_for_weekly;
             }
             if (iterator && !iterator(occ, matchCount)) {
@@ -860,7 +839,7 @@ export class RRuleTemporal {
           if (this.opts.until && yearCursor.year > this.opts.until.year) {
             break;
           }
-          yearCursor = yearCursor.add({ years: 1 });
+          yearCursor = yearCursor.add({years: 1});
         }
 
         return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -891,7 +870,7 @@ export class RRuleTemporal {
       // If no BYDAY, default to DTSTART’s weekday token
       const tokens = this.opts.byDay
         ? [...this.opts.byDay]
-        : (this.opts.byMonthDay && this.opts.byMonthDay.length > 0)
+        : this.opts.byMonthDay && this.opts.byMonthDay.length > 0
           ? Object.keys(dayMap)
           : [Object.entries(dayMap).find(([, d]) => d === start.dayOfWeek)![0]];
       const dows = tokens
@@ -902,18 +881,16 @@ export class RRuleTemporal {
       // Find the very first weekCursor: the earliest of this week’s matching days ≥ start
       const firstWeekDates = dows.map((dw) => {
         const delta = (dw - start.dayOfWeek + 7) % 7;
-        return start.add({ days: delta });
+        return start.add({days: delta});
       });
-      let firstOccurrence = firstWeekDates.reduce((a, b) =>
-        Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b
-      );
+      let firstOccurrence = firstWeekDates.reduce((a, b) => (Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b));
 
       // Get the week start day (default to Monday if not specified)
       const wkstDay = dayMap[this.opts.wkst || 'MO'] ?? 1;
 
       // Align weekCursor to the week start that contains the first occurrence
       const firstOccWeekOffset = (firstOccurrence.dayOfWeek - wkstDay + 7) % 7;
-      let weekCursor = firstOccurrence.subtract({ days: firstOccWeekOffset });
+      let weekCursor = firstOccurrence.subtract({days: firstOccWeekOffset});
       let matchCount = 0;
 
       outer_week: while (true) {
@@ -925,7 +902,7 @@ export class RRuleTemporal {
         let occs = dows
           .flatMap((dw) => {
             const delta = (dw - wkstDay + 7) % 7;
-            const sameDate = weekCursor.add({ days: delta });
+            const sameDate = weekCursor.add({days: delta});
             return this.expandByTime(sameDate);
           })
           .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
@@ -934,10 +911,7 @@ export class RRuleTemporal {
 
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (
-            this.opts.until &&
-            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-          ) {
+          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
             break outer_week;
           }
           if (!this.matchesByMonth(occ)) {
@@ -956,7 +930,7 @@ export class RRuleTemporal {
           }
         }
 
-        weekCursor = weekCursor.add({ weeks: this.opts.interval! });
+        weekCursor = weekCursor.add({weeks: this.opts.interval!});
       }
 
       return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -964,7 +938,7 @@ export class RRuleTemporal {
 
     // --- 3) MONTHLY + BYMONTH (without BYDAY/BYMONTHDAY) ---
     if (
-      this.opts.freq === "MONTHLY" &&
+      this.opts.freq === 'MONTHLY' &&
       this.opts.byMonth &&
       !this.opts.byDay &&
       !this.opts.byMonthDay &&
@@ -988,7 +962,7 @@ export class RRuleTemporal {
       let matchCount = dates.length; // Account for dtstart already added in non-strict mode
 
       // Find the first month >= dtstart.month
-      let startMonthIndex = months.findIndex(m => m >= start.month);
+      let startMonthIndex = months.findIndex((m) => m >= start.month);
       if (startMonthIndex === -1) {
         // All months are before dtstart.month, start from first month of next year
         startMonthIndex = 0;
@@ -1006,13 +980,10 @@ export class RRuleTemporal {
 
         const candidate = start.with({
           year: start.year + yearsToAdd,
-          month: targetMonth
+          month: targetMonth,
         });
 
-        if (
-          this.opts.until &&
-          Temporal.ZonedDateTime.compare(candidate, this.opts.until) > 0
-        ) {
+        if (this.opts.until && Temporal.ZonedDateTime.compare(candidate, this.opts.until) > 0) {
           break;
         }
 
@@ -1035,7 +1006,7 @@ export class RRuleTemporal {
 
     // --- 4) YEARLY + BYMONTH (all specified months per year) ---
     if (
-      this.opts.freq === "YEARLY" &&
+      this.opts.freq === 'YEARLY' &&
       this.opts.byMonth &&
       !this.opts.byDay &&
       !this.opts.byMonthDay &&
@@ -1066,16 +1037,13 @@ export class RRuleTemporal {
         const year = start.year + yearOffset * this.opts.interval!;
 
         for (const month of months) {
-          let occ = start.with({ year, month });
+          let occ = start.with({year, month});
           occ = this.applyTimeOverride(occ);
 
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) {
             continue;
           }
-          if (
-            this.opts.until &&
-            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-          ) {
+          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
             return dates;
           }
           if (iterator && !iterator(occ, matchCount)) {
@@ -1095,10 +1063,7 @@ export class RRuleTemporal {
     }
 
     // --- 5) YEARLY + BYDAY/BYMONTHDAY ---
-    if (
-      this.opts.freq === "YEARLY" &&
-      (this.opts.byDay || this.opts.byMonthDay)
-    ) {
+    if (this.opts.freq === 'YEARLY' && (this.opts.byDay || this.opts.byMonthDay)) {
       const start = this.originalDtstart;
 
       // Include dtstart even if it doesn't match the rule when includeDtstart is true
@@ -1112,7 +1077,7 @@ export class RRuleTemporal {
         }
       }
 
-      let yearCursor = start.with({ month: 1, day: 1 });
+      let yearCursor = start.with({month: 1, day: 1});
       let matchCount = 0;
 
       outer_year: while (true) {
@@ -1123,10 +1088,7 @@ export class RRuleTemporal {
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (
-            this.opts.until &&
-            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-          ) {
+          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
             break outer_year;
           }
           if (iterator && !iterator(occ, matchCount)) {
@@ -1138,17 +1100,14 @@ export class RRuleTemporal {
             break outer_year;
           }
         }
-        yearCursor = yearCursor.add({ years: this.opts.interval! });
+        yearCursor = yearCursor.add({years: this.opts.interval!});
       }
 
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
     // --- 6) YEARLY + BYYEARDAY/BYWEEKNO ---
-    if (
-      this.opts.freq === "YEARLY" &&
-      (this.opts.byYearDay || this.opts.byWeekNo)
-    ) {
+    if (this.opts.freq === 'YEARLY' && (this.opts.byYearDay || this.opts.byWeekNo)) {
       const start = this.originalDtstart;
 
       // Include dtstart even if it doesn't match the rule when includeDtstart is true
@@ -1162,7 +1121,7 @@ export class RRuleTemporal {
         }
       }
 
-      let yearCursor = start.with({ month: 1, day: 1 });
+      let yearCursor = start.with({month: 1, day: 1});
       let matchCount = 0;
 
       outer_year2: while (true) {
@@ -1173,10 +1132,7 @@ export class RRuleTemporal {
         const occs = this.generateYearlyOccurrences(yearCursor);
         for (const occ of occs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (
-            this.opts.until &&
-            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-          ) {
+          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
             break outer_year2;
           }
           if (iterator && !iterator(occ, matchCount)) {
@@ -1188,7 +1144,7 @@ export class RRuleTemporal {
             break outer_year2;
           }
         }
-        yearCursor = yearCursor.add({ years: this.opts.interval! });
+        yearCursor = yearCursor.add({years: this.opts.interval!});
       }
 
       return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1196,7 +1152,7 @@ export class RRuleTemporal {
 
     // --- 6a) MONTHLY + BYYEARDAY (special case) ---
     if (
-      this.opts.freq === "MONTHLY" &&
+      this.opts.freq === 'MONTHLY' &&
       this.opts.byYearDay &&
       this.opts.byYearDay.length > 0 &&
       !this.opts.byDay &&
@@ -1230,18 +1186,18 @@ export class RRuleTemporal {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
 
-        const yearStart = start.with({ year, month: 1, day: 1 });
-        const lastDayOfYear = yearStart.with({ month: 12, day: 31 }).dayOfYear;
+        const yearStart = start.with({year, month: 1, day: 1});
+        const lastDayOfYear = yearStart.with({month: 12, day: 31}).dayOfYear;
 
         for (const yd of yearDays) {
           const dayNum = yd > 0 ? yd : lastDayOfYear + yd + 1;
           if (dayNum <= 0 || dayNum > lastDayOfYear) continue;
 
-          const baseOcc = yearStart.add({ days: dayNum - 1 });
+          const baseOcc = yearStart.add({days: dayNum - 1});
 
           for (const occ of this.expandByTime(baseOcc)) {
             if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-            if (dates.some(d => Temporal.ZonedDateTime.compare(d, occ) === 0)) continue;
+            if (dates.some((d) => Temporal.ZonedDateTime.compare(d, occ) === 0)) continue;
 
             const occMonthAbs = occ.year * 12 + occ.month;
             if ((occMonthAbs - startMonthAbs) % interval !== 0) {
@@ -1285,7 +1241,7 @@ export class RRuleTemporal {
 
     // --- 7) fallback: step + filter ---
     // Handle DAILY frequency with BYSETPOS - need to group occurrences by day
-    if (this.opts.freq === "DAILY" && this.opts.bySetPos) {
+    if (this.opts.freq === 'DAILY' && this.opts.bySetPos) {
       let start = this.originalDtstart;
       let matchCount = 0;
 
@@ -1301,7 +1257,7 @@ export class RRuleTemporal {
         }
       }
 
-      let dayCursor = start.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
+      let dayCursor = start.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
 
       outer_daily: while (true) {
         if (++iterationCount > this.maxIterations) {
@@ -1310,15 +1266,12 @@ export class RRuleTemporal {
 
         // Generate all occurrences for this day
         let dayOccs = this.expandByTime(dayCursor);
-        dayOccs = dayOccs.filter(occ => this.matchesAll(occ));
+        dayOccs = dayOccs.filter((occ) => this.matchesAll(occ));
         dayOccs = this.applyBySetPos(dayOccs);
 
         for (const occ of dayOccs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (
-            this.opts.until &&
-            Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0
-          ) {
+          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
             break outer_daily;
           }
           if (iterator && !iterator(occ, matchCount)) {
@@ -1330,7 +1283,7 @@ export class RRuleTemporal {
             break outer_daily;
           }
         }
-        dayCursor = dayCursor.add({ days: this.opts.interval! });
+        dayCursor = dayCursor.add({days: this.opts.interval!});
       }
     } else {
       let current = this.computeFirst();
@@ -1354,10 +1307,7 @@ export class RRuleTemporal {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
 
-        if (
-          this.opts.until &&
-          Temporal.ZonedDateTime.compare(current, this.opts.until) > 0
-        ) {
+        if (this.opts.until && Temporal.ZonedDateTime.compare(current, this.opts.until) > 0) {
           break;
         }
         if (this.matchesAll(current)) {
@@ -1391,10 +1341,7 @@ export class RRuleTemporal {
     // Deduplicate
     const dedup: Temporal.ZonedDateTime[] = [];
     for (const d of dates) {
-      if (
-        dedup.length === 0 ||
-        Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0
-      ) {
+      if (dedup.length === 0 || Temporal.ZonedDateTime.compare(d, dedup[dedup.length - 1]!) !== 0) {
         dedup.push(d);
       }
     }
@@ -1409,10 +1356,8 @@ export class RRuleTemporal {
   private excludeExDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
     if (!this.opts.exDate || this.opts.exDate.length === 0) return dates;
 
-    return dates.filter(date => {
-      return !this.opts.exDate!.some(exDate =>
-        Temporal.ZonedDateTime.compare(date, exDate) === 0
-      );
+    return dates.filter((date) => {
+      return !this.opts.exDate!.some((exDate) => Temporal.ZonedDateTime.compare(date, exDate) === 0);
     });
   }
 
@@ -1424,7 +1369,7 @@ export class RRuleTemporal {
    */
   private applyCountLimitAndMergeRDates(
     dates: Temporal.ZonedDateTime[],
-    iterator?: (date: Temporal.ZonedDateTime, count: number) => boolean
+    iterator?: (date: Temporal.ZonedDateTime, count: number) => boolean,
   ): Temporal.ZonedDateTime[] {
     const merged = this.mergeAndDeduplicateRDates(dates);
     const excluded = this.excludeExDates(merged);
@@ -1475,20 +1420,14 @@ export class RRuleTemporal {
   between(
     after: Date | Temporal.ZonedDateTime,
     before: Date | Temporal.ZonedDateTime,
-    inc = false
+    inc = false,
   ): Temporal.ZonedDateTime[] {
-    const startInst =
-      after instanceof Date
-        ? Temporal.Instant.from(after.toISOString())
-        : after.toInstant();
-    const endInst =
-      before instanceof Date
-        ? Temporal.Instant.from(before.toISOString())
-        : before.toInstant();
+    const startInst = after instanceof Date ? Temporal.Instant.from(after.toISOString()) : after.toInstant();
+    const endInst = before instanceof Date ? Temporal.Instant.from(before.toISOString()) : before.toInstant();
 
     const beforeZdt = Temporal.Instant.from(endInst).toZonedDateTimeISO(this.tzid);
 
-    const tempOpts = { ...this.opts };
+    const tempOpts = {...this.opts};
 
     if (!tempOpts.until || Temporal.ZonedDateTime.compare(beforeZdt, tempOpts.until) < 0) {
       tempOpts.until = beforeZdt;
@@ -1500,7 +1439,7 @@ export class RRuleTemporal {
     const tempRule = new RRuleTemporal(tempOpts);
     const allDates = tempRule.all();
 
-    return allDates.filter(date => {
+    return allDates.filter((date) => {
       const inst = date.toInstant();
       const afterStart = inc
         ? Temporal.Instant.compare(inst, startInst) >= 0
@@ -1521,17 +1460,12 @@ export class RRuleTemporal {
    * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
    */
   next(after: Date | Temporal.ZonedDateTime = new Date(), inc = false): Temporal.ZonedDateTime | null {
-    const afterInst =
-      after instanceof Date
-        ? Temporal.Instant.from(after.toISOString())
-        : after.toInstant();
+    const afterInst = after instanceof Date ? Temporal.Instant.from(after.toISOString()) : after.toInstant();
 
     let result: Temporal.ZonedDateTime | null = null;
     this.all((occ) => {
       const inst = occ.toInstant();
-      const ok = inc
-        ? Temporal.Instant.compare(inst, afterInst) >= 0
-        : Temporal.Instant.compare(inst, afterInst) > 0;
+      const ok = inc ? Temporal.Instant.compare(inst, afterInst) >= 0 : Temporal.Instant.compare(inst, afterInst) > 0;
       if (ok) {
         result = occ;
         return false;
@@ -1549,10 +1483,7 @@ export class RRuleTemporal {
    * @returns The previous occurrence of the rule before the specified date or null if no occurrences are found.
    */
   previous(before: Date | Temporal.ZonedDateTime = new Date(), inc = false): Temporal.ZonedDateTime | null {
-    const beforeInst =
-      before instanceof Date
-        ? Temporal.Instant.from(before.toISOString())
-        : before.toInstant();
+    const beforeInst = before instanceof Date ? Temporal.Instant.from(before.toISOString()) : before.toInstant();
 
     let prev: Temporal.ZonedDateTime | null = null;
     this.all((occ) => {
@@ -1569,9 +1500,7 @@ export class RRuleTemporal {
   }
 
   toString(): string {
-    const iso = this.originalDtstart
-      .toString({ smallestUnit: "second" })
-      .replace(/[-:]/g, "");
+    const iso = this.originalDtstart.toString({smallestUnit: 'second'}).replace(/[-:]/g, '');
     const dtLine = `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
     const rule: string[] = [];
     const {
@@ -1590,39 +1519,39 @@ export class RRuleTemporal {
       byYearDay,
       wkst,
       rDate,
-      exDate
+      exDate,
     } = this.opts;
 
     rule.push(`FREQ=${freq}`);
     if (interval !== 1) rule.push(`INTERVAL=${interval}`);
     if (count !== undefined) rule.push(`COUNT=${count}`);
     if (until) {
-      const u = until.toInstant().toString().replace(/[-:]/g, "");
+      const u = until.toInstant().toString().replace(/[-:]/g, '');
       rule.push(`UNTIL=${u.slice(0, 15)}Z`);
     }
-    if (byHour) rule.push(`BYHOUR=${byHour.join(",")}`);
-    if (byMinute) rule.push(`BYMINUTE=${byMinute.join(",")}`);
-    if (bySecond) rule.push(`BYSECOND=${bySecond.join(",")}`);
-    if (byDay) rule.push(`BYDAY=${byDay.join(",")}`);
-    if (byMonth) rule.push(`BYMONTH=${byMonth.join(",")}`);
-    if (byMonthDay) rule.push(`BYMONTHDAY=${byMonthDay.join(",")}`);
-    if (bySetPos) rule.push(`BYSETPOS=${bySetPos.join(",")}`);
-    if (byWeekNo) rule.push(`BYWEEKNO=${byWeekNo.join(",")}`);
-    if (byYearDay) rule.push(`BYYEARDAY=${byYearDay.join(",")}`);
+    if (byHour) rule.push(`BYHOUR=${byHour.join(',')}`);
+    if (byMinute) rule.push(`BYMINUTE=${byMinute.join(',')}`);
+    if (bySecond) rule.push(`BYSECOND=${bySecond.join(',')}`);
+    if (byDay) rule.push(`BYDAY=${byDay.join(',')}`);
+    if (byMonth) rule.push(`BYMONTH=${byMonth.join(',')}`);
+    if (byMonthDay) rule.push(`BYMONTHDAY=${byMonthDay.join(',')}`);
+    if (bySetPos) rule.push(`BYSETPOS=${bySetPos.join(',')}`);
+    if (byWeekNo) rule.push(`BYWEEKNO=${byWeekNo.join(',')}`);
+    if (byYearDay) rule.push(`BYYEARDAY=${byYearDay.join(',')}`);
     if (wkst) rule.push(`WKST=${wkst}`);
 
-    const lines = [dtLine, `RRULE:${rule.join(";")}`];
-    if(rDate){
+    const lines = [dtLine, `RRULE:${rule.join(';')}`];
+    if (rDate) {
       lines.push(`RDATE:${this.joinDates(rDate)}`);
     }
-    if(exDate){
+    if (exDate) {
       lines.push(`EXDATE:${this.joinDates(exDate)}`);
     }
-    return lines.join("\n");
+    return lines.join('\n');
   }
 
-  private joinDates(dates:Temporal.ZonedDateTime[]){
-    return dates.map(d => d.toInstant().toString().replace(/[-:]/g, "").slice(0,15)+'Z');
+  private joinDates(dates: Temporal.ZonedDateTime[]) {
+    return dates.map((d) => d.toInstant().toString().replace(/[-:]/g, '').slice(0, 15) + 'Z');
   }
 
   /**
@@ -1630,22 +1559,17 @@ export class RRuleTemporal {
    * matching your opts.byDay and opts.byMonth (or the single "same day" if no BYDAY).
    */
   private generateMonthlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
-    const { byDay, byMonth, byMonthDay } = this.opts;
+    const {byDay, byMonth, byMonthDay} = this.opts;
 
     // 1) Skip whole month if BYMONTH says so
     if (byMonth && !byMonth.includes(sample.month)) return [];
 
-    const lastDay = sample
-      .with({ day: 1 })
-      .add({ months: 1 })
-      .subtract({ days: 1 }).day;
+    const lastDay = sample.with({day: 1}).add({months: 1}).subtract({days: 1}).day;
 
     // days matched by BYMONTHDAY tokens
     let byMonthDayHits: number[] = [];
     if (byMonthDay && byMonthDay.length > 0) {
-      byMonthDayHits = byMonthDay
-        .map((d) => (d > 0 ? d : lastDay + d + 1))
-        .filter((d) => d >= 1 && d <= lastDay);
+      byMonthDayHits = byMonthDay.map((d) => (d > 0 ? d : lastDay + d + 1)).filter((d) => d >= 1 && d <= lastDay);
     }
 
     if (!byDay && byMonthDay && byMonthDay.length > 0) {
@@ -1653,10 +1577,8 @@ export class RRuleTemporal {
         // No valid days found for this month, return empty array
         return [];
       }
-      const dates = byMonthDayHits.map((d) => sample.with({ day: d }));
-      let expanded = dates
-        .flatMap((z) => this.expandByTime(z))
-        .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+      const dates = byMonthDayHits.map((d) => sample.with({day: d}));
+      let expanded = dates.flatMap((z) => this.expandByTime(z)).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
       return expanded;
     }
 
@@ -1675,27 +1597,27 @@ export class RRuleTemporal {
       SU: 7,
     };
 
-    type Token = { ord: number; wd: number };
+    type Token = {ord: number; wd: number};
     const tokens: Token[] = byDay
       .map((tok) => {
         const m = tok.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
         if (!m) return null;
-        return { ord: m[1] ? parseInt(m[1], 10) : 0, wd: dayMap[m[2]!] };
+        return {ord: m[1] ? parseInt(m[1], 10) : 0, wd: dayMap[m[2]!]};
       })
       .filter((x): x is Token => x !== null);
 
     // Bucket every weekday in this month
     const buckets: Record<number, number[]> = {};
-    let cursor = sample.with({ day: 1 });
+    let cursor = sample.with({day: 1});
     while (cursor.month === sample.month) {
       const dow = cursor.dayOfWeek;
       (buckets[dow] ||= []).push(cursor.day);
-      cursor = cursor.add({ days: 1 });
+      cursor = cursor.add({days: 1});
     }
 
     // Resolve tokens → concrete days from BYDAY
     const byDayHits: number[] = [];
-    for (const { ord, wd } of tokens) {
+    for (const {ord, wd} of tokens) {
       const list = buckets[wd] ?? [];
       if (!list.length) continue;
 
@@ -1718,10 +1640,8 @@ export class RRuleTemporal {
       finalDays = finalDays.filter((d) => byMonthDayHits.includes(d));
     }
 
-    const hits = finalDays.map((d) => sample.with({ day: d }));
-    let expanded = hits
-      .flatMap((z) => this.expandByTime(z))
-      .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+    const hits = finalDays.map((d) => sample.with({day: d}));
+    let expanded = hits.flatMap((z) => this.expandByTime(z)).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
     return expanded;
   }
 
@@ -1739,7 +1659,7 @@ export class RRuleTemporal {
 
     let occs: Temporal.ZonedDateTime[] = [];
 
-    const hasOrdinalByDay = this.opts.byDay && this.opts.byDay.some(t => /^[+-]?\d/.test(t));
+    const hasOrdinalByDay = this.opts.byDay && this.opts.byDay.some((t) => /^[+-]?\d/.test(t));
     if (hasOrdinalByDay && !this.opts.byMonth) {
       // nth weekday of year
       const dayMap: Record<string, number> = {
@@ -1758,31 +1678,29 @@ export class RRuleTemporal {
         const wd = dayMap[m[2] as keyof typeof dayMap]!;
         let dt: Temporal.ZonedDateTime;
         if (ord > 0) {
-          const jan1 = sample.with({ month: 1, day: 1 });
+          const jan1 = sample.with({month: 1, day: 1});
           const delta = (wd - jan1.dayOfWeek + 7) % 7;
-          dt = jan1.add({ days: delta + 7 * (ord - 1) });
+          dt = jan1.add({days: delta + 7 * (ord - 1)});
         } else {
-          const dec31 = sample.with({ month: 12, day: 31 });
+          const dec31 = sample.with({month: 12, day: 31});
           const delta = (dec31.dayOfWeek - wd + 7) % 7;
-          dt = dec31.subtract({ days: delta + 7 * (-ord - 1) });
+          dt = dec31.subtract({days: delta + 7 * (-ord - 1)});
         }
         // byMonth is already checked to be falsy in the outer condition
         occs.push(...this.expandByTime(dt));
       }
     } else if (!this.opts.byYearDay && !this.opts.byWeekNo) {
       occs = months.flatMap((m) => {
-        const monthSample = sample.with({ month: m, day: 1 });
+        const monthSample = sample.with({month: m, day: 1});
         return this.generateMonthlyOccurrences(monthSample);
       });
     }
 
     if (this.opts.byYearDay) {
-      const last = sample.with({ month: 12, day: 31 }).dayOfYear;
+      const last = sample.with({month: 12, day: 31}).dayOfYear;
       for (const d of this.opts.byYearDay) {
         const dayNum = d > 0 ? d : last + d + 1;
-        const dt = sample
-          .with({ month: 1, day: 1 })
-          .add({ days: dayNum - 1 });
+        const dt = sample.with({month: 1, day: 1}).add({days: dayNum - 1});
         if (!this.opts.byMonth || this.opts.byMonth!.includes(dt.month)) {
           occs.push(...this.expandByTime(dt));
         }
@@ -1799,27 +1717,24 @@ export class RRuleTemporal {
         SA: 6,
         SU: 7,
       };
-      const wkst = dayMap[(this.opts.wkst || "MO") as keyof typeof dayMap]!;
-      const jan1 = sample.with({ month: 1, day: 1 });
+      const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
+      const jan1 = sample.with({month: 1, day: 1});
       const delta = (jan1.dayOfWeek - wkst + 7) % 7;
-      const firstWeekStart = jan1.subtract({ days: delta });
-      const lastWeekDiff = sample
-        .with({ month: 12, day: 31 })
-        .toPlainDate()
-        .since(firstWeekStart.toPlainDate()).days;
+      const firstWeekStart = jan1.subtract({days: delta});
+      const lastWeekDiff = sample.with({month: 12, day: 31}).toPlainDate().since(firstWeekStart.toPlainDate()).days;
       const lastWeek = Math.floor(lastWeekDiff / 7) + 1;
 
       const tokens = this.opts.byDay?.length
         ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
-        : [this.opts.wkst || "MO"];
+        : [this.opts.wkst || 'MO'];
 
       for (const weekNo of this.opts.byWeekNo) {
         const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
-        const weekStart = firstWeekStart.add({ weeks: weekIndex });
+        const weekStart = firstWeekStart.add({weeks: weekIndex});
         for (const tok of tokens) {
           if (!tok) continue;
           const targetDow = dayMap[tok as keyof typeof dayMap]!;
-          const inst = weekStart.add({ days: (targetDow - wkst + 7) % 7 });
+          const inst = weekStart.add({days: (targetDow - wkst + 7) % 7});
           if (!this.opts.byMonth || this.opts.byMonth!.includes(inst.month)) {
             occs.push(...this.expandByTime(inst));
           }
@@ -1833,7 +1748,7 @@ export class RRuleTemporal {
   }
 
   private applyBySetPos(list: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
-    const { bySetPos } = this.opts;
+    const {bySetPos} = this.opts;
     if (!bySetPos || !bySetPos.length) return list;
     const sorted = [...list].sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
     const out: Temporal.ZonedDateTime[] = [];
