@@ -705,22 +705,58 @@ export class RRuleTemporal {
     return byYearDay.some((d) => (d > 0 ? dayOfYear === d : dayOfYear === last + d + 1));
   }
 
+  private getIsoWeekInfo(zdt: Temporal.ZonedDateTime): { week: number, year: number } {
+    // Using ISO 8601 week date system. Week starts on Monday.
+    // The week year is the year of the Thursday of that week.
+    const thursday = zdt.add({ days: 4 - zdt.dayOfWeek });
+    const year = thursday.year;
+
+    // The first Thursday of the year.
+    const firstThursday = thursday.with({ month: 1, day: 1 }).add({ days: (4 - thursday.with({ month: 1, day: 1 }).dayOfWeek + 7) % 7 });
+
+    const diffDays = thursday.toPlainDate().since(firstThursday.toPlainDate()).days;
+    const week = Math.floor(diffDays / 7) + 1;
+    return { week, year };
+  }
+
   private matchesByWeekNo(zdt: Temporal.ZonedDateTime): boolean {
     const { byWeekNo, wkst } = this.opts;
     if (!byWeekNo) return true;
-    const dayMap: Record<string, number> = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7 };
-    const startDow = dayMap[(wkst ?? "MO") as keyof typeof dayMap]!;
-    const jan1 = zdt.with({ month: 1, day: 1 });
-    const delta = (jan1.dayOfWeek - startDow + 7) % 7;
-    const firstWeekStart = jan1.subtract({ days: delta });
-    const diffDays = zdt.toPlainDate().since(firstWeekStart.toPlainDate()).days;
-    const week = Math.floor(diffDays / 7) + 1;
-    const lastWeekDiff = zdt
-      .with({ month: 12, day: 31 })
-      .toPlainDate()
-      .since(firstWeekStart.toPlainDate()).days;
-    const lastWeek = Math.floor(lastWeekDiff / 7) + 1;
-    return byWeekNo.some((n) => (n > 0 ? week === n : week === lastWeek + n + 1));
+
+    if (wkst && wkst !== 'MO') {
+      // The original implementation might be correct for non-ISO weeks.
+      // This logic is specifically for ISO 8601 weeks (starting on Monday).
+      const dayMap: Record<string, number> = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7 };
+      const startDow = dayMap[(wkst ?? "MO") as keyof typeof dayMap]!;
+      const jan1 = zdt.with({ month: 1, day: 1 });
+      const delta = (jan1.dayOfWeek - startDow + 7) % 7;
+      const firstWeekStart = jan1.subtract({ days: delta });
+      const diffDays = zdt.toPlainDate().since(firstWeekStart.toPlainDate()).days;
+      const week = Math.floor(diffDays / 7) + 1;
+      const lastWeekDiff = zdt
+        .with({ month: 12, day: 31 })
+        .toPlainDate()
+        .since(firstWeekStart.toPlainDate()).days;
+      const lastWeek = Math.floor(lastWeekDiff / 7) + 1;
+      return byWeekNo.some((n) => (n > 0 ? week === n : week === lastWeek + n + 1));
+    }
+
+    const { week, year } = this.getIsoWeekInfo(zdt);
+
+    const jan1 = zdt.with({ year, month: 1, day: 1 });
+    const dec31 = zdt.with({ year, month: 12, day: 31 });
+    let lastWeek = 52;
+    if (jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4) {
+        lastWeek = 53;
+    }
+
+    return byWeekNo.some(wn => {
+      if (wn > 0) {
+        return week === wn;
+      } else {
+        return week === lastWeek + wn + 1;
+      }
+    });
   }
 
   options() {
