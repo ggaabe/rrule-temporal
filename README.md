@@ -135,6 +135,7 @@ toText(weekly);
 // "every week on Sunday at 10 AM UTC"
 toText(weekly, "es");
 // "cada semana en domingo a las 10 AM UTC"
+```
 
 `toText()` currently ships translations for **English (`en`)**, 
 **Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
