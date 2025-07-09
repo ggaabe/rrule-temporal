@@ -102,7 +102,7 @@ const next = rule.next();
 const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 ```
 
-## Converting back to text
+## Converting to human-readable text
 
 The `toText` helper converts a rule into a human readable description.
 
