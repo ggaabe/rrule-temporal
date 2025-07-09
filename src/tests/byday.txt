@@ -1,0 +1,118 @@
+The BYDAY rule part specifies a COMMA-separated list of days of
+the week; SU indicates Sunday; MO indicates Monday; TU indicates
+Tuesday; WE indicates Wednesday; TH indicates Thursday; FR
+indicates Friday; and SA indicates Saturday.
+
+Each BYDAY value can also be preceded by a positive (+n) or
+negative (-n) integer.  If present, this indicates the nth
+occurrence of a specific day within the MONTHLY or YEARLY "RRULE".
+
+
+For example, within a MONTHLY rule, +1MO (or simply 1MO)
+represents the first Monday within the month, whereas -1MO
+represents the last Monday of the month.  The numeric value in a
+BYDAY rule part with the FREQ rule part set to YEARLY corresponds
+to an offset within the month when the BYMONTH rule part is
+present, and corresponds to an offset within the year when the
+BYWEEKNO or BYMONTH rule parts are present.  If an integer
+modifier is not present, it means all days of this type within the
+specified frequency.  For example, within a MONTHLY rule, MO
+represents all Mondays within the month.  The BYDAY rule part MUST
+NOT be specified with a numeric value when the FREQ rule part is
+not set to MONTHLY or YEARLY.  Furthermore, the BYDAY rule part
+MUST NOT be specified with a numeric value with the FREQ rule part
+set to YEARLY when the BYWEEKNO rule part is specified.
+
+BYxxx rule parts modify the recurrence in some manner.  BYxxx rule
+parts for a period of time that is the same or greater than the
+frequency generally reduce or limit the number of occurrences of
+the recurrence generated.  For example, "FREQ=DAILY;BYMONTH=1"
+reduces the number of recurrence instances from all days (if
+BYMONTH rule part is not present) to all days in January.  BYxxx
+rule parts for a period of time less than the frequency generally
+increase or expand the number of occurrences of the recurrence.
+For example, "FREQ=YEARLY;BYMONTH=1,2" increases the number of
+days within the yearly recurrence set from 1 (if BYMONTH rule part
+is not present) to 2.
+
+If multiple BYxxx rule parts are specified, then after evaluating
+the specified FREQ and INTERVAL rule parts, the BYxxx rule parts
+are applied to the current set of evaluated occurrences in the
+following order: BYMONTH, BYWEEKNO, BYYEARDAY, BYMONTHDAY, BYDAY,
+BYHOUR, BYMINUTE, BYSECOND and BYSETPOS; then COUNT and UNTIL are
+evaluated.
+
+BYDAY has some special behavior depending on the FREQ value and
+this is described in separate notes below the table.
+
++----------+--------+--------+-------+-------+------+-------+------+
+|          |SECONDLY|MINUTELY|HOURLY |DAILY  |WEEKLY|MONTHLY|YEARLY|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYMONTH   |Limit   |Limit   |Limit  |Limit  |Limit |Limit  |Expand|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYWEEKNO  |N/A     |N/A     |N/A    |N/A    |N/A   |N/A    |Expand|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYYEARDAY |Limit   |Limit   |Limit  |N/A    |N/A   |N/A    |Expand|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYMONTHDAY|Limit   |Limit   |Limit  |Limit  |N/A   |Expand |Expand|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYDAY     |Limit   |Limit   |Limit  |Limit  |Expand|Note 1 |Note 2|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYHOUR    |Limit   |Limit   |Limit  |Expand |Expand|Expand |Expand|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYMINUTE  |Limit   |Limit   |Expand |Expand |Expand|Expand |Expand|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYSECOND  |Limit   |Expand  |Expand |Expand |Expand|Expand |Expand|
++----------+--------+--------+-------+-------+------+-------+------+
+|BYSETPOS  |Limit   |Limit   |Limit  |Limit  |Limit |Limit  |Limit |
++----------+--------+--------+-------+-------+------+-------+------+
+
+BYDAY has some special behavior depending on the FREQ value
+equals to MONTHLY and YEARLY.
+
+For MONTHLY, the days should limit if BYMONTHDAY is present;
+otherwise, special expand for MONTHLY.
+
+For YEARLY, limit if BYYEARDAY or BYMONTHDAY is present; otherwise,
+special expand for WEEKLY if BYWEEKNO present; otherwise,
+special expand for MONTHLY if BYMONTH present; otherwise,
+special expand for YEARLY.
+
+Here is an example of evaluating multiple BYxxx rule parts.
+
+DTSTART;TZID=America/New_York:19970105T083000
+RRULE:FREQ=YEARLY;INTERVAL=2;BYMONTH=1;BYDAY=SU;BYHOUR=8,9;
+BYMINUTE=30
+
+First, the "INTERVAL=2" would be applied to "FREQ=YEARLY" to
+arrive at "every other year".  Then, "BYMONTH=1" would be applied
+to arrive at "every January, every other year".  Then, "BYDAY=SU"
+would be applied to arrive at "every Sunday in January, every
+other year".  Then, "BYHOUR=8,9" would be applied to arrive at
+"every Sunday in January at 8 AM and 9 AM, every other year".
+Then, "BYMINUTE=30" would be applied to arrive at "every Sunday in
+January at 8:30 AM and 9:30 AM, every other year".  Then, lacking
+information from "RRULE", the second is derived from "DTSTART", to
+end up in "every Sunday in January at 8:30:00 AM and 9:30:00 AM,
+every other year".  Similarly, if the BYMINUTE, BYHOUR, BYDAY,
+BYMONTHDAY, or BYMONTH rule part were missing, the appropriate
+minute, hour, day, or month would have been retrieved from the
+"DTSTART" property.
+
+The BYSETPOS rule part specifies a COMMA-separated list of values
+that corresponds to the nth occurrence within the set of
+recurrence instances specified by the rule.  BYSETPOS operates on
+a set of recurrence instances in one interval of the recurrence
+rule.  For example, in a WEEKLY rule, the interval would be one
+week A set of recurrence instances starts at the beginning of the
+interval defined by the FREQ rule part.  Valid values are 1 to 366
+or -366 to -1.  It MUST only be used in conjunction with another
+BYxxx rule part.  For example "the last work day of the month"
+could be represented as:
+
+FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1
+
+Each BYSETPOS value can include a positive (+n) or negative (-n)
+integer.  If present, this indicates the nth occurrence of the
+specific occurrence within the set of occurrences specified by the
+rule.

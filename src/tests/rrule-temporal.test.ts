@@ -1085,7 +1085,7 @@ describe('RRuleTemporal - Safety Limits', () => {
 
     expect(() => {
       rule.between(after.toPlainDate().toZonedDateTime('UTC'), before.toPlainDate().toZonedDateTime('UTC'));
-    }).toThrow('Maximum iterations (100) exceeded in between()');
+    }).toThrow('Maximum iterations (100) exceeded in all()');
   });
 
   test('all() should work normally within safety limits', () => {
