@@ -25,14 +25,13 @@ type Freq =
 // Extended ManualOpts to include BYDAY and BYMONTH
 /**
  * Shared options for all rule constructors.
- *
- * @property tzid - Time zone identifier as defined in RFC&nbsp;5545 §3.2.19.
- * @property maxIterations - Safety cap when generating occurrences.
- * @property includeDtstart - Include DTSTART even if it does not match the rule.
  */
 interface BaseOpts {
+  /** Time zone identifier as defined in RFC&nbsp;5545 §3.2.19. */
   tzid?: string;
+  /** Safety cap when generating occurrences. */
   maxIterations?: number;
+  /** Include DTSTART as an occurrence even if it does not match the rule pattern. */
   includeDtstart?: boolean;
 }
 
