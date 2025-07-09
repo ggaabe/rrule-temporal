@@ -3,6 +3,9 @@ import {assertDates, zdt} from './helpers';
 
 // https://github.com/dateutil/dateutil/blob/master/tests/test_rrule.py
 // to verify https://recurrence-expansion-service.appspot.com/
+// tool to check dates https://www.timeanddate.com/worldclock/converter.html
+// to check week numbers https://www.epochconverter.com/weeknumbers
+
 describe('RRuleTemporal - Python compatibility tests 1', () => {
   describe('Yearly frequency tests', () => {
     it('testYearly', () => {

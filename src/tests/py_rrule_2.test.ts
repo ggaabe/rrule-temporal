@@ -564,7 +564,7 @@ describe('RRuleTemporal - Python compatibility tests 2', () => {
       assertDates({rule}, ['1997-12-28T00:00:00.000Z', '1997-12-28T01:00:00.000Z', '1997-12-28T02:00:00.000Z']);
     });
 
-    it.skip('testHourlyByWeekNoAndWeekDay53', () => {
+    it('testHourlyByWeekNoAndWeekDay53', () => {
       const rule = new RRuleTemporal({
         freq: 'HOURLY',
         count: 3,

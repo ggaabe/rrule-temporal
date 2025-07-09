@@ -468,12 +468,88 @@ export class RRuleTemporal {
   private computeFirst(): Temporal.ZonedDateTime {
     let zdt = this.originalDtstart;
 
+    // If BYWEEKNO is present with small frequencies, jump to the first matching week
+    if (this.opts.byWeekNo?.length && ["DAILY", "HOURLY", "MINUTELY", "SECONDLY"].includes(this.opts.freq)) {
+      let targetWeek = this.opts.byWeekNo[0]!;
+      let targetYear = zdt.year;
+
+      // Find the first year >= dtstart.year that has the target week
+      while (targetYear <= zdt.year + 10) { // reasonable upper bound
+        const jan1 = zdt.with({ year: targetYear, month: 1, day: 1 });
+        const dec31 = zdt.with({ year: targetYear, month: 12, day: 31 });
+
+        // Check if this year has the target week
+        let hasTargetWeek = false;
+        if (targetWeek > 0) {
+          let maxWeek = 52;
+          if (jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4) {
+            maxWeek = 53;
+          }
+          hasTargetWeek = targetWeek <= maxWeek;
+        } else {
+          // Negative week number
+          let maxWeek = 52;
+          if (jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4) {
+            maxWeek = 53;
+          }
+          hasTargetWeek = (-targetWeek) <= maxWeek;
+        }
+
+        if (hasTargetWeek) {
+          // Calculate the first day of the target week
+          const firstThursday = jan1.add({ days: (4 - jan1.dayOfWeek + 7) % 7 });
+          let weekStart: Temporal.ZonedDateTime;
+
+          if (targetWeek > 0) {
+            weekStart = firstThursday.subtract({ days: 3 }).add({ weeks: targetWeek - 1 });
+          } else {
+            const lastWeek = jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4 ? 53 : 52;
+            weekStart = firstThursday.subtract({ days: 3 }).add({ weeks: lastWeek + targetWeek });
+          }
+
+          // If we have BYDAY, find the specific day in that week
+          if (this.opts.byDay?.length) {
+            const dayMap: Record<string, number> = {
+              MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7,
+            };
+
+            const targetDays = this.opts.byDay
+              .map(tok => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+              .filter(Boolean)
+              .map(day => dayMap[day!]!)
+              .filter(Boolean);
+
+            if (targetDays.length) {
+              const candidates = targetDays.map(dayOfWeek => {
+                const delta = (dayOfWeek - weekStart.dayOfWeek + 7) % 7;
+                return weekStart.add({ days: delta });
+              });
+
+              const firstCandidate = candidates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b))[0];
+              if (firstCandidate && Temporal.ZonedDateTime.compare(firstCandidate, this.originalDtstart) >= 0) {
+                zdt = firstCandidate;
+                break;
+              }
+            }
+          } else {
+            // No BYDAY, use the start of the week
+            if (Temporal.ZonedDateTime.compare(weekStart, this.originalDtstart) >= 0) {
+              zdt = weekStart;
+              break;
+            }
+          }
+        }
+
+        targetYear++;
+      }
+    }
+
     // If BYDAY is present, advance zdt to the first matching weekday ≥ DTSTART.
     // When the frequency is smaller than a week (e.g. HOURLY or SECONDLY),
     // iterating one unit at a time until the desired weekday can be extremely
     // slow.  We instead jump directly to the next matching weekday whenever all
     // BYDAY tokens are simple two-letter codes (e.g. "MO").
-    if (this.opts.byDay?.length) {
+    if (this.opts.byDay?.length && !this.opts.byWeekNo) {
       const dayMap: Record<string, number> = {
         MO: 1,
         TU: 2,
@@ -506,8 +582,15 @@ export class RRuleTemporal {
       }
     }
 
-    // then your existing BYHOUR/BYMINUTE override logic:
+    // Apply time overrides based on frequency and BYHOUR/BYMINUTE/BYSECOND
     const { byHour, byMinute, bySecond } = this.opts;
+
+    // For HOURLY frequency without BYHOUR, start from 00:00 only if we jumped to a different date
+    if (this.opts.freq === "HOURLY" && !byHour &&
+        Temporal.ZonedDateTime.compare(zdt.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 }), this.originalDtstart) > 0) {
+      zdt = zdt.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
+    }
+
     if (byHour || byMinute || bySecond) {
       const candidates = this.expandByTime(zdt);
       for (const candidate of candidates) {
