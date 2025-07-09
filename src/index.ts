@@ -762,7 +762,8 @@ export class RRuleTemporal {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
 
-        const occs = this.generateMonthlyOccurrences(monthCursor);
+        let occs = this.generateMonthlyOccurrences(monthCursor);
+        occs = this.applyBySetPos(occs);
         // Skip this month entirely if **any** occurrence precedes DTSTART AND
         // DTSTART matches the rule (i.e., DTSTART is in the occurrences list).
         if (
@@ -1774,13 +1775,12 @@ export class RRuleTemporal {
       let expanded = dates
         .flatMap((z) => this.expandByTime(z))
         .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
-      expanded = this.applyBySetPos(expanded);
       return expanded;
     }
 
     if (!byDay) {
       const expanded = this.expandByTime(sample);
-      return this.applyBySetPos(expanded);
+      return expanded;
     }
 
     const dayMap: Record<string, number> = {
@@ -1840,7 +1840,6 @@ export class RRuleTemporal {
     let expanded = hits
       .flatMap((z) => this.expandByTime(z))
       .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
-    expanded = this.applyBySetPos(expanded);
     return expanded;
   }
 
