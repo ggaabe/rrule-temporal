@@ -1771,13 +1771,16 @@ export class RRuleTemporal {
         return [];
       }
       const dates = byMonthDayHits.map((d) => sample.with({ day: d }));
-      return dates
+      let expanded = dates
         .flatMap((z) => this.expandByTime(z))
         .sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+      expanded = this.applyBySetPos(expanded);
+      return expanded;
     }
 
     if (!byDay) {
-      return this.expandByTime(sample);
+      const expanded = this.expandByTime(sample);
+      return this.applyBySetPos(expanded);
     }
 
     const dayMap: Record<string, number> = {
