@@ -894,14 +894,13 @@ describe('RRuleTemporal - BYSECOND Rules', () => {
 });
 
 describe('RRuleTemporal - BYWEEKNO Rules', () => {
-  it.skip('should handle yearly recurrence by positive week number', () => {
+  it('should handle yearly recurrence by positive week number', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byWeekNo: [1, 26, 52],
       count: 6,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    // TODO: should it include 2025-01-01?
     assertDates({rule}, [
       '2025-06-23T12:00:00.000Z',
       '2025-12-22T12:00:00.000Z',
