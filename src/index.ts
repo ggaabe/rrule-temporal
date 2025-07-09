@@ -614,7 +614,7 @@ export class RRuleTemporal {
   // --- NEW: constraint checks ---
   // 2) Replace your matchesByDay with this:
   private matchesByDay(zdt: Temporal.ZonedDateTime): boolean {
-    const { byDay } = this.opts;
+    const { byDay, freq } = this.opts;
     if (!byDay) return true;
 
     // map two‑letter to Temporal dayOfWeek (1=Mon … 7=Sun)
@@ -641,7 +641,7 @@ export class RRuleTemporal {
       const wd = dayMap[weekday]; // no more "undefined index" error
 
       // no ordinal → simple weekday match
-      if (ord === 0) {
+      if (ord === 0 || freq === 'DAILY') {
         if (zdt.dayOfWeek === wd) return true;
         continue;
       }
