@@ -553,23 +553,53 @@ export class RRuleTemporal {
         SU: 7,
       };
 
-      let deltas: number[] = [];
-      if (
-        ['DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'].includes(this.opts.freq) &&
-        this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
-      ) {
-        deltas = this.opts.byDay.map((tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7);
+      // Check if we have ordinal BYDAY tokens (e.g., "1TU", "-1TH")
+      const hasOrdinalTokens = this.opts.byDay.some((tok) => /^[+-]?\d/.test(tok));
+      
+      if (hasOrdinalTokens && this.opts.byMonth && this.opts.freq === 'MINUTELY') {
+        // Handle ordinal BYDAY tokens with BYMONTH for MINUTELY frequency - find the first matching occurrence
+        const months = [...this.opts.byMonth].sort((a, b) => a - b);
+        let foundFirst = false;
+        
+        // Start from the current year and month, then check future months
+        for (let year = zdt.year; year <= zdt.year + 10 && !foundFirst; year++) {
+          for (const month of months) {
+            // Skip past months in the current year
+            if (year === zdt.year && month < zdt.month) continue;
+            
+            const monthSample = zdt.with({year, month, day: 1});
+            const monthlyOccs = this.generateMonthlyOccurrences(monthSample);
+            
+            for (const occ of monthlyOccs) {
+              if (Temporal.ZonedDateTime.compare(occ, zdt) >= 0) {
+                zdt = occ;
+                foundFirst = true;
+                break;
+              }
+            }
+            if (foundFirst) break;
+          }
+        }
       } else {
-        deltas = this.opts.byDay
-          .map((tok) => {
-            const wdTok = tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1];
-            return wdTok ? (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7 : null;
-          })
-          .filter((d): d is number => d !== null);
-      }
+        // Handle simple weekday tokens or non-BYMONTH cases
+        let deltas: number[] = [];
+        if (
+          ['DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'].includes(this.opts.freq) &&
+          this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
+        ) {
+          deltas = this.opts.byDay.map((tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7);
+        } else {
+          deltas = this.opts.byDay
+            .map((tok) => {
+              const wdTok = tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1];
+              return wdTok ? (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7 : null;
+            })
+            .filter((d): d is number => d !== null);
+        }
 
-      if (deltas.length) {
-        zdt = zdt.add({days: Math.min(...deltas)});
+        if (deltas.length) {
+          zdt = zdt.add({days: Math.min(...deltas)});
+        }
       }
     }
 
@@ -580,6 +610,18 @@ export class RRuleTemporal {
     if (
       this.opts.freq === 'HOURLY' &&
       !byHour &&
+      Temporal.ZonedDateTime.compare(
+        zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0}),
+        this.originalDtstart,
+      ) > 0
+    ) {
+      zdt = zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
+    }
+
+    // For MINUTELY frequency without BYMINUTE, start from 00:00 only if we jumped to a different date
+    if (
+      this.opts.freq === 'MINUTELY' &&
+      !byMinute &&
       Temporal.ZonedDateTime.compare(
         zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0}),
         this.originalDtstart,
@@ -1947,8 +1989,10 @@ export class RRuleTemporal {
         const nextYear = current.add({years: 1});
         const nextYearLastDay = nextYear.with({month: 12, day: 31}).dayOfYear;
         const firstYearDay = yearDays[0];
-        const dayNum = firstYearDay > 0 ? firstYearDay : nextYearLastDay + firstYearDay + 1;
-        current = nextYear.with({month: 1, day: 1}).add({days: dayNum - 1});
+        if (firstYearDay !== undefined) {
+          const dayNum = firstYearDay > 0 ? firstYearDay : nextYearLastDay + firstYearDay + 1;
+          current = nextYear.with({month: 1, day: 1}).add({days: dayNum - 1});
+        }
       }
       current = this.applyTimeOverride(current);
       return current;
@@ -1981,8 +2025,10 @@ export class RRuleTemporal {
         const nextMonth = current.add({months: 1}).with({day: 1});
         const nextMonthLastDay = nextMonth.add({months: 1}).subtract({days: 1}).day;
         const firstMonthDay = monthDays[0];
-        const dayNum = firstMonthDay > 0 ? firstMonthDay : nextMonthLastDay + firstMonthDay + 1;
-        current = nextMonth.with({day: Math.max(1, Math.min(dayNum, nextMonthLastDay)), hour: 0, minute: 0, second: 0});
+        if (firstMonthDay !== undefined) {
+          const dayNum = firstMonthDay > 0 ? firstMonthDay : nextMonthLastDay + firstMonthDay + 1;
+          current = nextMonth.with({day: Math.max(1, Math.min(dayNum, nextMonthLastDay)), hour: 0, minute: 0, second: 0});
+        }
       }
       current = this.applyTimeOverride(current);
       return current;
@@ -1999,8 +2045,8 @@ export class RRuleTemporal {
         const match = token.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
         if (match && !match[1]) {
           // Simple weekday without ordinal
-          const dow = dayMap[match[2]];
-          if (dow > currentDow) {
+          const dow = dayMap[match[2] as keyof typeof dayMap];
+          if (dow && dow > currentDow) {
             nextDow = Math.min(nextDow, dow);
           }
         }

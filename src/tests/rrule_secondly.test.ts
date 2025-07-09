@@ -102,7 +102,7 @@ describe('Secondly frequency tests', () => {
       byDay: ['1TU', '-1TH'],
       dtstart: zdt(1997, 9, 2, 9, 'UTC'),
     });
-    assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:00:01.000Z', '1998-01-01T00:00:02.000Z']);
+    assertDates({rule}, ['1998-01-06T00:00:00.000Z', '1998-01-06T00:00:01.000Z', '1998-01-06T00:00:02.000Z']);
   });
 
   it('testSecondlyByMonthDayAndWeekDay', () => {

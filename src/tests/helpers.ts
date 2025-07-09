@@ -59,7 +59,7 @@ export async function verifyWithLibRecur(rule: RRuleTemporal) {
   const url = 'https://recurrence-expansion-service.appspot.com/reaas?' + new URLSearchParams(params).toString();
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Response status: ${response.status}`);
+    throw new Error(`Response status: ${response.status}, url:${url}`);
   }
   const json = (await response.json()) as {instances: string[]};
   return (json.instances ?? []).map((i) => {

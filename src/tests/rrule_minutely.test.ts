@@ -93,7 +93,7 @@ describe('Minutely frequency tests', () => {
     assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:01:00.000Z', '1998-01-01T00:02:00.000Z']);
   });
 
-  it.skip('testMinutelyByMonthAndNWeekDay', () => {
+  it('testMinutelyByMonthAndNWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 3,
@@ -101,7 +101,7 @@ describe('Minutely frequency tests', () => {
       byDay: ['1TU', '-1TH'],
       dtstart: zdt(1997, 9, 2, 9, 'UTC'),
     });
-    assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:01:00.000Z', '1998-01-01T00:02:00.000Z']);
+    assertDates({rule}, ['1998-01-06T00:00:00.000Z', '1998-01-06T00:01:00.000Z', '1998-01-06T00:02:00.000Z']);
   });
 
   it('testMinutelyByMonthDayAndWeekDay', () => {
@@ -189,7 +189,7 @@ describe('Minutely frequency tests', () => {
     ]);
   });
 
-  it.skip('testMinutelyByWeekNo', () => {
+  it('testMinutelyByWeekNo', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 3,
@@ -199,7 +199,7 @@ describe('Minutely frequency tests', () => {
     assertDates({rule}, ['1998-05-11T00:00:00.000Z', '1998-05-11T00:01:00.000Z', '1998-05-11T00:02:00.000Z']);
   });
 
-  it.skip('testMinutelyByWeekNoAndWeekDay', () => {
+  it('testMinutelyByWeekNoAndWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 3,
@@ -210,7 +210,7 @@ describe('Minutely frequency tests', () => {
     assertDates({rule}, ['1997-12-29T00:00:00.000Z', '1997-12-29T00:01:00.000Z', '1997-12-29T00:02:00.000Z']);
   });
 
-  it.skip('testMinutelyByWeekNoAndWeekDayLarge', () => {
+  it('testMinutelyByWeekNoAndWeekDayLarge', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 3,
@@ -221,7 +221,7 @@ describe('Minutely frequency tests', () => {
     assertDates({rule}, ['1997-12-28T00:00:00.000Z', '1997-12-28T00:01:00.000Z', '1997-12-28T00:02:00.000Z']);
   });
 
-  it.skip('testMinutelyByWeekNoAndWeekDayLast', () => {
+  it('testMinutelyByWeekNoAndWeekDayLast', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 3,
@@ -232,7 +232,7 @@ describe('Minutely frequency tests', () => {
     assertDates({rule}, ['1997-12-28T00:00:00.000Z', '1997-12-28T00:01:00.000Z', '1997-12-28T00:02:00.000Z']);
   });
 
-  it.skip('testMinutelyByWeekNoAndWeekDay53', () => {
+  it('testMinutelyByWeekNoAndWeekDay53', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 3,
