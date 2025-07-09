@@ -921,6 +921,9 @@ export class RRuleTemporal {
           ) {
             break outer_week;
           }
+          if (!this.matchesByMonth(occ)) {
+            continue;
+          }
           if (iterator && !iterator(occ, matchCount)) {
             break outer_week;
           }
@@ -1578,6 +1581,9 @@ export class RRuleTemporal {
 
         const occs = this.generateWeeklyOccurrences(weekCursor);
         for (const occ of occs) {
+          if (!this.matchesByMonth(occ)) {
+            continue;
+          }
           const inst = occ.toInstant();
           // break when beyond end
           if (
