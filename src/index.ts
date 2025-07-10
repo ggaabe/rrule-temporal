@@ -360,17 +360,24 @@ export class RRuleTemporal {
       return this.applyTimeOverride(zdt.add({hours: interval}));
     }
 
+    if (bySecond && bySecond.length > 1) {
+      const idx = bySecond.indexOf(zdt.second);
+      if (idx !== -1 && idx < bySecond.length - 1) {
+        return zdt.with({second: bySecond[idx + 1]});
+      }
+    }
+
     // MINUTELY frequency with BYHOUR constraint but no BYMINUTE - advance by interval minutes
     // and check if we're still in an allowed hour, otherwise find the next allowed hour
     if (freq === 'MINUTELY' && byHour && byHour.length > 1 && !byMinute) {
       const next = zdt.add({minutes: interval});
       if (byHour.includes(next.hour)) {
-        return next;
+        return next.with({second: bySecond ? bySecond[0] : zdt.second});
       }
       // Find next allowed hour
       const nextHour = byHour.find((h) => h > zdt.hour) || byHour[0];
       if (nextHour && nextHour > zdt.hour) {
-        return zdt.with({hour: nextHour, minute: 0});
+        return zdt.with({hour: nextHour, minute: 0, second: bySecond ? bySecond[0] : zdt.second});
       }
       // Move to next day and use first allowed hour
       return this.applyTimeOverride(zdt.add({days: 1}));
@@ -387,13 +394,6 @@ export class RRuleTemporal {
       const next = zdt.add({seconds: interval});
       if (next.minute === byMinute[0]) return next;
       return this.applyTimeOverride(zdt.add({hours: interval})).with({second: 0});
-    }
-
-    if (bySecond && bySecond.length > 1) {
-      const idx = bySecond.indexOf(zdt.second);
-      if (idx !== -1 && idx < bySecond.length - 1) {
-        return zdt.with({second: bySecond[idx + 1]});
-      }
     }
 
     if (byMinute && byMinute.length > 1) {
