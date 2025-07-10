@@ -1228,15 +1228,33 @@ export class RRuleTemporal {
     }
 
     // --- 7) fallback: step + filter ---
-    // Handle HOURLY/DAILY frequency with BYSETPOS
-    if ((this.opts.freq === 'HOURLY' || this.opts.freq === 'DAILY') && this.opts.bySetPos) {
+    // Handle MINUTELY/HOURLY/DAILY frequency with BYSETPOS
+    if ((this.opts.freq === 'MINUTELY' || this.opts.freq === 'HOURLY' || this.opts.freq === 'DAILY') && this.opts.bySetPos) {
       const start = this.originalDtstart;
       if (!this.addDtstartIfNeeded(dates, iterator)) {
         return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
 
-      let cursor = start.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
-      const duration = this.opts.freq === 'HOURLY' ? {hours: this.opts.interval!} : {days: this.opts.interval!};
+      let cursor;
+      let duration;
+
+      switch (this.opts.freq) {
+        case 'MINUTELY':
+          cursor = start.with({ second: 0, microsecond: 0, nanosecond: 0 });
+          duration = { minutes: this.opts.interval! };
+          break;
+        case 'HOURLY':
+          cursor = start.with({ minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
+          duration = { hours: this.opts.interval! };
+          break;
+        case 'DAILY':
+          cursor = start.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
+          duration = { days: this.opts.interval! };
+          break;
+        default:
+          // Should not be reached
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+      }
 
       while (true) {
         if (++iterationCount > this.maxIterations) {

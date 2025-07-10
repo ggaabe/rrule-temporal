@@ -318,7 +318,7 @@ describe('Minutely frequency tests', () => {
     assertDates({rule}, ['1997-09-02T18:06:06.000Z', '1997-09-02T18:06:18.000Z', '1997-09-02T18:18:06.000Z']);
   });
 
-  it.skip('testMinutelyBySetPos', () => {
+  it('testMinutelyBySetPos', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 3,
