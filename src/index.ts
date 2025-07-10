@@ -383,6 +383,20 @@ export class RRuleTemporal {
       return this.applyTimeOverride(zdt.add({days: 1}));
     }
 
+    if (freq === 'SECONDLY' && byHour && !byMinute && !bySecond) {
+      const next = zdt.add({seconds: interval});
+      if (byHour.includes(next.hour)) {
+        return next;
+      }
+      // Find next allowed hour
+      const nextHour = byHour.find((h) => h > zdt.hour) || byHour[0];
+      if (nextHour && nextHour > zdt.hour) {
+        return zdt.with({hour: nextHour, minute: 0, second: 0});
+      }
+      // Move to next day and use first allowed hour
+      return this.applyTimeOverride(zdt.add({days: 1}));
+    }
+
     if (freq === 'SECONDLY' && bySecond && bySecond.length === 1) {
       return this.applyTimeOverride(zdt.add({minutes: interval})).with({second: bySecond[0]});
     }
