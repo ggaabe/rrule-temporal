@@ -500,15 +500,7 @@ export class RRuleTemporal {
 
           // If we have BYDAY, find the specific day in that week
           if (this.opts.byDay?.length) {
-            const dayMap: Record<string, number> = {
-              MO: 1,
-              TU: 2,
-              WE: 3,
-              TH: 4,
-              FR: 5,
-              SA: 6,
-              SU: 7,
-            };
+            const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
 
             const targetDays = this.opts.byDay
               .map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
@@ -547,15 +539,7 @@ export class RRuleTemporal {
     // slow.  We instead jump directly to the next matching weekday whenever all
     // BYDAY tokens are simple two-letter codes (e.g. "MO").
     if (this.opts.byDay?.length && !this.opts.byWeekNo) {
-      const dayMap: Record<string, number> = {
-        MO: 1,
-        TU: 2,
-        WE: 3,
-        TH: 4,
-        FR: 5,
-        SA: 6,
-        SU: 7,
-      };
+      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
 
       // Check if we have ordinal BYDAY tokens (e.g., "1TU", "-1TH")
       const hasOrdinalTokens = this.opts.byDay.some((tok) => /^[+-]?\d/.test(tok));
@@ -657,15 +641,7 @@ export class RRuleTemporal {
     if (!byDay) return true;
 
     // map two‑letter to Temporal dayOfWeek (1=Mon … 7=Sun)
-    const dayMap: Record<string, number> = {
-      MO: 1,
-      TU: 2,
-      WE: 3,
-      TH: 4,
-      FR: 5,
-      SA: 6,
-      SU: 7,
-    };
+    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
 
     for (const token of byDay) {
       // 1) match and destructure
@@ -781,6 +757,54 @@ export class RRuleTemporal {
     return this.opts;
   }
 
+  private addDtstartIfNeeded(
+    dates: Temporal.ZonedDateTime[],
+    iterator?: (date: Temporal.ZonedDateTime, i: number) => boolean,
+  ): boolean {
+    if (this.includeDtstart && !this.matchesAll(this.originalDtstart)) {
+      if (iterator && !iterator(this.originalDtstart, dates.length)) {
+        return false; // stop
+      }
+      dates.push(this.originalDtstart);
+      if (this.shouldBreakForCountLimit(dates.length)) {
+        return false; // stop
+      }
+    }
+    return true; // continue
+  }
+
+  private processOccurrences(
+    occs: Temporal.ZonedDateTime[],
+    dates: Temporal.ZonedDateTime[],
+    start: Temporal.ZonedDateTime,
+    iterator?: (date: Temporal.ZonedDateTime, i: number) => boolean,
+    extraFilters?: (occ: Temporal.ZonedDateTime) => boolean,
+  ): {
+    shouldBreak: boolean;
+  } {
+    let shouldBreak = false;
+    for (const occ of occs) {
+      if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
+      if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
+        shouldBreak = true;
+        break;
+      }
+      if (extraFilters && !extraFilters(occ)) {
+        continue;
+      }
+      if (iterator && !iterator(occ, dates.length)) {
+        shouldBreak = true;
+        break;
+      }
+      dates.push(occ);
+      if (this.shouldBreakForCountLimit(dates.length)) {
+        shouldBreak = true;
+        break;
+      }
+    }
+    return {shouldBreak};
+  }
+
   /**
    * Returns all occurrences of the rule.
    * @param iterator - An optional callback iterator function that can be used to filter or modify the occurrences.
@@ -796,22 +820,13 @@ export class RRuleTemporal {
     // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
     if (this.opts.freq === 'MONTHLY' && (this.opts.byDay || this.opts.byMonthDay)) {
       const start = this.originalDtstart;
-      let monthCursor = start.with({day: 1});
-      let matchCount = 0;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        matchCount++;
-        if (this.shouldBreakForCountLimit(matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
 
-      outer_month: while (true) {
+      let monthCursor = start.with({day: 1});
+
+      while (true) {
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
@@ -826,22 +841,12 @@ export class RRuleTemporal {
           occs.some((o) => Temporal.ZonedDateTime.compare(o, start) === 0)
         ) {
           monthCursor = monthCursor.add({months: this.opts.interval!});
-          continue outer_month;
+          continue;
         }
 
-        for (const occ of occs) {
-          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-            break outer_month;
-          }
-          if (iterator && !iterator(occ, matchCount)) {
-            break outer_month;
-          }
-          dates.push(occ);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
-            break outer_month;
-          }
+        const {shouldBreak} = this.processOccurrences(occs, dates, start, iterator);
+        if (shouldBreak) {
+          break;
         }
         monthCursor = monthCursor.add({months: this.opts.interval!});
       }
@@ -850,75 +855,14 @@ export class RRuleTemporal {
     }
 
     // --- 2) WEEKLY + BYDAY (or default to DTSTART’s weekday) ---
-    if (this.opts.freq === 'WEEKLY') {
-      if (this.opts.byYearDay && this.opts.byYearDay.length > 0) {
-        const start = this.originalDtstart;
-
-        // Include dtstart even if it doesn't match the rule when includeDtstart is true
-        if (this.includeDtstart && !this.matchesAll(start)) {
-          if (iterator && !iterator(start, 0)) {
-            return this.applyCountLimitAndMergeRDates(dates, iterator);
-          }
-          dates.push(start);
-          if (this.shouldBreakForCountLimit(1)) {
-            return this.applyCountLimitAndMergeRDates(dates, iterator);
-          }
-        }
-
-        let yearCursor = start.with({month: 1, day: 1});
-        let matchCount = dates.length;
-
-        outer_year_for_weekly: while (true) {
-          if (++iterationCount > this.maxIterations) {
-            throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
-          }
-
-          const occs = this.generateYearlyOccurrences(yearCursor);
-          for (const occ of occs) {
-            if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-            if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-              break outer_year_for_weekly;
-            }
-            if (iterator && !iterator(occ, matchCount)) {
-              break outer_year_for_weekly;
-            }
-            dates.push(occ);
-            matchCount++;
-            if (this.shouldBreakForCountLimit(matchCount)) {
-              break outer_year_for_weekly;
-            }
-          }
-          if (this.opts.until && yearCursor.year > this.opts.until.year) {
-            break;
-          }
-          yearCursor = yearCursor.add({years: 1});
-        }
-
-        return this.applyCountLimitAndMergeRDates(dates, iterator);
-      }
+    if (this.opts.freq === 'WEEKLY' && !(this.opts.byYearDay && this.opts.byYearDay.length > 0)) {
       const start = this.originalDtstart;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, 0)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        if (this.shouldBreakForCountLimit(1)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
 
       // Build the list of target weekdays (1=Mon..7=Sun)
-      const dayMap: Record<string, number> = {
-        MO: 1,
-        TU: 2,
-        WE: 3,
-        TH: 4,
-        FR: 5,
-        SA: 6,
-        SU: 7,
-      };
+      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
       // If no BYDAY, default to DTSTART’s weekday token
       const tokens = this.opts.byDay
         ? [...this.opts.byDay]
@@ -943,9 +887,8 @@ export class RRuleTemporal {
       // Align weekCursor to the week start that contains the first occurrence
       const firstOccWeekOffset = (firstOccurrence.dayOfWeek - wkstDay + 7) % 7;
       let weekCursor = firstOccurrence.subtract({days: firstOccWeekOffset});
-      let matchCount = 0;
 
-      outer_week: while (true) {
+      while (true) {
         // Generate this week’s occurrences
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
@@ -961,25 +904,16 @@ export class RRuleTemporal {
 
         occs = this.applyBySetPos(occs);
 
-        for (const occ of occs) {
-          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-            break outer_week;
-          }
-          if (!this.matchesByMonth(occ)) {
-            continue;
-          }
-          if (!this.matchesByMonthDay(occ)) {
-            continue;
-          }
-          if (iterator && !iterator(occ, matchCount)) {
-            break outer_week;
-          }
-          dates.push(occ);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
-            break outer_week;
-          }
+        const {shouldBreak} = this.processOccurrences(
+          occs,
+          dates,
+          start,
+          iterator,
+          (occ) => this.matchesByMonth(occ) && this.matchesByMonthDay(occ),
+        );
+
+        if (shouldBreak) {
+          break;
         }
 
         weekCursor = weekCursor.add({weeks: this.opts.interval!});
@@ -997,21 +931,12 @@ export class RRuleTemporal {
       !this.opts.byYearDay
     ) {
       const start = this.originalDtstart;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, 0)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        if (this.shouldBreakForCountLimit(1)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
 
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
       let monthOffset = 0;
-      let matchCount = dates.length; // Account for dtstart already added in non-strict mode
 
       // Find the first month >= dtstart.month
       let startMonthIndex = months.findIndex((m) => m >= start.month);
@@ -1040,12 +965,11 @@ export class RRuleTemporal {
         }
 
         if (Temporal.ZonedDateTime.compare(candidate, start) >= 0) {
-          if (iterator && !iterator(candidate, matchCount)) {
+          if (iterator && !iterator(candidate, dates.length)) {
             break;
           }
           dates.push(candidate);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
+          if (this.shouldBreakForCountLimit(dates.length)) {
             break;
           }
         }
@@ -1066,20 +990,11 @@ export class RRuleTemporal {
       !this.opts.byWeekNo
     ) {
       const start = this.originalDtstart;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, 0)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        if (this.shouldBreakForCountLimit(1)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
       let yearOffset = 0;
-      let matchCount = 0;
 
       while (true) {
         if (++iterationCount > this.maxIterations) {
@@ -1098,13 +1013,12 @@ export class RRuleTemporal {
           if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
             return dates;
           }
-          if (iterator && !iterator(occ, matchCount)) {
+          if (iterator && !iterator(occ, dates.length)) {
             return dates;
           }
 
           dates.push(occ);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
+          if (this.shouldBreakForCountLimit(dates.length)) {
             return this.applyCountLimitAndMergeRDates(dates, iterator);
           }
         }
@@ -1114,48 +1028,37 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    // --- 5) YEARLY + BYDAY/BYMONTHDAY/BYYEARDAY/BYWEEKNO ---
+    // --- 5) YEARLY + BY... rules (also handles WEEKLY + BYYEARDAY) ---
     if (
-      this.opts.freq === 'YEARLY' &&
-      (this.opts.byDay || this.opts.byMonthDay || this.opts.byYearDay || this.opts.byWeekNo)
+      (this.opts.freq === 'YEARLY' &&
+        (this.opts.byDay || this.opts.byMonthDay || this.opts.byYearDay || this.opts.byWeekNo)) ||
+      (this.opts.freq === 'WEEKLY' && this.opts.byYearDay && this.opts.byYearDay.length > 0)
     ) {
       const start = this.originalDtstart;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, 0)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        if (this.shouldBreakForCountLimit(1)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
 
       let yearCursor = start.with({month: 1, day: 1});
-      let matchCount = 0;
 
-      outer_year: while (true) {
+      while (true) {
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
 
         const occs = this.generateYearlyOccurrences(yearCursor);
-        for (const occ of occs) {
-          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-            break outer_year;
-          }
-          if (iterator && !iterator(occ, matchCount)) {
-            break outer_year;
-          }
-          dates.push(occ);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
-            break outer_year;
-          }
+        const {shouldBreak} = this.processOccurrences(occs, dates, start, iterator);
+
+        if (shouldBreak) {
+          break;
         }
-        yearCursor = yearCursor.add({years: this.opts.interval!});
+
+        const interval = this.opts.freq === 'WEEKLY' ? 1 : this.opts.interval!;
+        yearCursor = yearCursor.add({years: interval});
+
+        if (this.opts.freq === 'WEEKLY' && this.opts.until && yearCursor.year > this.opts.until.year) {
+          break;
+        }
       }
 
       return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1166,24 +1069,12 @@ export class RRuleTemporal {
       (this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY') &&
       (this.opts.byMonth || this.opts.byWeekNo || this.opts.byYearDay || this.opts.byMonthDay || this.opts.byDay)
     ) {
-      const start = this.originalDtstart;
-      let matchCount = 0;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        matchCount++;
-        if (this.shouldBreakForCountLimit(matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
-
       let current = this.computeFirst();
 
-      outer_small_freq: while (true) {
+      while (true) {
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
@@ -1194,12 +1085,11 @@ export class RRuleTemporal {
 
         // Check if current date matches all constraints
         if (this.matchesAll(current)) {
-          if (iterator && !iterator(current, matchCount)) {
+          if (iterator && !iterator(current, dates.length)) {
             break;
           }
           dates.push(current);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
+          if (this.shouldBreakForCountLimit(dates.length)) {
             break;
           }
           current = this.nextCandidateSameDate(current);
@@ -1221,18 +1111,8 @@ export class RRuleTemporal {
       !this.opts.byMonthDay
     ) {
       const start = this.originalDtstart;
-      let matchCount = 0;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        matchCount++;
-        if (this.shouldBreakForCountLimit(matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
 
       let year = start.year;
@@ -1241,7 +1121,7 @@ export class RRuleTemporal {
       const startMonthAbs = start.year * 12 + start.month;
 
       outer_loop: while (true) {
-        if (this.shouldBreakForCountLimit(matchCount)) {
+        if (this.shouldBreakForCountLimit(dates.length)) {
           break;
         }
         if (++iterationCount > this.maxIterations) {
@@ -1274,14 +1154,13 @@ export class RRuleTemporal {
               break outer_loop;
             }
 
-            if (iterator && !iterator(occ, matchCount)) {
+            if (iterator && !iterator(occ, dates.length)) {
               break outer_loop;
             }
 
             dates.push(occ);
-            matchCount++;
 
-            if (this.shouldBreakForCountLimit(matchCount)) {
+            if (this.shouldBreakForCountLimit(dates.length)) {
               break outer_loop;
             }
           }
@@ -1304,25 +1183,15 @@ export class RRuleTemporal {
     // --- 7) fallback: step + filter ---
     // Handle HOURLY/DAILY frequency with BYSETPOS
     if ((this.opts.freq === 'HOURLY' || this.opts.freq === 'DAILY') && this.opts.bySetPos) {
-      let start = this.originalDtstart;
-      let matchCount = 0;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        matchCount++;
-        if (this.shouldBreakForCountLimit(matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
+      const start = this.originalDtstart;
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
       }
 
       let cursor = start.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
       const duration = this.opts.freq === 'HOURLY' ? {hours: this.opts.interval!} : {days: this.opts.interval!};
 
-      outer_loop: while (true) {
+      while (true) {
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
@@ -1332,38 +1201,27 @@ export class RRuleTemporal {
         periodOccs = periodOccs.filter((occ) => this.matchesAll(occ));
         periodOccs = this.applyBySetPos(periodOccs);
 
-        for (const occ of periodOccs) {
-          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-            break outer_loop;
-          }
-          if (iterator && !iterator(occ, matchCount)) {
-            break outer_loop;
-          }
-          dates.push(occ);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
-            break outer_loop;
-          }
+        const {shouldBreak} = this.processOccurrences(periodOccs, dates, start, iterator);
+        if (shouldBreak) {
+          break;
         }
+
         cursor = cursor.add(duration);
         if (this.opts.until && Temporal.ZonedDateTime.compare(cursor, this.opts.until) > 0) {
-          break outer_loop;
+          break;
         }
       }
     } else {
       let current = this.computeFirst();
-      let matchCount = 0;
 
       // Include dtstart even if it doesn't match the rule when includeDtstart is true
       if (this.includeDtstart && Temporal.ZonedDateTime.compare(current, this.originalDtstart) > 0) {
         // dtstart doesn't match the rule, but we should include it in non-strict mode
-        if (iterator && !iterator(this.originalDtstart, matchCount)) {
+        if (iterator && !iterator(this.originalDtstart, dates.length)) {
           return this.applyCountLimitAndMergeRDates(dates, iterator);
         }
         dates.push(this.originalDtstart);
-        matchCount++;
-        if (this.shouldBreakForCountLimit(matchCount)) {
+        if (this.shouldBreakForCountLimit(dates.length)) {
           return this.applyCountLimitAndMergeRDates(dates, iterator);
         }
       }
@@ -1377,12 +1235,11 @@ export class RRuleTemporal {
           break;
         }
         if (this.matchesAll(current)) {
-          if (iterator && !iterator(current, matchCount)) {
+          if (iterator && !iterator(current, dates.length)) {
             break;
           }
           dates.push(current);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
+          if (this.shouldBreakForCountLimit(dates.length)) {
             break;
           }
         }
@@ -1644,13 +1501,11 @@ export class RRuleTemporal {
         return [];
       }
       const dates = byMonthDayHits.map((d) => sample.with({day: d}));
-      let expanded = dates.flatMap((z) => this.expandByTime(z)).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
-      return expanded;
+      return dates.flatMap((z) => this.expandByTime(z)).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
     }
 
     if (!byDay) {
-      const expanded = this.expandByTime(sample);
-      return expanded;
+      return this.expandByTime(sample);
     }
 
     const dayMap: Record<string, number> = {
@@ -1707,8 +1562,7 @@ export class RRuleTemporal {
     }
 
     const hits = finalDays.map((d) => sample.with({day: d}));
-    let expanded = hits.flatMap((z) => this.expandByTime(z)).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
-    return expanded;
+    return hits.flatMap((z) => this.expandByTime(z)).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 
   /**
