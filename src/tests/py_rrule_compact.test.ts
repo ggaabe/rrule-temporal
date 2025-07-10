@@ -2,7 +2,7 @@ import {RRuleTemporal} from '../index';
 import {assertDates, zdt} from './helpers';
 
 // https://github.com/dateutil/dateutil/blob/master/tests/test_rrule.py
-describe('RRuleTemporal - Python compatibility tests 3', () => {
+describe('RRuleTemporal - Python compatibility tests', () => {
   it('testUntilNotMatching', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
@@ -61,15 +61,6 @@ describe('RRuleTemporal - Python compatibility tests 3', () => {
       dtstart: zdt(1997, 9, 2, 9, 'UTC'),
     });
     assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1997-09-14T09:00:00.000Z', '1997-09-16T09:00:00.000Z']);
-  });
-
-  it.skip('testDTStartWithMicroseconds', () => {
-    const rule = new RRuleTemporal({
-      freq: 'DAILY',
-      count: 3,
-      dtstart: zdt(1997, 9, 2, 9, 'UTC'),
-    });
-    assertDates({rule}, ['1997-09-02T09:00:00.000Z', '1997-09-03T09:00:00.000Z', '1997-09-04T09:00:00.000Z']);
   });
 
   // it('testMaxYear', () => {
