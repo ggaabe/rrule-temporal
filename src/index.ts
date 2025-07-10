@@ -405,8 +405,23 @@ export class RRuleTemporal {
           second: bySecond ? bySecond[0] : zdt.second,
         });
       }
-      // For MINUTELY frequency, when we reach the last BYMINUTE value, advance to next hour
+      // For MINUTELY frequency, when we reach the last BYMINUTE value, advance to next valid hour
       if (freq === 'MINUTELY' && idx === byMinute.length - 1) {
+        if (byHour && byHour.length > 0) {
+          const currentHourIdx = byHour.indexOf(zdt.hour);
+          if (currentHourIdx !== -1 && currentHourIdx < byHour.length - 1) {
+            // next hour on same day
+            return zdt.with({
+              hour: byHour[currentHourIdx + 1],
+              minute: byMinute[0],
+              second: bySecond ? bySecond[0] : zdt.second,
+            });
+          } else {
+            // last hour for today, advance day and take first hour
+            return this.applyTimeOverride(zdt.add({days: 1}));
+          }
+        }
+        // No byHour, just advance by interval
         return zdt.add({hours: interval}).with({
           minute: byMinute[0],
           second: bySecond ? bySecond[0] : zdt.second,
@@ -693,13 +708,49 @@ export class RRuleTemporal {
     return this.matchesNumericConstraint(zdt.day, byMonthDay, lastDay);
   }
 
+  private matchesByHour(zdt: Temporal.ZonedDateTime): boolean {
+    const {byHour} = this.opts;
+    if (!byHour) return true;
+    if (byHour.includes(zdt.hour)) {
+      return true;
+    }
+
+    // Handle DST spring-forward case. Check if any of the hours specified
+    // in the rule, when applied, would result in the hour of the candidate time.
+    for (const h of byHour) {
+      const intendedTime = zdt.with({hour: h});
+      if (intendedTime.hour === zdt.hour) {
+        // This indicates that setting the hour to `h` resulted in `zdt.hour`,
+        // which is the signature of a DST jump where `h` was the skipped hour.
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private matchesByMinute(zdt: Temporal.ZonedDateTime): boolean {
+    const {byMinute} = this.opts;
+    if (!byMinute) return true;
+    return byMinute.includes(zdt.minute);
+  }
+
+  private matchesBySecond(zdt: Temporal.ZonedDateTime): boolean {
+    const {bySecond} = this.opts;
+    if (!bySecond) return true;
+    return bySecond.includes(zdt.second);
+  }
+
   private matchesAll(zdt: Temporal.ZonedDateTime): boolean {
     return (
       this.matchesByDay(zdt) &&
       this.matchesByMonth(zdt) &&
       this.matchesByMonthDay(zdt) &&
       this.matchesByYearDay(zdt) &&
-      this.matchesByWeekNo(zdt)
+      this.matchesByWeekNo(zdt) &&
+      this.matchesByHour(zdt) &&
+      this.matchesByMinute(zdt) &&
+      this.matchesBySecond(zdt)
     );
   }
 

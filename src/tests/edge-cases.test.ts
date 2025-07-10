@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
-import {assertDates, format, limit, parse, zdt} from './helpers';
+import {assertDates, format, formatISO, limit, parse, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 const DATE_2019 = zdt(2019, 1, 1, 0, 'UTC');
@@ -694,6 +694,25 @@ describe('Tests from rust package', function () {
     ]);
   });
 
+  it('DST hourly/minutes handling GMT -> BST using hourly', function () {
+    const tz = 'Europe/London';
+    const rule = `DTSTART;TZID=${tz}:20240330T230000\nRRULE:FREQ=HOURLY;COUNT=5`;
+    assertDates({rule: parse(rule), print: format(tz)}, [
+      '2024-03-30T23:00:00+00:00[Europe/London]',
+      '2024-03-31T00:00:00+00:00[Europe/London]',
+      '2024-03-31T02:00:00+01:00[Europe/London]',
+      '2024-03-31T03:00:00+01:00[Europe/London]',
+      '2024-03-31T04:00:00+01:00[Europe/London]',
+    ]);
+    assertDates({rule: parse(rule)}, [
+      '2024-03-30T23:00:00.000Z',
+      '2024-03-31T00:00:00.000Z',
+      '2024-03-31T01:00:00.000Z',
+      '2024-03-31T02:00:00.000Z',
+      '2024-03-31T03:00:00.000Z',
+    ]);
+  });
+
   it('DST hourly/minutes handling BST -> GMT', function () {
     const tz = 'Europe/London';
     const rule = `DTSTART;TZID=${tz}:20241026T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
@@ -720,6 +739,25 @@ describe('Tests from rust package', function () {
       '2024-10-27T02:30:00.000Z',
       '2024-10-27T03:00:00.000Z',
       '2024-10-27T03:30:00.000Z',
+    ]);
+  });
+  it.skip('DST hourly/minutes handling BST -> GMT using hourly', function () {
+    const tz = 'Europe/London';
+    const rule = `DTSTART;TZID=${tz}:20241027T000000\nRRULE:FREQ=HOURLY;COUNT=5`;
+    const entries =parse(rule).all();
+    assertDates({rule:parse(rule), print:format(tz)},  [
+      '2024-10-27T00:00:00+01:00[Europe/London]',
+      '2024-10-27T01:00:00+01:00[Europe/London]',
+      '2024-10-27T02:00:00+00:00[Europe/London]',
+      '2024-10-27T03:00:00+00:00[Europe/London]',
+      '2024-10-27T04:00:00+00:00[Europe/London]'
+    ])
+    assertDates({rule:parse(rule)},  [
+      '2024-10-26T23:00:00.000Z',
+      '2024-10-27T00:00:00.000Z',
+      '2024-10-27T02:00:00.000Z',
+      '2024-10-27T03:00:00.000Z',
+      '2024-10-27T04:00:00.000Z'
     ]);
   });
 });
