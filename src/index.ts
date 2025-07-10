@@ -555,21 +555,21 @@ export class RRuleTemporal {
 
       // Check if we have ordinal BYDAY tokens (e.g., "1TU", "-1TH")
       const hasOrdinalTokens = this.opts.byDay.some((tok) => /^[+-]?\d/.test(tok));
-      
+
       if (hasOrdinalTokens && this.opts.byMonth && this.opts.freq === 'MINUTELY') {
         // Handle ordinal BYDAY tokens with BYMONTH for MINUTELY frequency - find the first matching occurrence
         const months = [...this.opts.byMonth].sort((a, b) => a - b);
         let foundFirst = false;
-        
+
         // Start from the current year and month, then check future months
         for (let year = zdt.year; year <= zdt.year + 10 && !foundFirst; year++) {
           for (const month of months) {
             // Skip past months in the current year
             if (year === zdt.year && month < zdt.month) continue;
-            
+
             const monthSample = zdt.with({year, month, day: 1});
             const monthlyOccs = this.generateMonthlyOccurrences(monthSample);
-            
+
             for (const occ of monthlyOccs) {
               if (Temporal.ZonedDateTime.compare(occ, zdt) >= 0) {
                 zdt = occ;
@@ -1902,7 +1902,10 @@ export class RRuleTemporal {
       const last = sample.with({month: 12, day: 31}).dayOfYear;
       for (const d of this.opts.byYearDay) {
         const dayNum = d > 0 ? d : last + d + 1;
-        const dt = sample.with({month: 1, day: 1}).add({days: dayNum - 1});
+        const dt =
+          this.opts.freq === 'MINUTELY'
+            ? sample.with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0}).add({days: dayNum - 1})
+            : sample.with({month: 1, day: 1}).add({days: dayNum - 1});
         if (!this.opts.byMonth || this.opts.byMonth!.includes(dt.month)) {
           occs.push(...this.expandByTime(dt));
         }
@@ -1983,7 +1986,13 @@ export class RRuleTemporal {
 
       if (nextYearDay) {
         const dayNum = nextYearDay > 0 ? nextYearDay : lastDayOfYear + nextYearDay + 1;
-        current = current.with({month: 1, day: 1}).add({days: dayNum - 1});
+        if (this.opts.freq === 'MINUTELY') {
+          current = current
+            .with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0})
+            .add({days: dayNum - 1});
+        } else {
+          current = current.with({month: 1, day: 1}).add({days: dayNum - 1});
+        }
       } else {
         // Move to next year and use first valid yearday
         const nextYear = current.add({years: 1});
@@ -1991,7 +2000,13 @@ export class RRuleTemporal {
         const firstYearDay = yearDays[0];
         if (firstYearDay !== undefined) {
           const dayNum = firstYearDay > 0 ? firstYearDay : nextYearLastDay + firstYearDay + 1;
-          current = nextYear.with({month: 1, day: 1}).add({days: dayNum - 1});
+          if (this.opts.freq === 'MINUTELY') {
+            current = nextYear
+              .with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0})
+              .add({days: dayNum - 1});
+          } else {
+            current = nextYear.with({month: 1, day: 1}).add({days: dayNum - 1});
+          }
         }
       }
       current = this.applyTimeOverride(current);
@@ -2027,7 +2042,12 @@ export class RRuleTemporal {
         const firstMonthDay = monthDays[0];
         if (firstMonthDay !== undefined) {
           const dayNum = firstMonthDay > 0 ? firstMonthDay : nextMonthLastDay + firstMonthDay + 1;
-          current = nextMonth.with({day: Math.max(1, Math.min(dayNum, nextMonthLastDay)), hour: 0, minute: 0, second: 0});
+          current = nextMonth.with({
+            day: Math.max(1, Math.min(dayNum, nextMonthLastDay)),
+            hour: 0,
+            minute: 0,
+            second: 0,
+          });
         }
       }
       current = this.applyTimeOverride(current);

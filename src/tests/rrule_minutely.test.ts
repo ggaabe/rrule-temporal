@@ -127,7 +127,7 @@ describe('Minutely frequency tests', () => {
     assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:01:00.000Z', '1998-01-01T00:02:00.000Z']);
   });
 
-  it.skip('testMinutelyByYearDay', () => {
+  it('testMinutelyByYearDay', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 4,
@@ -142,7 +142,7 @@ describe('Minutely frequency tests', () => {
     ]);
   });
 
-  it.skip('testMinutelyByYearDayNeg', () => {
+  it('testMinutelyByYearDayNeg', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       count: 4,
