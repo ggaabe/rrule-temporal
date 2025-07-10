@@ -419,6 +419,13 @@ export class RRuleTemporal {
           second: bySecond ? bySecond[0] : zdt.second,
         });
       }
+      // For MINUTELY frequency, when we reach the last BYMINUTE value, advance to next hour
+      if (freq === 'MINUTELY' && idx === byMinute.length - 1) {
+        return zdt.add({hours: interval}).with({
+          minute: byMinute[0],
+          second: bySecond ? bySecond[0] : zdt.second,
+        });
+      }
     }
 
     if (byHour && byHour.length > 1) {
