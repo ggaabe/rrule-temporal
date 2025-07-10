@@ -102,7 +102,29 @@ function parseDateValues(dateValues: string[], tzid: string, valueType?: string)
 }
 
 /**
- * Parse either a full ICS snippet or an RRULE line into ManualOpts
+ * Parse either a full ICS snippet or an RRULE line into ManualOpts.
+ *
+ * @param input - String containing a `DTSTART` line followed by `RRULE` and
+ *   optional `EXDATE`/`RDATE` lines. A single `RRULE:` line without
+ *   `DTSTART` will throw an error.
+ * @param targetTimezone - Optional IANA time zone identifier used when the
+ *   `DTSTART` line omits `TZID`. Floating times are interpreted in this zone
+ *   and the resulting `tzid` field in the returned options will be set to this
+ *   value. If `DTSTART` already specifies a `TZID` this parameter is ignored.
+ *
+ * Examples:
+ * ```ts
+ * parseRRuleString(
+ *   `DTSTART:20240101T090000\nRRULE:FREQ=DAILY`,
+ *   'America/New_York'
+ * );
+ * // => opts.tzid === 'America/New_York'
+ *
+ * parseRRuleString(
+ *   `DTSTART;TZID=Europe/Paris:20240101T090000\nRRULE:FREQ=DAILY`
+ * );
+ * // => opts.tzid === 'Europe/Paris' (targetTimezone ignored)
+ * ```
  */
 function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
   // Unfold the input according to RFC 5545 specification
