@@ -73,29 +73,33 @@ function unfoldLine(foldedLine: string): string {
 }
 
 /**
+ * Parse a single ICS date-time string into a Temporal.ZonedDateTime
+ */
+function parseIcsDateTime(dateStr: string, tzid: string, valueType?: string): Temporal.ZonedDateTime {
+  const isDate = valueType === 'DATE' || !dateStr.includes('T');
+
+  if (isDate) {
+    const isoDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+    return Temporal.PlainDate.from(isoDate).toZonedDateTime({timeZone: tzid});
+  }
+
+  if (/Z$/.test(dateStr)) {
+    const iso = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}T${dateStr.slice(9, 15)}Z`;
+    return Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || 'UTC');
+  } else {
+    const isoDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}T${dateStr.slice(9)}`;
+    return Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid);
+  }
+}
+
+/**
  * Parse date values from EXDATE or RDATE lines
  */
 function parseDateValues(dateValues: string[], tzid: string, valueType?: string) {
   const dates: Temporal.ZonedDateTime[] = [];
 
   for (const dateValue of dateValues) {
-    const isDate = valueType === 'DATE' || !dateValue.includes('T');
-
-    if (isDate) {
-      const isoDate = `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}`;
-      dates.push(Temporal.PlainDate.from(isoDate).toZonedDateTime({timeZone: tzid}));
-    } else {
-      // DATE-TIME
-      if (/Z$/.test(dateValue)) {
-        const iso =
-          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-` + `${dateValue.slice(6, 8)}T${dateValue.slice(9, 15)}Z`;
-        dates.push(Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || 'UTC'));
-      } else {
-        const isoDate =
-          `${dateValue.slice(0, 4)}-${dateValue.slice(4, 6)}-${dateValue.slice(6, 8)}` + `T${dateValue.slice(9)}`;
-        dates.push(Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid));
-      }
-    }
+    dates.push(parseIcsDateTime(dateValue, tzid, valueType));
   }
 
   return dates;
@@ -143,7 +147,7 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
 
     const [, valueType, dtTzid, dtValue] = dtMatch;
     tzid = dtTzid ?? targetTimezone ?? tzid;
-    dtstart = parseDateValues([dtValue!], tzid, valueType)[0]!;
+    dtstart = parseIcsDateTime(dtValue!, tzid, valueType);
 
     rruleLine = rrLine!;
 
@@ -176,15 +180,9 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
         break;
       case 'UNTIL': {
         // RFC5545 UNTIL is YYYYMMDDTHHMMSSZ or without Z
-        if (/Z$/.test(val!)) {
-          const iso = `${val!.slice(0, 4)}-${val!.slice(4, 6)}-` + `${val!.slice(6, 8)}T${val!.slice(9, 15)}Z`;
-          opts.until = Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || 'UTC');
-        } else {
-          const iso = `${val!.slice(0, 4)}-${val!.slice(4, 6)}-` + `${val!.slice(6, 8)}T${val!.slice(9, 15)}`;
-          opts.until = Temporal.PlainDateTime.from(iso).toZonedDateTime(tzid || 'UTC');
-          if (tzid !== 'UTC') {
-            throw new Error('UNTIL rule part MUST always be specified as a date with UTC time');
-          }
+        opts.until = parseIcsDateTime(val!, tzid || 'UTC');
+        if (!/Z$/.test(val!) && tzid !== 'UTC') {
+          throw new Error('UNTIL rule part MUST always be specified as a date with UTC time');
         }
         break;
       }
@@ -269,46 +267,37 @@ export class RRuleTemporal {
     this.includeDtstart = manual.includeDtstart ?? false; // Default to RFC 5545 compliant behavior
   }
 
+  private sanitizeNumericArray(
+    arr: number[] | undefined,
+    min: number,
+    max: number,
+    allowZero = false,
+    sort = false,
+  ): number[] | undefined {
+    if (!arr) return undefined;
+    const sanitized = arr.filter((n) => Number.isInteger(n) && n >= min && n <= max && (allowZero || n !== 0));
+    if (sanitized.length === 0) return undefined;
+    return sort ? sanitized.sort((a, b) => a - b) : sanitized;
+  }
+
   private sanitizeOpts(opts: ManualOpts): ManualOpts {
     const validDay = /^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/;
     if (opts.byDay) {
       opts.byDay = opts.byDay.filter((d) => validDay.test(d));
       if (opts.byDay.length === 0) delete opts.byDay;
     }
-    if (opts.byMonth) {
-      opts.byMonth = opts.byMonth.filter((n) => Number.isInteger(n) && n >= 1 && n <= 12);
-      if (opts.byMonth.length === 0) delete opts.byMonth;
-    }
-    if (opts.byMonthDay) {
-      opts.byMonthDay = opts.byMonthDay.filter((n) => Number.isInteger(n) && n !== 0 && n >= -31 && n <= 31);
-      if (opts.byMonthDay.length === 0) delete opts.byMonthDay;
-    }
-    if (opts.byYearDay) {
-      opts.byYearDay = opts.byYearDay.filter((n) => Number.isInteger(n) && n !== 0 && n >= -366 && n <= 366);
-      if (opts.byYearDay.length === 0) delete opts.byYearDay;
-    }
-    if (opts.byWeekNo) {
-      opts.byWeekNo = opts.byWeekNo.filter((n) => Number.isInteger(n) && n !== 0 && n >= -53 && n <= 53);
-      if (opts.byWeekNo.length === 0) delete opts.byWeekNo;
-    }
-    if (opts.byHour) {
-      opts.byHour = opts.byHour.filter((n) => Number.isInteger(n) && n >= 0 && n <= 23).sort((a, b) => a - b);
-      if (opts.byHour.length === 0) delete opts.byHour;
-    }
-    if (opts.byMinute) {
-      opts.byMinute = opts.byMinute.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59).sort((a, b) => a - b);
-      if (opts.byMinute.length === 0) delete opts.byMinute;
-    }
-    if (opts.bySecond) {
-      opts.bySecond = opts.bySecond.filter((n) => Number.isInteger(n) && n >= 0 && n <= 59).sort((a, b) => a - b);
-      if (opts.bySecond.length === 0) delete opts.bySecond;
-    }
+    opts.byMonth = this.sanitizeNumericArray(opts.byMonth, 1, 12, false, false);
+    opts.byMonthDay = this.sanitizeNumericArray(opts.byMonthDay, -31, 31, false, false);
+    opts.byYearDay = this.sanitizeNumericArray(opts.byYearDay, -366, 366, false, false);
+    opts.byWeekNo = this.sanitizeNumericArray(opts.byWeekNo, -53, 53, false, false);
+    opts.byHour = this.sanitizeNumericArray(opts.byHour, 0, 23, true, true);
+    opts.byMinute = this.sanitizeNumericArray(opts.byMinute, 0, 59, true, true);
+    opts.bySecond = this.sanitizeNumericArray(opts.bySecond, 0, 59, true, true);
     if (opts.bySetPos) {
       if (opts.bySetPos.some((p) => p === 0)) {
         throw new Error('bySetPos may not contain 0');
       }
-      opts.bySetPos = opts.bySetPos.filter((n) => Number.isInteger(n) && n !== 0);
-      if (opts.bySetPos.length === 0) delete opts.bySetPos;
+      opts.bySetPos = this.sanitizeNumericArray(opts.bySetPos, -Infinity, Infinity, false, false);
     }
     return opts;
   }
@@ -690,11 +679,18 @@ export class RRuleTemporal {
     return byMonth.includes(zdt.month);
   }
 
+  private matchesNumericConstraint(value: number, constraints: number[], maxPositiveValue: number): boolean {
+    return constraints.some((c) => {
+      const target = c > 0 ? c : maxPositiveValue + c + 1;
+      return value === target;
+    });
+  }
+
   private matchesByMonthDay(zdt: Temporal.ZonedDateTime): boolean {
     const {byMonthDay} = this.opts;
     if (!byMonthDay) return true;
     const lastDay = zdt.with({day: 1}).add({months: 1}).subtract({days: 1}).day;
-    return byMonthDay.some((d) => (d > 0 ? zdt.day === d : zdt.day === lastDay + d + 1));
+    return this.matchesNumericConstraint(zdt.day, byMonthDay, lastDay);
   }
 
   private matchesAll(zdt: Temporal.ZonedDateTime): boolean {
@@ -712,7 +708,7 @@ export class RRuleTemporal {
     if (!byYearDay) return true;
     const dayOfYear = zdt.dayOfYear;
     const last = zdt.with({month: 12, day: 31}).dayOfYear;
-    return byYearDay.some((d) => (d > 0 ? dayOfYear === d : dayOfYear === last + d + 1));
+    return this.matchesNumericConstraint(dayOfYear, byYearDay, last);
   }
 
   private getIsoWeekInfo(zdt: Temporal.ZonedDateTime): {week: number; year: number} {
@@ -1449,8 +1445,7 @@ export class RRuleTemporal {
     if (interval !== 1) rule.push(`INTERVAL=${interval}`);
     if (count !== undefined) rule.push(`COUNT=${count}`);
     if (until) {
-      const u = until.toInstant().toString().replace(/[-:]/g, '');
-      rule.push(`UNTIL=${u.slice(0, 15)}Z`);
+      rule.push(`UNTIL=${this.formatIcsDateTime(until)}`);
     }
     if (byHour) rule.push(`BYHOUR=${byHour.join(',')}`);
     if (byMinute) rule.push(`BYMINUTE=${byMinute.join(',')}`);
@@ -1473,8 +1468,12 @@ export class RRuleTemporal {
     return lines.join('\n');
   }
 
+  private formatIcsDateTime(date: Temporal.ZonedDateTime): string {
+    return date.toInstant().toString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  }
+
   private joinDates(dates: Temporal.ZonedDateTime[]) {
-    return dates.map((d) => d.toInstant().toString().replace(/[-:]/g, '').slice(0, 15) + 'Z');
+    return dates.map((d) => this.formatIcsDateTime(d));
   }
 
   /**
@@ -1508,15 +1507,7 @@ export class RRuleTemporal {
       return this.expandByTime(sample);
     }
 
-    const dayMap: Record<string, number> = {
-      MO: 1,
-      TU: 2,
-      WE: 3,
-      TH: 4,
-      FR: 5,
-      SA: 6,
-      SU: 7,
-    };
+    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
 
     type Token = {ord: number; wd: number};
     const tokens: Token[] = byDay
@@ -1582,15 +1573,7 @@ export class RRuleTemporal {
     const hasOrdinalByDay = this.opts.byDay && this.opts.byDay.some((t) => /^[+-]?\d/.test(t));
     if (hasOrdinalByDay && !this.opts.byMonth) {
       // nth weekday of year
-      const dayMap: Record<string, number> = {
-        MO: 1,
-        TU: 2,
-        WE: 3,
-        TH: 4,
-        FR: 5,
-        SA: 6,
-        SU: 7,
-      };
+      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
       for (const tok of this.opts.byDay!) {
         const m = tok.match(/^([+-]?\d{1,2})(MO|TU|WE|TH|FR|SA|SU)$/);
         if (!m) continue;
@@ -1631,15 +1614,7 @@ export class RRuleTemporal {
     }
 
     if (this.opts.byWeekNo) {
-      const dayMap: Record<string, number> = {
-        MO: 1,
-        TU: 2,
-        WE: 3,
-        TH: 4,
-        FR: 5,
-        SA: 6,
-        SU: 7,
-      };
+      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
       const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
       const jan1 = sample.with({month: 1, day: 1});
       const delta = (jan1.dayOfWeek - wkst + 7) % 7;
@@ -1671,6 +1646,13 @@ export class RRuleTemporal {
   }
 
   /**
+   * Helper to find the next valid value from a sorted array
+   */
+  private findNextValidValue<T>(currentValue: T, validValues: T[], compare: (a: T, b: T) => number): T | null {
+    return validValues.find((v) => compare(v, currentValue) > 0) || null;
+  }
+
+  /**
    * Efficiently find the next valid date for MINUTELY and SECONDLY frequency by jumping over
    * large gaps when BYXXX constraints don't match.
    */
@@ -1680,8 +1662,8 @@ export class RRuleTemporal {
     // Check BYMONTH first (largest potential jump)
     if (this.opts.byMonth && !this.opts.byMonth.includes(current.month)) {
       const months = [...this.opts.byMonth].sort((a, b) => a - b);
-      const nextMonth = months.find((m) => m > current.month) || months[0];
-      if (nextMonth && nextMonth > current.month) {
+      const nextMonth = this.findNextValidValue(current.month, months, (a, b) => a - b);
+      if (nextMonth) {
         current = current.with({month: nextMonth, day: 1, hour: 0, minute: 0, second: 0});
       } else {
         // Move to next year and use first valid month
@@ -1745,14 +1727,16 @@ export class RRuleTemporal {
       const lastDayOfMonth = current.with({day: 1}).add({months: 1}).subtract({days: 1}).day;
       const currentDay = current.day;
 
-      let nextDay = monthDays.find((d) => {
-        const dayNum = d > 0 ? d : lastDayOfMonth + d + 1;
-        return dayNum > currentDay && dayNum <= lastDayOfMonth;
-      });
+      // Convert negative monthdays to positive and find valid candidates
+      const validDays = monthDays
+        .map((d) => (d > 0 ? d : lastDayOfMonth + d + 1))
+        .filter((d) => d > 0 && d <= lastDayOfMonth)
+        .sort((a, b) => a - b);
+
+      const nextDay = this.findNextValidValue(currentDay, validDays, (a, b) => a - b);
 
       if (nextDay) {
-        const dayNum = nextDay > 0 ? nextDay : lastDayOfMonth + nextDay + 1;
-        current = current.with({day: dayNum, hour: 0, minute: 0, second: 0});
+        current = current.with({day: nextDay, hour: 0, minute: 0, second: 0});
       } else {
         // Move to next month and use first valid day
         const nextMonth = current.add({months: 1}).with({day: 1});
