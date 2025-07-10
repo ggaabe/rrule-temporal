@@ -401,13 +401,30 @@ export class RRuleTemporal {
       return this.applyTimeOverride(zdt.add({minutes: interval})).with({second: bySecond[0]});
     }
 
-    // SECONDLY frequency with a single BYMINUTE value should emit every
-    // second within that minute. When the minute rolls over, jump to the
-    // next hour and reset seconds.
-    if (freq === 'SECONDLY' && byMinute && byMinute.length === 1) {
+    // SECONDLY frequency with BYMINUTE. Emit every second within allowed minutes.
+    if (freq === 'SECONDLY' && byMinute && byMinute.length > 0) {
       const next = zdt.add({seconds: interval});
-      if (next.minute === byMinute[0]) return next;
-      return this.applyTimeOverride(zdt.add({hours: interval})).with({second: 0});
+      if (byMinute.includes(next.minute)) {
+        return next;
+      }
+      // Minute rolled over to an invalid one. Find the next valid minute.
+      const nextMinute = byMinute.find((m) => m > zdt.minute);
+      if (nextMinute !== undefined) {
+        return zdt.with({minute: nextMinute, second: bySecond ? bySecond[0] : 0});
+      }
+
+      // No more valid minutes in this hour. Find next valid hour.
+      if (byHour && byHour.length > 0) {
+        const nextHour = byHour.find((h) => h > zdt.hour);
+        if (nextHour !== undefined) {
+          return zdt.with({hour: nextHour, minute: byMinute[0], second: bySecond ? bySecond[0] : 0});
+        }
+        // No more valid hours today, move to next day
+        return this.applyTimeOverride(zdt.add({days: 1}));
+      }
+
+      // No byHour, just advance to next hour
+      return zdt.add({hours: 1}).with({minute: byMinute[0], second: bySecond ? bySecond[0] : 0});
     }
 
     if (byMinute && byMinute.length > 1) {
