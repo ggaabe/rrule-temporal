@@ -94,7 +94,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:00:01.000Z', '1998-01-01T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByMonthAndNWeekDay', () => {
+  it('testSecondlyByMonthAndNWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,

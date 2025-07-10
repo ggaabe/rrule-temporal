@@ -548,8 +548,8 @@ export class RRuleTemporal {
       // Check if we have ordinal BYDAY tokens (e.g., "1TU", "-1TH")
       const hasOrdinalTokens = this.opts.byDay.some((tok) => /^[+-]?\d/.test(tok));
 
-      if (hasOrdinalTokens && this.opts.byMonth && this.opts.freq === 'MINUTELY') {
-        // Handle ordinal BYDAY tokens with BYMONTH for MINUTELY frequency - find the first matching occurrence
+      if (hasOrdinalTokens && this.opts.byMonth && (this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY')) {
+        // Handle ordinal BYDAY tokens with BYMONTH for MINUTELY/SECONDLY frequency - find the first matching occurrence
         const months = [...this.opts.byMonth].sort((a, b) => a - b);
         let foundFirst = false;
 
@@ -564,7 +564,11 @@ export class RRuleTemporal {
 
             for (const occ of monthlyOccs) {
               if (Temporal.ZonedDateTime.compare(occ, zdt) >= 0) {
-                zdt = occ;
+                if (!occ.toPlainDate().equals(zdt.toPlainDate())) {
+                  zdt = this.applyTimeOverride(occ.with({hour: 0, minute: 0, second: 0}));
+                } else {
+                  zdt = occ;
+                }
                 foundFirst = true;
                 break;
               }
@@ -1229,7 +1233,10 @@ export class RRuleTemporal {
 
     // --- 7) fallback: step + filter ---
     // Handle MINUTELY/HOURLY/DAILY frequency with BYSETPOS
-    if ((this.opts.freq === 'MINUTELY' || this.opts.freq === 'HOURLY' || this.opts.freq === 'DAILY') && this.opts.bySetPos) {
+    if (
+      (this.opts.freq === 'MINUTELY' || this.opts.freq === 'HOURLY' || this.opts.freq === 'DAILY') &&
+      this.opts.bySetPos
+    ) {
       const start = this.originalDtstart;
       if (!this.addDtstartIfNeeded(dates, iterator)) {
         return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1240,16 +1247,16 @@ export class RRuleTemporal {
 
       switch (this.opts.freq) {
         case 'MINUTELY':
-          cursor = start.with({ second: 0, microsecond: 0, nanosecond: 0 });
-          duration = { minutes: this.opts.interval! };
+          cursor = start.with({second: 0, microsecond: 0, nanosecond: 0});
+          duration = {minutes: this.opts.interval!};
           break;
         case 'HOURLY':
-          cursor = start.with({ minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
-          duration = { hours: this.opts.interval! };
+          cursor = start.with({minute: 0, second: 0, microsecond: 0, nanosecond: 0});
+          duration = {hours: this.opts.interval!};
           break;
         case 'DAILY':
-          cursor = start.with({ hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0 });
-          duration = { days: this.opts.interval! };
+          cursor = start.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
+          duration = {days: this.opts.interval!};
           break;
         default:
           // Should not be reached

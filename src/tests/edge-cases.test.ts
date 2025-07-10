@@ -744,20 +744,20 @@ describe('Tests from rust package', function () {
   it.skip('DST hourly/minutes handling BST -> GMT using hourly', function () {
     const tz = 'Europe/London';
     const rule = `DTSTART;TZID=${tz}:20241027T000000\nRRULE:FREQ=HOURLY;COUNT=5`;
-    const entries =parse(rule).all();
-    assertDates({rule:parse(rule), print:format(tz)},  [
+    const entries = parse(rule).all();
+    assertDates({rule: parse(rule), print: format(tz)}, [
       '2024-10-27T00:00:00+01:00[Europe/London]',
       '2024-10-27T01:00:00+01:00[Europe/London]',
       '2024-10-27T02:00:00+00:00[Europe/London]',
       '2024-10-27T03:00:00+00:00[Europe/London]',
-      '2024-10-27T04:00:00+00:00[Europe/London]'
-    ])
-    assertDates({rule:parse(rule)},  [
+      '2024-10-27T04:00:00+00:00[Europe/London]',
+    ]);
+    assertDates({rule: parse(rule)}, [
       '2024-10-26T23:00:00.000Z',
       '2024-10-27T00:00:00.000Z',
       '2024-10-27T02:00:00.000Z',
       '2024-10-27T03:00:00.000Z',
-      '2024-10-27T04:00:00.000Z'
+      '2024-10-27T04:00:00.000Z',
     ]);
   });
 });
