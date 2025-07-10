@@ -376,7 +376,7 @@ export class RRuleTemporal {
 
     // MINUTELY frequency with BYHOUR constraint but no BYMINUTE - advance by interval minutes
     // and check if we're still in an allowed hour, otherwise find the next allowed hour
-    if (freq === 'MINUTELY' && byHour && byHour.length > 1 && !byMinute && interval > 1) {
+    if (freq === 'MINUTELY' && byHour && byHour.length > 1 && !byMinute) {
       const next = zdt.add({minutes: interval});
       if (byHour.includes(next.hour)) {
         return next;
