@@ -75,7 +75,7 @@ function unfoldLine(foldedLine: string): string {
 /**
  * Parse date values from EXDATE or RDATE lines
  */
-function parseDateValues(dateValues: string[], tzid: string, valueType?: string): Temporal.ZonedDateTime[] {
+function parseDateValues(dateValues: string[], tzid: string, valueType?: string) {
   const dates: Temporal.ZonedDateTime[] = [];
 
   for (const dateValue of dateValues) {
@@ -98,6 +98,22 @@ function parseDateValues(dateValues: string[], tzid: string, valueType?: string)
     }
   }
 
+  return dates;
+}
+
+function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', defaultTzid: string) {
+  const dates: Temporal.ZonedDateTime[] = [];
+  const regex = new RegExp(`^${linePrefix}(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)`, 'i');
+
+  for (const line of lines) {
+    const match = line.match(regex);
+    if (match) {
+      const [, valueType, tzid, dateValuesStr] = match;
+      const timezone = tzid || defaultTzid;
+      const dateValues = dateValuesStr!.split(',');
+      dates.push(...parseDateValues(dateValues, timezone, valueType));
+    }
+  }
   return dates;
 }
 
@@ -131,27 +147,8 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
 
     rruleLine = rrLine!;
 
-    // Parse EXDATE lines
-    for (const exLine of exLines) {
-      const exMatch = exLine.match(/EXDATE(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)/i);
-      if (exMatch) {
-        const [, valueType, exTzid, dateValuesStr] = exMatch;
-        const exTimezone = exTzid || tzid;
-        const dateValues = dateValuesStr!.split(',');
-        exDate.push(...parseDateValues(dateValues, exTimezone, valueType));
-      }
-    }
-
-    // Parse RDATE lines
-    for (const rLine of rLines) {
-      const rMatch = rLine.match(/RDATE(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)/i);
-      if (rMatch) {
-        const [, valueType, rTzid, dateValuesStr] = rMatch;
-        const rTimezone = rTzid || tzid;
-        const dateValues = dateValuesStr!.split(',');
-        rDate.push(...parseDateValues(dateValues, rTimezone, valueType));
-      }
-    }
+    exDate = parseDateLines(exLines, 'EXDATE', tzid);
+    rDate = parseDateLines(rLines, 'RDATE', tzid);
   } else {
     throw new Error('dtstart required when parsing RRULE alone');
   }
@@ -1117,8 +1114,11 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    // --- 5) YEARLY + BYDAY/BYMONTHDAY ---
-    if (this.opts.freq === 'YEARLY' && (this.opts.byDay || this.opts.byMonthDay)) {
+    // --- 5) YEARLY + BYDAY/BYMONTHDAY/BYYEARDAY/BYWEEKNO ---
+    if (
+      this.opts.freq === 'YEARLY' &&
+      (this.opts.byDay || this.opts.byMonthDay || this.opts.byYearDay || this.opts.byWeekNo)
+    ) {
       const start = this.originalDtstart;
 
       // Include dtstart even if it doesn't match the rule when includeDtstart is true
@@ -1161,53 +1161,9 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    // --- 6) YEARLY + BYYEARDAY/BYWEEKNO ---
-    if (this.opts.freq === 'YEARLY' && (this.opts.byYearDay || this.opts.byWeekNo)) {
-      const start = this.originalDtstart;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, 0)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        if (this.shouldBreakForCountLimit(1)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-      }
-
-      let yearCursor = start.with({month: 1, day: 1});
-      let matchCount = 0;
-
-      outer_year2: while (true) {
-        if (++iterationCount > this.maxIterations) {
-          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
-        }
-
-        const occs = this.generateYearlyOccurrences(yearCursor);
-        for (const occ of occs) {
-          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-            break outer_year2;
-          }
-          if (iterator && !iterator(occ, matchCount)) {
-            break outer_year2;
-          }
-          dates.push(occ);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
-            break outer_year2;
-          }
-        }
-        yearCursor = yearCursor.add({years: this.opts.interval!});
-      }
-
-      return this.applyCountLimitAndMergeRDates(dates, iterator);
-    }
-
-    // --- 6a) MINUTELY with limiting BYXXX constraints (special case) ---
+    // --- 6a) MINUTELY/SECONDLY with limiting BYXXX constraints (special case) ---
     if (
-      this.opts.freq === 'MINUTELY' &&
+      (this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY') &&
       (this.opts.byMonth || this.opts.byWeekNo || this.opts.byYearDay || this.opts.byMonthDay || this.opts.byDay)
     ) {
       const start = this.originalDtstart;
@@ -1227,58 +1183,7 @@ export class RRuleTemporal {
 
       let current = this.computeFirst();
 
-      outer_minutely: while (true) {
-        if (++iterationCount > this.maxIterations) {
-          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
-        }
-
-        if (this.opts.until && Temporal.ZonedDateTime.compare(current, this.opts.until) > 0) {
-          break;
-        }
-
-        // Check if current date matches all constraints
-        if (this.matchesAll(current)) {
-          if (iterator && !iterator(current, matchCount)) {
-            break;
-          }
-          dates.push(current);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
-            break;
-          }
-          current = this.nextCandidateSameDate(current);
-        } else {
-          // Current date doesn't match constraints, find next candidate efficiently
-          current = this.findNextValidDate(current);
-        }
-      }
-
-      return this.applyCountLimitAndMergeRDates(dates, iterator);
-    }
-
-    // --- 6b) SECONDLY with limiting BYXXX constraints (special case) ---
-    if (
-      this.opts.freq === 'SECONDLY' &&
-      (this.opts.byMonth || this.opts.byWeekNo || this.opts.byYearDay || this.opts.byMonthDay || this.opts.byDay)
-    ) {
-      const start = this.originalDtstart;
-      let matchCount = 0;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        matchCount++;
-        if (this.shouldBreakForCountLimit(matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-      }
-
-      let current = this.computeFirst();
-
-      outer_secondly: while (true) {
+      outer_small_freq: while (true) {
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
@@ -1397,8 +1302,8 @@ export class RRuleTemporal {
     }
 
     // --- 7) fallback: step + filter ---
-    // Handle HOURLY frequency with BYSETPOS - need to group occurrences by hour
-    if (this.opts.freq === 'HOURLY' && this.opts.bySetPos) {
+    // Handle HOURLY/DAILY frequency with BYSETPOS
+    if ((this.opts.freq === 'HOURLY' || this.opts.freq === 'DAILY') && this.opts.bySetPos) {
       let start = this.originalDtstart;
       let matchCount = 0;
 
@@ -1414,84 +1319,36 @@ export class RRuleTemporal {
         }
       }
 
-      let hourCursor = start.with({minute: 0, second: 0, microsecond: 0, nanosecond: 0});
+      let cursor = start.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
+      const duration = this.opts.freq === 'HOURLY' ? {hours: this.opts.interval!} : {days: this.opts.interval!};
 
-      outer_hourly: while (true) {
+      outer_loop: while (true) {
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
         }
 
-        // Generate all occurrences for this hour
-        let hourOccs = this.expandByTime(hourCursor);
-        hourOccs = hourOccs.filter((occ) => this.matchesAll(occ));
-        hourOccs = this.applyBySetPos(hourOccs);
+        // Generate all occurrences for this period
+        let periodOccs = this.expandByTime(cursor);
+        periodOccs = periodOccs.filter((occ) => this.matchesAll(occ));
+        periodOccs = this.applyBySetPos(periodOccs);
 
-        for (const occ of hourOccs) {
+        for (const occ of periodOccs) {
           if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
           if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-            break outer_hourly;
+            break outer_loop;
           }
           if (iterator && !iterator(occ, matchCount)) {
-            break outer_hourly;
+            break outer_loop;
           }
           dates.push(occ);
           matchCount++;
           if (this.shouldBreakForCountLimit(matchCount)) {
-            break outer_hourly;
+            break outer_loop;
           }
         }
-        hourCursor = hourCursor.add({hours: this.opts.interval!});
-        if (this.opts.until && Temporal.ZonedDateTime.compare(hourCursor, this.opts.until) > 0) {
-          break outer_hourly;
-        }
-      }
-    }
-    // Handle DAILY frequency with BYSETPOS - need to group occurrences by day
-    else if (this.opts.freq === 'DAILY' && this.opts.bySetPos) {
-      let start = this.originalDtstart;
-      let matchCount = 0;
-
-      // Include dtstart even if it doesn't match the rule when includeDtstart is true
-      if (this.includeDtstart && !this.matchesAll(start)) {
-        if (iterator && !iterator(start, matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-        dates.push(start);
-        matchCount++;
-        if (this.shouldBreakForCountLimit(matchCount)) {
-          return this.applyCountLimitAndMergeRDates(dates, iterator);
-        }
-      }
-
-      let dayCursor = start.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
-
-      outer_daily: while (true) {
-        if (++iterationCount > this.maxIterations) {
-          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
-        }
-
-        // Generate all occurrences for this day
-        let dayOccs = this.expandByTime(dayCursor);
-        dayOccs = dayOccs.filter((occ) => this.matchesAll(occ));
-        dayOccs = this.applyBySetPos(dayOccs);
-
-        for (const occ of dayOccs) {
-          if (Temporal.ZonedDateTime.compare(occ, start) < 0) continue;
-          if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
-            break outer_daily;
-          }
-          if (iterator && !iterator(occ, matchCount)) {
-            break outer_daily;
-          }
-          dates.push(occ);
-          matchCount++;
-          if (this.shouldBreakForCountLimit(matchCount)) {
-            break outer_daily;
-          }
-        }
-        dayCursor = dayCursor.add({days: this.opts.interval!});
-        if (this.opts.until && Temporal.ZonedDateTime.compare(dayCursor, this.opts.until) > 0) {
-          break outer_daily;
+        cursor = cursor.add(duration);
+        if (this.opts.until && Temporal.ZonedDateTime.compare(cursor, this.opts.until) > 0) {
+          break outer_loop;
         }
       }
     } else {
