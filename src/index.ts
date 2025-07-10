@@ -383,48 +383,42 @@ export class RRuleTemporal {
       return this.applyTimeOverride(zdt.add({days: 1}));
     }
 
-    if (freq === 'SECONDLY' && byHour && !byMinute && !bySecond) {
-      const next = zdt.add({seconds: interval});
-      if (byHour.includes(next.hour)) {
-        return next;
-      }
-      // Find next allowed hour
-      const nextHour = byHour.find((h) => h > zdt.hour) || byHour[0];
-      if (nextHour && nextHour > zdt.hour) {
-        return zdt.with({hour: nextHour, minute: 0, second: 0});
-      }
-      // Move to next day and use first allowed hour
-      return this.applyTimeOverride(zdt.add({days: 1}));
-    }
+    if (freq === 'SECONDLY') {
+      let next = zdt.add({seconds: interval});
 
-    if (freq === 'SECONDLY' && bySecond && bySecond.length === 1) {
-      return this.applyTimeOverride(zdt.add({minutes: interval})).with({second: bySecond[0]});
-    }
-
-    // SECONDLY frequency with BYMINUTE. Emit every second within allowed minutes.
-    if (freq === 'SECONDLY' && byMinute && byMinute.length > 0) {
-      const next = zdt.add({seconds: interval});
-      if (byMinute.includes(next.minute)) {
-        return next;
-      }
-      // Minute rolled over to an invalid one. Find the next valid minute.
-      const nextMinute = byMinute.find((m) => m > zdt.minute);
-      if (nextMinute !== undefined) {
-        return zdt.with({minute: nextMinute, second: bySecond ? bySecond[0] : 0});
-      }
-
-      // No more valid minutes in this hour. Find next valid hour.
-      if (byHour && byHour.length > 0) {
-        const nextHour = byHour.find((h) => h > zdt.hour);
-        if (nextHour !== undefined) {
-          return zdt.with({hour: nextHour, minute: byMinute[0], second: bySecond ? bySecond[0] : 0});
+      if (bySecond && bySecond.length > 0) {
+        const nextSecond = bySecond.find((s) => s > zdt.second);
+        if (nextSecond !== undefined) {
+          next = zdt.with({second: nextSecond});
+        } else {
+          next = zdt.add({minutes: 1}).with({second: bySecond[0]});
         }
-        // No more valid hours today, move to next day
-        return this.applyTimeOverride(zdt.add({days: 1}));
       }
 
-      // No byHour, just advance to next hour
-      return zdt.add({hours: 1}).with({minute: byMinute[0], second: bySecond ? bySecond[0] : 0});
+      if (byMinute && byMinute.length > 0 && !byMinute.includes(next.minute)) {
+        const nextMinute = byMinute.find((m) => m > next.minute);
+        if (nextMinute !== undefined) {
+          next = next.with({minute: nextMinute, second: bySecond ? bySecond[0] : 0});
+        } else {
+          const nextHour = byHour ? byHour.find((h) => h > next.hour) : undefined;
+          if (nextHour !== undefined) {
+            next = next.with({hour: nextHour, minute: byMinute[0], second: bySecond ? bySecond[0] : 0});
+          } else {
+            next = this.applyTimeOverride(next.add({days: 1}));
+          }
+        }
+      }
+
+      if (byHour && byHour.length > 0 && !byHour.includes(next.hour)) {
+        const nextHour = byHour.find((h) => h > next.hour);
+        if (nextHour !== undefined) {
+          next = next.with({hour: nextHour, minute: byMinute ? byMinute[0] : 0, second: bySecond ? bySecond[0] : 0});
+        } else {
+          next = this.applyTimeOverride(next.add({days: 1}));
+        }
+      }
+
+      return next;
     }
 
     if (byMinute && byMinute.length > 1) {

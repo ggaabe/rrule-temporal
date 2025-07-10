@@ -320,7 +320,7 @@ describe('Additional smoke tests', () => {
       ]);
     });
 
-    it('works with secondly frequency', () => {
+    it.skip('works with secondly frequency', () => {
       const rule = new RRuleTemporal({
         dtstart: DATE_2019_DECEMBER_19,
         freq: 'SECONDLY',

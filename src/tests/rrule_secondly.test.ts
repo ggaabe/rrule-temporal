@@ -264,7 +264,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T09:06:00.000Z', '1997-09-02T09:06:01.000Z', '1997-09-02T09:06:02.000Z']);
   });
 
-  it.skip('testSecondlyBySecond', () => {
+  it('testSecondlyBySecond', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -274,7 +274,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T09:00:06.000Z', '1997-09-02T09:00:18.000Z', '1997-09-02T09:01:06.000Z']);
   });
 
-  it.skip('testSecondlyByHourAndMinute', () => {
+  it('testSecondlyByHourAndMinute', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -285,7 +285,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-09-02T18:06:00.000Z', '1997-09-02T18:06:01.000Z', '1997-09-02T18:06:02.000Z']);
   });
 
-  it.skip('testSecondlyByHourAndSecond', () => {
+  it('testSecondlyByHourAndSecond', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
