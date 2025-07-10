@@ -190,7 +190,7 @@ describe('Secondly frequency tests', () => {
     ]);
   });
 
-  it.skip('testSecondlyByWeekNo', () => {
+  it('testSecondlyByWeekNo', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -200,7 +200,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1998-05-11T00:00:00.000Z', '1998-05-11T00:00:01.000Z', '1998-05-11T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByWeekNoAndWeekDay', () => {
+  it('testSecondlyByWeekNoAndWeekDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -211,7 +211,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-12-29T00:00:00.000Z', '1997-12-29T00:00:01.000Z', '1997-12-29T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByWeekNoAndWeekDayLarge', () => {
+  it('testSecondlyByWeekNoAndWeekDayLarge', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -222,7 +222,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-12-28T00:00:00.000Z', '1997-12-28T00:00:01.000Z', '1997-12-28T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByWeekNoAndWeekDayLast', () => {
+  it('testSecondlyByWeekNoAndWeekDayLast', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,
@@ -233,7 +233,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1997-12-28T00:00:00.000Z', '1997-12-28T00:00:01.000Z', '1997-12-28T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByWeekNoAndWeekDay53', () => {
+  it('testSecondlyByWeekNoAndWeekDay53', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 3,

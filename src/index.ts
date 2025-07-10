@@ -626,6 +626,19 @@ export class RRuleTemporal {
       zdt = zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
     }
 
+    // For SECONDLY frequency with BYWEEKNO without BYSECOND, start from 00:00 only if we jumped to a different date
+    if (
+      this.opts.freq === 'SECONDLY' &&
+      this.opts.byWeekNo?.length &&
+      !bySecond &&
+      Temporal.ZonedDateTime.compare(
+        zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0}),
+        this.originalDtstart,
+      ) > 0
+    ) {
+      zdt = zdt.with({hour: 0, minute: 0, second: 0, microsecond: 0, nanosecond: 0});
+    }
+
     if (byHour || byMinute || bySecond) {
       const candidates = this.expandByTime(zdt);
       for (const candidate of candidates) {
