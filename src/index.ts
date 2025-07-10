@@ -1762,7 +1762,7 @@ export class RRuleTemporal {
 
       if (nextYearDay) {
         const dayNum = nextYearDay > 0 ? nextYearDay : lastDayOfYear + nextYearDay + 1;
-        if (this.opts.freq === 'MINUTELY') {
+        if (this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY') {
           current = current
             .with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0})
             .add({days: dayNum - 1});
@@ -1776,7 +1776,7 @@ export class RRuleTemporal {
         const firstYearDay = yearDays[0];
         if (firstYearDay !== undefined) {
           const dayNum = firstYearDay > 0 ? firstYearDay : nextYearLastDay + firstYearDay + 1;
-          if (this.opts.freq === 'MINUTELY') {
+          if (this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY') {
             current = nextYear
               .with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0})
               .add({days: dayNum - 1});

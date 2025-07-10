@@ -128,7 +128,7 @@ describe('Secondly frequency tests', () => {
     assertDates({rule}, ['1998-01-01T00:00:00.000Z', '1998-01-01T00:00:01.000Z', '1998-01-01T00:00:02.000Z']);
   });
 
-  it.skip('testSecondlyByYearDay', () => {
+  it('testSecondlyByYearDay', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 4,
@@ -143,7 +143,7 @@ describe('Secondly frequency tests', () => {
     ]);
   });
 
-  it.skip('testSecondlyByYearDayNeg', () => {
+  it('testSecondlyByYearDayNeg', () => {
     const rule = new RRuleTemporal({
       freq: 'SECONDLY',
       count: 4,
