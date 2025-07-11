@@ -61,7 +61,6 @@ export default function App() {
       root.classList.remove('dark');
       root.style.colorScheme = 'light';
     }
-    console.log('Dark mode:', darkMode, 'Classes:', root.classList.toString());
   }, [darkMode]);
 
   // -------- derived rule + occurrences -------------------------------------
@@ -297,14 +296,14 @@ export default function App() {
 
   // -------------------------------------------------------------------------
   return (
-    <div className="min-h-screen p-4 text-sm">
+    <div className="min-h-screen p-4 text-sm bg-white dark:bg-gray-900 text-black dark:text-white">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">
           <a
             href="https://github.com/ggaabe/rrule-temporal"
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:underline text-blue-700"
+            className="hover:underline text-blue-700 dark:text-blue-400"
           >
             rrule-temporal
           </a>{" "}
@@ -314,7 +313,7 @@ export default function App() {
         {/* Dark mode toggle */}
         <button
           onClick={() => setDarkMode(!darkMode)}
-          className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white dark:bg-gray-800"
           aria-label="Toggle dark mode"
         >
           {darkMode ? (
@@ -335,8 +334,10 @@ export default function App() {
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`px-3 py-1 rounded border ${
-              mode === m ? "bg-blue-600 text-white" : "bg-white text-black"
+            className={`px-3 py-1 rounded border transition-colors ${
+              mode === m 
+                ? "bg-blue-600 text-white border-blue-600" 
+                : "bg-white dark:bg-gray-800 text-black dark:text-white border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
           >
             {m.charAt(0).toUpperCase() + m.slice(1)}
@@ -351,7 +352,7 @@ export default function App() {
 
           {mode === "raw" ? (
             <textarea
-              className="w-full h-64 border rounded p-2 font-mono text-xs shadow"
+              className="w-full h-64 border rounded p-2 font-mono text-xs shadow bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
               value={ics}
               onChange={(e) => setIcs(e.target.value)}
             />
@@ -379,14 +380,14 @@ export default function App() {
                 <label className="font-medium w-20">Start:</label>
                 <input
                   type="date"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={dtDate}
                   onChange={(e) => setDtDate(e.target.value)}
                 />
                 <input
                   type="time"
                   step="1"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={dtTime}
                   onChange={(e) => setDtTime(e.target.value)}
                 />
@@ -398,7 +399,7 @@ export default function App() {
                 <select
                   value={tzid}
                   onChange={(e) => setTzid(e.target.value)}
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                 >
                   {tzOptions.map((tz) => (
                     <option key={tz}>{tz}</option>
@@ -414,7 +415,7 @@ export default function App() {
                   min={1}
                   value={count}
                   onChange={(e) => setCount(parseInt(e.target.value) || 1)}
-                  className="border rounded p-1 w-24"
+                  className="border rounded p-1 w-24 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                 />
               </div>
 
@@ -460,7 +461,7 @@ export default function App() {
                   min={1}
                   value={interval}
                   onChange={(e) => setInterval(parseInt(e.target.value) || 1)}
-                  className="border rounded p-1 w-24"
+                  className="border rounded p-1 w-24 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                 />
               </div>
 
@@ -469,14 +470,14 @@ export default function App() {
                 <label className="font-medium w-20">Until:</label>
                 <input
                   type="date"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={untilDate}
                   onChange={(e) => setUntilDate(e.target.value)}
                 />
                 <input
                   type="time"
                   step="1"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={untilTime}
                   onChange={(e) => setUntilTime(e.target.value)}
                 />
@@ -487,7 +488,7 @@ export default function App() {
                 <label className="font-medium w-20">By Minute:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={byMinuteStr}
                   onChange={(e) => setByMinuteStr(e.target.value)}
                 />
@@ -498,7 +499,7 @@ export default function App() {
                 <label className="font-medium w-20">By Second:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={bySecondStr}
                   onChange={(e) => setBySecondStr(e.target.value)}
                 />
@@ -509,7 +510,7 @@ export default function App() {
                 <label className="font-medium w-20">By Month:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={byMonthStr}
                   onChange={(e) => setByMonthStr(e.target.value)}
                 />
@@ -520,7 +521,7 @@ export default function App() {
                 <label className="font-medium w-20">By Mo.Day:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={byMonthDayStr}
                   onChange={(e) => setByMonthDayStr(e.target.value)}
                 />
@@ -531,7 +532,7 @@ export default function App() {
                 <label className="font-medium w-20">By Yr.Day:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={byYearDayStr}
                   onChange={(e) => setByYearDayStr(e.target.value)}
                 />
@@ -542,7 +543,7 @@ export default function App() {
                 <label className="font-medium w-20">By WeekNo:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={byWeekNoStr}
                   onChange={(e) => setByWeekNoStr(e.target.value)}
                 />
@@ -553,7 +554,7 @@ export default function App() {
                 <label className="font-medium w-20">By SetPos:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={bySetPosStr}
                   onChange={(e) => setBySetPosStr(e.target.value)}
                 />
@@ -565,7 +566,7 @@ export default function App() {
                 <select
                   value={wkst}
                   onChange={(e) => setWkst(e.target.value)}
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                 >
                   <option value="">(none)</option>
                   {dowTokens.map((d) => (
@@ -581,7 +582,7 @@ export default function App() {
                 <label className="font-medium w-20">RDATE:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={rDateStr}
                   onChange={(e) => setRDateStr(e.target.value)}
                 />
@@ -592,7 +593,7 @@ export default function App() {
                 <label className="font-medium w-20">EXDATE:</label>
                 <input
                   type="text"
-                  className="border rounded p-1 flex-1"
+                  className="border rounded p-1 flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={exDateStr}
                   onChange={(e) => setExDateStr(e.target.value)}
                 />
@@ -604,7 +605,7 @@ export default function App() {
                 <input
                   type="number"
                   min={1}
-                  className="border rounded p-1 w-24"
+                  className="border rounded p-1 w-24 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                   value={maxIterations}
                   onChange={(e) => setMaxIterations(parseInt(e.target.value) || 1)}
                 />
@@ -622,7 +623,7 @@ export default function App() {
             </div>
           )}
 
-          {err && <p className="mt-2 text-red-600 text-xs">{err}</p>}
+          {err && <p className="mt-2 text-red-600 dark:text-red-400 text-xs">{err}</p>}
         </div>
 
         {/* ───────── OUTPUT COLUMN ───────── */}
@@ -630,30 +631,30 @@ export default function App() {
           <h2 className="text-xl font-semibold mb-2">Output</h2>
           {ruleText && <p className="mb-2 italic">{ruleText}</p>}
           {ruleString && (
-            <pre className=" p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto">
+            <pre className="p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600">
               {ruleString}
             </pre>
           )}
 
-          <div className="overflow-x-auto max-h-[28rem] overflow-y-auto border rounded shadow text-xs">
+          <div className="overflow-x-auto max-h-[28rem] overflow-y-auto border rounded shadow text-xs border-gray-300 dark:border-gray-600">
             <table className="min-w-full">
-              <thead className="sticky top-0 ">
+              <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-2 py-1 border">#</th>
-                  <th className="px-2 py-1 border">Day</th>
-                  <th className="px-2 py-1 border">Date</th>
-                  <th className="px-2 py-1 border">Time</th>
-                  <th className="px-2 py-1 border">TZ</th>
+                  <th className="px-2 py-1 border border-gray-300 dark:border-gray-600">#</th>
+                  <th className="px-2 py-1 border border-gray-300 dark:border-gray-600">Day</th>
+                  <th className="px-2 py-1 border border-gray-300 dark:border-gray-600">Date</th>
+                  <th className="px-2 py-1 border border-gray-300 dark:border-gray-600">Time</th>
+                  <th className="px-2 py-1 border border-gray-300 dark:border-gray-600">TZ</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.idx} className={r.idx % 2 ? "" : undefined}>
-                    <td className="px-2 border text-center">{r.idx}</td>
-                    <td className="px-2  border">{r.dow}</td>
-                    <td className="px-2  border">{`${r.day} ${r.month} ${r.year}`}</td>
-                    <td className="px-2  border">{r.time}</td>
-                    <td className="px-2 border">{r.tz}</td>
+                  <tr key={r.idx} className={r.idx % 2 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800"}>
+                    <td className="px-2 border text-center border-gray-300 dark:border-gray-600">{r.idx}</td>
+                    <td className="px-2 border border-gray-300 dark:border-gray-600">{r.dow}</td>
+                    <td className="px-2 border border-gray-300 dark:border-gray-600">{`${r.day} ${r.month} ${r.year}`}</td>
+                    <td className="px-2 border border-gray-300 dark:border-gray-600">{r.time}</td>
+                    <td className="px-2 border border-gray-300 dark:border-gray-600">{r.tz}</td>
                   </tr>
                 ))}
               </tbody>
@@ -662,7 +663,7 @@ export default function App() {
         </div>
       </div>
 
-      <footer className="mt-8 text-xs text-gray-500">
+      <footer className="mt-8 text-xs text-gray-500 dark:text-gray-400">
         Built with <code>rrule-temporal</code>, Temporal API & Tailwind v4.
       </footer>
     </div>
