@@ -67,9 +67,13 @@ export default function App() {
       root.style.colorScheme = 'dark';
       styleEl.textContent = `
         body { background-color: #111827; color: #f9fafb; }
-        input, textarea, select, button { background-color: #1f2937; color: #f9fafb; border-color: #4b5563; }
+        input, textarea, select { background-color: #1f2937; color: #f9fafb; border-color: #4b5563; }
         input:focus, textarea:focus, select:focus { border-color: #6b7280; }
+        button { background-color: #1f2937; color: #f9fafb; border-color: #4b5563; }
         button:hover { background-color: #374151; }
+        .bg-blue-600 { background-color: #2563eb !important; }
+        .bg-white { background-color: #1f2937 !important; }
+        .text-black { color: #f9fafb !important; }
         table { background-color: #1f2937; }
         th { background-color: #374151; }
         td { border-color: #4b5563; }
@@ -85,9 +89,13 @@ export default function App() {
       root.style.colorScheme = 'light';
       styleEl.textContent = `
         body { background-color: #ffffff; color: #111827; }
-        input, textarea, select, button { background-color: #ffffff; color: #111827; border-color: #d1d5db; }
+        input, textarea, select { background-color: #ffffff; color: #111827; border-color: #d1d5db; }
         input:focus, textarea:focus, select:focus { border-color: #9ca3af; }
+        button { background-color: #ffffff; color: #111827; border-color: #d1d5db; }
         button:hover { background-color: #f9fafb; }
+        .bg-blue-600 { background-color: #2563eb !important; }
+        .bg-white { background-color: #ffffff !important; }
+        .text-black { color: #111827 !important; }
         table { background-color: #ffffff; }
         th { background-color: #f9fafb; }
         td { border-color: #d1d5db; }
@@ -99,15 +107,17 @@ export default function App() {
         .text-gray-500 { color: #6b7280; }
       `;
     }
+  }, [darkMode]);
 
-    // Cleanup function
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       const styleElement = document.getElementById('dynamic-theme-styles');
       if (styleElement) {
         styleElement.remove();
       }
     };
-  }, [darkMode]);
+  }, []);
 
   // -------- derived rule + occurrences -------------------------------------
   const { ruleString, ruleText, rows } = useMemo(() => {
