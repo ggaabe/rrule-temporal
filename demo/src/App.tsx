@@ -344,14 +344,14 @@ export default function App() {
                 <label className="font-medium w-20">Start:</label>
                 <input
                   type="date"
-                  className="border rounded p-1"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
                   value={dtDate}
                   onChange={(e) => setDtDate(e.target.value)}
                 />
                 <input
                   type="time"
                   step="1"
-                  className="border rounded p-1"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
                   value={dtTime}
                   onChange={(e) => setDtTime(e.target.value)}
                 />
@@ -434,14 +434,14 @@ export default function App() {
                 <label className="font-medium w-20">Until:</label>
                 <input
                   type="date"
-                  className="border rounded p-1"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
                   value={untilDate}
                   onChange={(e) => setUntilDate(e.target.value)}
                 />
                 <input
                   type="time"
                   step="1"
-                  className="border rounded p-1"
+                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
                   value={untilTime}
                   onChange={(e) => setUntilTime(e.target.value)}
                 />
