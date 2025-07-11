@@ -96,6 +96,21 @@ export default function App() {
   const [dtTime, setDtTime] = useState("12:00:00");
   const [byDay, setByDay] = useState<string[]>([]);
   const [byHour, setByHour] = useState<number[]>([12]);
+  const [interval, setInterval] = useState(1);
+  const [untilDate, setUntilDate] = useState("");
+  const [untilTime, setUntilTime] = useState("00:00:00");
+  const [byMinuteStr, setByMinuteStr] = useState("");
+  const [bySecondStr, setBySecondStr] = useState("");
+  const [byMonthStr, setByMonthStr] = useState("");
+  const [byMonthDayStr, setByMonthDayStr] = useState("");
+  const [byYearDayStr, setByYearDayStr] = useState("");
+  const [byWeekNoStr, setByWeekNoStr] = useState("");
+  const [bySetPosStr, setBySetPosStr] = useState("");
+  const [wkst, setWkst] = useState("");
+  const [rDateStr, setRDateStr] = useState("");
+  const [exDateStr, setExDateStr] = useState("");
+  const [maxIterations, setMaxIterations] = useState(10000);
+  const [includeDtstart, setIncludeDtstart] = useState(false);
 
   // --- sync visual controls from raw ics when entering visual ---------------
   useEffect(() => {
@@ -103,7 +118,10 @@ export default function App() {
     try {
       const opts = new RRuleTemporal({ rruleString: ics.trim() }).options();
       setFreq(opts.freq);
+      setInterval(opts.interval ?? 1);
       setCount(opts.count ?? 30);
+      setUntilDate(opts.until ? toDateInput(opts.until) : "");
+      setUntilTime(opts.until ? toTimeInput(opts.until) : "00:00:00");
       setTzid(opts.tzid ?? opts.dtstart.timeZoneId);
       setDtDate(toDateInput(opts.dtstart));
       setDtTime(toTimeInput(opts.dtstart));
@@ -114,6 +132,22 @@ export default function App() {
             ? []
             : [opts.dtstart.hour])
       );
+      setByMinuteStr(opts.byMinute ? opts.byMinute.join(",") : "");
+      setBySecondStr(opts.bySecond ? opts.bySecond.join(",") : "");
+      setByMonthStr(opts.byMonth ? opts.byMonth.join(",") : "");
+      setByMonthDayStr(opts.byMonthDay ? opts.byMonthDay.join(",") : "");
+      setByYearDayStr(opts.byYearDay ? opts.byYearDay.join(",") : "");
+      setByWeekNoStr(opts.byWeekNo ? opts.byWeekNo.join(",") : "");
+      setBySetPosStr(opts.bySetPos ? opts.bySetPos.join(",") : "");
+      setWkst(opts.wkst ?? "");
+      setRDateStr(
+        opts.rDate ? opts.rDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(",") : ""
+      );
+      setExDateStr(
+        opts.exDate ? opts.exDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(",") : ""
+      );
+      setMaxIterations(opts.maxIterations ?? 10000);
+      setIncludeDtstart(opts.includeDtstart ?? false);
     } catch (e) {
       /* ignore parse failure */
       console.log(e);
@@ -135,6 +169,41 @@ export default function App() {
         second: ss ?? 0,
         timeZone: tzid,
       });
+      const until = untilDate
+        ? Temporal.ZonedDateTime.from({
+            year: Number(untilDate.split("-")[0]),
+            month: Number(untilDate.split("-")[1]),
+            day: Number(untilDate.split("-")[2]),
+            hour: Number(untilTime.split(":")[0] || 0),
+            minute: Number(untilTime.split(":")[1] || 0),
+            second: Number(untilTime.split(":")[2] || 0),
+            timeZone: tzid,
+          })
+        : undefined;
+
+      const numList = (str: string) =>
+        str.trim()
+          ? str.split(/\s*,\s*/).map((n) => parseInt(n, 10)).filter((n) => !isNaN(n))
+          : undefined;
+      const dateList = (str: string): Temporal.ZonedDateTime[] | undefined => {
+        if (!str.trim()) return undefined;
+        const parts = str.split(/\s*,\s*/);
+        const out: Temporal.ZonedDateTime[] = [];
+        for (const p of parts) {
+          try {
+            out.push(Temporal.ZonedDateTime.from(p));
+          } catch {
+            try {
+              out.push(
+                Temporal.PlainDateTime.from(p).toZonedDateTime({ timeZone: tzid })
+              );
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        return out.length ? out : undefined;
+      };
       const rule = new RRuleTemporal({
         freq: freq as
           | "YEARLY"
@@ -144,15 +213,29 @@ export default function App() {
           | "HOURLY"
           | "MINUTELY"
           | "SECONDLY",
+        interval,
         count,
+        until,
         dtstart,
         tzid,
+        maxIterations,
+        includeDtstart,
         byDay: byDay.length ? byDay : undefined,
         byHour: ["MINUTELY", "SECONDLY"].includes(freq)
           ? undefined
           : byHour.length
           ? [...byHour].sort((a, b) => a - b)
           : undefined,
+        byMinute: numList(byMinuteStr),
+        bySecond: numList(bySecondStr),
+        byMonth: numList(byMonthStr),
+        byMonthDay: numList(byMonthDayStr),
+        byYearDay: numList(byYearDayStr),
+        byWeekNo: numList(byWeekNoStr),
+        bySetPos: numList(bySetPosStr),
+        wkst: wkst || undefined,
+        rDate: dateList(rDateStr),
+        exDate: dateList(exDateStr),
       });
       setIcs(rule.toString());
     } catch (e) {
@@ -160,7 +243,31 @@ export default function App() {
       console.log(e);
       setErr(e as string);
     }
-  }, [mode, freq, count, tzid, dtDate, dtTime, byDay, byHour]);
+  }, [
+    mode,
+    freq,
+    interval,
+    count,
+    untilDate,
+    untilTime,
+    tzid,
+    dtDate,
+    dtTime,
+    byDay,
+    byHour,
+    byMinuteStr,
+    bySecondStr,
+    byMonthStr,
+    byMonthDayStr,
+    byYearDayStr,
+    byWeekNoStr,
+    bySetPosStr,
+    wkst,
+    rDateStr,
+    exDateStr,
+    maxIterations,
+    includeDtstart,
+  ]);
 
   // helpers ------------------------------------------------------------------
   const toggleDay = (tok: string) =>
@@ -308,6 +415,174 @@ export default function App() {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              {/* INTERVAL */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">Interval:</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={interval}
+                  onChange={(e) => setInterval(parseInt(e.target.value) || 1)}
+                  className="border rounded p-1 w-24"
+                />
+              </div>
+
+              {/* UNTIL */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">Until:</label>
+                <input
+                  type="date"
+                  className="border rounded p-1"
+                  value={untilDate}
+                  onChange={(e) => setUntilDate(e.target.value)}
+                />
+                <input
+                  type="time"
+                  step="1"
+                  className="border rounded p-1"
+                  value={untilTime}
+                  onChange={(e) => setUntilTime(e.target.value)}
+                />
+              </div>
+
+              {/* BYMINUTE */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">By Minute:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={byMinuteStr}
+                  onChange={(e) => setByMinuteStr(e.target.value)}
+                />
+              </div>
+
+              {/* BYSECOND */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">By Second:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={bySecondStr}
+                  onChange={(e) => setBySecondStr(e.target.value)}
+                />
+              </div>
+
+              {/* BYMONTH */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">By Month:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={byMonthStr}
+                  onChange={(e) => setByMonthStr(e.target.value)}
+                />
+              </div>
+
+              {/* BYMONTHDAY */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">By Mo.Day:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={byMonthDayStr}
+                  onChange={(e) => setByMonthDayStr(e.target.value)}
+                />
+              </div>
+
+              {/* BYYEARDAY */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">By Yr.Day:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={byYearDayStr}
+                  onChange={(e) => setByYearDayStr(e.target.value)}
+                />
+              </div>
+
+              {/* BYWEEKNO */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">By WeekNo:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={byWeekNoStr}
+                  onChange={(e) => setByWeekNoStr(e.target.value)}
+                />
+              </div>
+
+              {/* BYSETPOS */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">By SetPos:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={bySetPosStr}
+                  onChange={(e) => setBySetPosStr(e.target.value)}
+                />
+              </div>
+
+              {/* WKST */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">WKST:</label>
+                <select
+                  value={wkst}
+                  onChange={(e) => setWkst(e.target.value)}
+                  className="border rounded p-1 flex-1"
+                >
+                  <option value="">(none)</option>
+                  {dowTokens.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* RDATE */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">RDATE:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={rDateStr}
+                  onChange={(e) => setRDateStr(e.target.value)}
+                />
+              </div>
+
+              {/* EXDATE */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">EXDATE:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={exDateStr}
+                  onChange={(e) => setExDateStr(e.target.value)}
+                />
+              </div>
+
+              {/* MAX ITER */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">Max Iter:</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="border rounded p-1 w-24"
+                  value={maxIterations}
+                  onChange={(e) => setMaxIterations(parseInt(e.target.value) || 1)}
+                />
+              </div>
+
+              {/* INCLUDE DTSTART */}
+              <div className="flex items-center space-x-2">
+                <label className="font-medium w-20">Include DT:</label>
+                <input
+                  type="checkbox"
+                  checked={includeDtstart}
+                  onChange={(e) => setIncludeDtstart(e.target.checked)}
+                />
               </div>
             </div>
           )}
