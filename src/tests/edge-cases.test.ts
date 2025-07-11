@@ -948,7 +948,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
     ]);
   });
 
-  it.skip('should handle yearly recurrence by negative week number', () => {
+  it('should handle yearly recurrence by negative week number', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byWeekNo: [-1, -2],
