@@ -414,41 +414,58 @@ export class RRuleTemporal {
     }
 
     if (freq === 'SECONDLY') {
-      let next = zdt.add({seconds: interval});
+      let candidate = zdt;
 
+      // 1. Process Seconds
       if (bySecond && bySecond.length > 0) {
-        const nextSecond = bySecond.find((s) => s > zdt.second);
-        if (nextSecond !== undefined) {
-          next = zdt.with({second: nextSecond});
-        } else {
-          next = zdt.add({minutes: 1}).with({second: bySecond[0]});
+        const nextSecondInList = bySecond.find((s) => s > candidate.second);
+        if (nextSecondInList !== undefined) {
+          return candidate.with({second: nextSecondInList});
         }
+        // Seconds exhausted for current minute, reset second and advance minute
+        candidate = candidate.with({second: bySecond[0]}).add({minutes: 1});
+      } else {
+        // No bySecond, advance by interval seconds
+        candidate = candidate.add({seconds: interval});
       }
 
-      if (byMinute && byMinute.length > 0 && !byMinute.includes(next.minute)) {
-        const nextMinute = byMinute.find((m) => m > next.minute);
-        if (nextMinute !== undefined) {
-          next = next.with({minute: nextMinute, second: bySecond ? bySecond[0] : 0});
-        } else {
-          const nextHour = byHour ? byHour.find((h) => h > next.hour) : undefined;
-          if (nextHour !== undefined) {
-            next = next.with({hour: nextHour, minute: byMinute[0], second: bySecond ? bySecond[0] : 0});
-          } else {
-            next = this.applyTimeOverride(next.add({days: 1}));
+      // 2. Process Minutes (after potential second advancement/rollover)
+      if (byMinute && byMinute.length > 0) {
+        // Check if the new minute is valid or needs further advancement
+        if (
+          !byMinute.includes(candidate.minute) ||
+          (candidate.minute === zdt.minute && candidate.second < zdt.second)
+        ) {
+          const nextMinuteInList = byMinute.find((m) => m > candidate.minute);
+          if (nextMinuteInList !== undefined) {
+            return candidate.with({minute: nextMinuteInList, second: bySecond ? bySecond[0] : 0});
           }
+          // Minutes exhausted for current hour, reset minute and advance hour
+          candidate = candidate.with({minute: byMinute[0], second: bySecond ? bySecond[0] : 0}).add({hours: 1});
         }
       }
 
-      if (byHour && byHour.length > 0 && !byHour.includes(next.hour)) {
-        const nextHour = byHour.find((h) => h > next.hour);
-        if (nextHour !== undefined) {
-          next = next.with({hour: nextHour, minute: byMinute ? byMinute[0] : 0, second: bySecond ? bySecond[0] : 0});
-        } else {
-          next = this.applyTimeOverride(next.add({days: 1}));
+      // 3. Process Hours (after potential minute advancement/rollover)
+      if (byHour && byHour.length > 0) {
+        // Check if the new hour is valid or needs further advancement
+        if (!byHour.includes(candidate.hour) || (candidate.hour === zdt.hour && candidate.minute < zdt.minute)) {
+          const nextHourInList = byHour.find((h) => h > candidate.hour);
+          if (nextHourInList !== undefined) {
+            return candidate.with({
+              hour: nextHourInList,
+              minute: byMinute ? byMinute[0] : 0,
+              second: bySecond ? bySecond[0] : 0,
+            });
+          }
+          // Hours exhausted for current day, reset hour and advance day
+          candidate = candidate
+            .with({hour: byHour[0], minute: byMinute ? byMinute[0] : 0, second: bySecond ? bySecond[0] : 0})
+            .add({days: 1});
         }
       }
 
-      return next;
+      // If we reached here, all time components have been processed and advanced as needed.
+      return candidate;
     }
 
     if (byMinute && byMinute.length > 1) {
