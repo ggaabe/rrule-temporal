@@ -332,17 +332,17 @@ describe('Additional smoke tests', () => {
         '2019-12-19T00:00:10.000Z',
         '2019-12-19T00:00:30.000Z',
         '2019-12-19T00:00:58.000Z',
-        '2019-12-19T00:00:10.000Z',
-        '2019-12-19T00:00:30.000Z',
-        '2019-12-19T00:00:58.000Z',
-        '2019-12-19T00:00:10.000Z',
-        '2019-12-19T00:00:30.000Z',
-        '2019-12-19T00:00:58.000Z',
-        '2019-12-19T00:00:10.000Z',
-        '2019-12-19T00:00:30.000Z',
-        '2019-12-19T00:00:58.000Z',
-        '2019-12-19T00:00:10.000Z',
-        '2019-12-19T00:00:30.000Z',
+        '2019-12-19T00:01:10.000Z',
+        '2019-12-19T00:01:30.000Z',
+        '2019-12-19T00:01:58.000Z',
+        '2019-12-19T00:02:10.000Z',
+        '2019-12-19T00:02:30.000Z',
+        '2019-12-19T00:02:58.000Z',
+        '2019-12-19T00:03:10.000Z',
+        '2019-12-19T00:03:30.000Z',
+        '2019-12-19T00:03:58.000Z',
+        '2019-12-19T00:04:10.000Z',
+        '2019-12-19T00:04:30.000Z',
       ]);
     });
 
@@ -694,7 +694,26 @@ describe('Tests from rust package', function () {
     ]);
   });
 
-  it('DST hourly/minutes handling BST -> GMT', function () {
+  it('DST hourly/minutes handling GMT -> BST using hourly', function () {
+    const tz = 'Europe/London';
+    const rule = `DTSTART;TZID=${tz}:20240330T230000\nRRULE:FREQ=HOURLY;COUNT=5`;
+    assertDates({rule: parse(rule), print: format(tz)}, [
+      '2024-03-30T23:00:00+00:00[Europe/London]',
+      '2024-03-31T00:00:00+00:00[Europe/London]',
+      '2024-03-31T02:00:00+01:00[Europe/London]',
+      '2024-03-31T03:00:00+01:00[Europe/London]',
+      '2024-03-31T04:00:00+01:00[Europe/London]',
+    ]);
+    assertDates({rule: parse(rule)}, [
+      '2024-03-30T23:00:00.000Z',
+      '2024-03-31T00:00:00.000Z',
+      '2024-03-31T01:00:00.000Z',
+      '2024-03-31T02:00:00.000Z',
+      '2024-03-31T03:00:00.000Z',
+    ]);
+  });
+
+  it('BYHOUR DST hourly/minutes handling BST -> GMT', function () {
     const tz = 'Europe/London';
     const rule = `DTSTART;TZID=${tz}:20241026T000000\nRRULE:FREQ=DAILY;BYHOUR=0,1,2,3,4;BYMINUTE=0,30`;
     const Y2024_10_27_UTC = 1729987200000;
@@ -720,6 +739,24 @@ describe('Tests from rust package', function () {
       '2024-10-27T02:30:00.000Z',
       '2024-10-27T03:00:00.000Z',
       '2024-10-27T03:30:00.000Z',
+    ]);
+  });
+  it('HOURLY DST hourly/minutes handling BST -> GMT', function () {
+    const tz = 'Europe/London';
+    const rule = `DTSTART;TZID=${tz}:20241027T000000\nRRULE:FREQ=HOURLY;COUNT=5`;
+    assertDates({rule: parse(rule), print: format(tz)}, [
+      '2024-10-27T00:00:00+01:00[Europe/London]',
+      '2024-10-27T01:00:00+01:00[Europe/London]',
+      '2024-10-27T02:00:00+00:00[Europe/London]',
+      '2024-10-27T03:00:00+00:00[Europe/London]',
+      '2024-10-27T04:00:00+00:00[Europe/London]',
+    ]);
+    assertDates({rule: parse(rule)}, [
+      '2024-10-26T23:00:00.000Z',
+      '2024-10-27T00:00:00.000Z',
+      '2024-10-27T02:00:00.000Z',
+      '2024-10-27T03:00:00.000Z',
+      '2024-10-27T04:00:00.000Z',
     ]);
   });
 });
@@ -902,30 +939,31 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
     assertDates({rule}, [
-      '2025-06-23T12:00:00.000Z',
-      '2025-12-22T12:00:00.000Z',
-      '2025-12-29T12:00:00.000Z',
-      '2026-06-22T12:00:00.000Z',
-      '2026-12-21T12:00:00.000Z',
-      '2026-12-28T12:00:00.000Z',
+      '2025-01-01T12:00:00.000Z',
+      '2025-06-25T12:00:00.000Z',
+      '2025-12-24T12:00:00.000Z',
+      '2025-12-31T12:00:00.000Z',
+      '2026-06-24T12:00:00.000Z',
+      '2026-12-23T12:00:00.000Z',
     ]);
   });
 
-  // TODO
-  it.skip('should handle yearly recurrence by negative week number', () => {
+  it('should handle yearly recurrence by negative week number', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byWeekNo: [-1, -2],
       count: 4,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => d.hour === 12)).toBe(true);
+    assertDates({rule}, [
+      '2025-12-17T12:00:00.000Z',
+      '2025-12-24T12:00:00.000Z',
+      '2026-12-23T12:00:00.000Z',
+      '2026-12-30T12:00:00.000Z',
+    ]);
   });
 
-  // TODO
-  it.skip('should handle BYWEEKNO with BYDAY', () => {
+  it('should handle BYWEEKNO with BYDAY', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byWeekNo: [1, 2],
@@ -933,9 +971,13 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
       count: 4,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => d.dayOfWeek === 1)).toBe(true);
+    assertDates({rule}, [
+      // week 1 monday 2025 is before 2025-01-01 (Dec 30, 2024)
+      '2025-01-06T12:00:00.000Z', // week 2 monday 2025 is Jan 6
+      '2025-12-29T12:00:00.000Z', // week 1 monday 2026 is Dec 29, 2025 (RFC 5545 week spans calendar years)
+      '2026-01-05T12:00:00.000Z', // week 2 monday 2026 is Jan 5
+      '2026-12-28T12:00:00.000Z', // week 1 monday 2027 is Dec 28, 2026 (RFC 5545 week spans calendar years)
+    ]);
   });
 });
 
