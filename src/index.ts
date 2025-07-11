@@ -840,10 +840,9 @@ export class RRuleTemporal {
     const thursday = zdt.add({days: 4 - zdt.dayOfWeek});
     const year = thursday.year;
 
-    // The first Thursday of the year.
-    const firstThursday = thursday
-      .with({month: 1, day: 1})
-      .add({days: (4 - thursday.with({month: 1, day: 1}).dayOfWeek + 7) % 7});
+    // The first Thursday of the ISO week year.
+    const jan1 = zdt.with({year, month: 1, day: 1});
+    const firstThursday = jan1.add({days: (4 - jan1.dayOfWeek + 7) % 7});
 
     const diffDays = thursday.toPlainDate().since(firstThursday.toPlainDate()).days;
     const week = Math.floor(diffDays / 7) + 1;

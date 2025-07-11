@@ -963,8 +963,7 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
     ]);
   });
 
-  // TODO
-  it.skip('should handle BYWEEKNO with BYDAY', () => {
+  it('should handle BYWEEKNO with BYDAY', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byWeekNo: [1, 2],
@@ -972,9 +971,13 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
       count: 4,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => d.dayOfWeek === 1)).toBe(true);
+    assertDates({rule}, [
+      // week 1 monday 2025 is before 2025-01-01 (Dec 30, 2024)
+      '2025-01-06T12:00:00.000Z', // week 2 monday 2025 is Jan 6
+      '2025-12-29T12:00:00.000Z', // week 1 monday 2026 is Dec 29, 2025 (RFC 5545 week spans calendar years)
+      '2026-01-05T12:00:00.000Z', // week 2 monday 2026 is Jan 5
+      '2026-12-28T12:00:00.000Z', // week 1 monday 2027 is Dec 28, 2026 (RFC 5545 week spans calendar years)
+    ]);
   });
 });
 
