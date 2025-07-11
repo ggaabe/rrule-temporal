@@ -982,50 +982,78 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
 });
 
 describe('RRuleTemporal - BYYEARDAY Rules', () => {
-  // TODO
-  it.skip('should handle positive year days', () => {
+  it('should handle positive year days', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byYearDay: [1, 100, 365],
       count: 6,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(6);
-    expect(dates.map((d) => d.dayOfYear)).toEqual([1, 100, 365, 1, 100, 365]);
+    assertDates({rule}, [
+      '2025-01-01T12:00:00.000Z',
+      '2025-04-10T12:00:00.000Z',
+      '2025-12-31T12:00:00.000Z',
+      '2026-01-01T12:00:00.000Z',
+      '2026-04-10T12:00:00.000Z',
+      '2026-12-31T12:00:00.000Z',
+    ]);
   });
 
-  // TODO
-  it.skip('should handle negative year days', () => {
+  it('should handle negative year days', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byYearDay: [-1, -100],
       count: 4,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => d.hour === 12)).toBe(true);
+    assertDates({rule}, [
+      '2025-09-23T12:00:00.000Z',
+      '2025-12-31T12:00:00.000Z',
+      '2026-09-23T12:00:00.000Z',
+      '2026-12-31T12:00:00.000Z',
+    ]);
   });
 
-  // TODO
   it.skip('should handle BYYEARDAY in leap year', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byYearDay: [366, -1],
-      count: 2,
+      count: 8,
       dtstart: Temporal.ZonedDateTime.from('2024-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(2);
-    expect(dates[0]?.dayOfYear).toBe(366);
-    expect(dates[1]?.dayOfYear).toBe(366);
+    // byYearDay:[366, -1] are on the same day...
+    assertDates({rule}, [
+      '2024-12-31T12:00:00.000Z',
+      '2025-12-31T12:00:00.000Z',
+      '2026-12-31T12:00:00.000Z',
+      '2027-12-31T12:00:00.000Z',
+      '2028-12-31T12:00:00.000Z',
+      '2029-12-31T12:00:00.000Z',
+      '2030-12-31T12:00:00.000Z',
+      '2031-12-31T12:00:00.000Z',
+    ]);
+  });
+
+  it('Monthly byYearDay', async () => {
+    const rule = new RRuleTemporal({
+      freq: 'MONTHLY',
+      count: 6,
+      byYearDay: [32],
+      dtstart: Temporal.ZonedDateTime.from({year: 2010, month: 3, day: 22, hour: 12, minute: 1, timeZone: 'UTC'}),
+    });
+    assertDates({rule}, [
+      '2011-02-01T12:01:00.000Z',
+      '2012-02-01T12:01:00.000Z',
+      '2013-02-01T12:01:00.000Z',
+      '2014-02-01T12:01:00.000Z',
+      '2015-02-01T12:01:00.000Z',
+      '2016-02-01T12:01:00.000Z',
+    ]);
   });
 });
 
 describe('RRuleTemporal - Complex Time Patterns', () => {
-  // TODO
-  it.skip('should handle MINUTELY with multiple BYHOUR', () => {
+  it('should handle MINUTELY with multiple BYHOUR', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       byHour: [9, 14, 17],
@@ -1033,40 +1061,37 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
       count: 6,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T09:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(6);
-    expect(dates.map((d) => d.hour)).toEqual([9, 9, 14, 14, 17, 17]);
+    assertDates({rule}, [
+      '2025-01-01T09:00:00.000Z',
+      '2025-01-01T09:30:00.000Z',
+      '2025-01-01T14:00:00.000Z',
+      '2025-01-01T14:30:00.000Z',
+      '2025-01-01T17:00:00.000Z',
+      '2025-01-01T17:30:00.000Z',
+    ]);
   });
 
-  // TODO
-  it.skip('should handle HOURLY with single BYHOUR to prevent infinite loop', () => {
+  it('should handle HOURLY with single BYHOUR to prevent infinite loop', () => {
     const rule = new RRuleTemporal({
       freq: 'HOURLY',
       byHour: [12],
       count: 3,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(3);
-    expect(dates.every((d) => d.hour === 12)).toBe(true);
-    expect(dates.map((d) => d.day)).toEqual([1, 2, 3]);
+    assertDates({rule}, ['2025-01-01T12:00:00.000Z', '2025-01-02T12:00:00.000Z', '2025-01-03T12:00:00.000Z']);
   });
 
-  // TODO
-  it.skip('should handle WEEKLY frequency raw advancement', () => {
+  it('should handle WEEKLY frequency raw advancement', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
       interval: 2,
       count: 3,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(3);
-    expect(dates.map((d) => d.day)).toEqual([1, 15, 29]);
+    assertDates({rule}, ['2025-01-01T12:00:00.000Z', '2025-01-15T12:00:00.000Z', '2025-01-29T12:00:00.000Z']);
   });
 
-  // TODO
-  it.skip('should handle MINUTELY with BYDAY constraint', () => {
+  it('should handle MINUTELY with BYDAY constraint', () => {
     const rule = new RRuleTemporal({
       freq: 'MINUTELY',
       byDay: ['MO'],
@@ -1074,16 +1099,17 @@ describe('RRuleTemporal - Complex Time Patterns', () => {
       count: 4,
       dtstart: Temporal.ZonedDateTime.from('2025-01-06T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => d.dayOfWeek === 1)).toBe(true);
-    expect(dates.map((d) => d.minute)).toEqual([0, 30, 0, 30]);
+    assertDates({rule}, [
+      '2025-01-06T12:00:00.000Z',
+      '2025-01-06T12:30:00.000Z',
+      '2025-01-06T13:00:00.000Z',
+      '2025-01-06T13:30:00.000Z',
+    ]);
   });
 });
 
 describe('RRuleTemporal - Advanced BYSETPOS', () => {
-  // TODO
-  it.skip('should handle BYSETPOS with MONTHLY frequency', () => {
+  it('should handle BYSETPOS with MONTHLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'MONTHLY',
       byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
@@ -1091,12 +1117,16 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
       count: 6,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(6);
-    expect(dates.every((d) => [1, 2, 3, 4, 5].includes(d.dayOfWeek))).toBe(true);
+    assertDates({rule}, [
+      '2025-01-01T12:00:00.000Z',
+      '2025-01-31T12:00:00.000Z',
+      '2025-02-03T12:00:00.000Z',
+      '2025-02-28T12:00:00.000Z',
+      '2025-03-03T12:00:00.000Z',
+      '2025-03-31T12:00:00.000Z',
+    ]);
   });
 
-  // TODO
   it.skip('should handle BYSETPOS with YEARLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -1112,57 +1142,69 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
 });
 
 describe('RRuleTemporal - BYMONTH with different frequencies', () => {
-  // TODO
-  it.skip('should handle BYMONTH with DAILY frequency', () => {
+  it('should handle BYMONTH with DAILY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
       byMonth: [1, 6, 12],
       count: 6,
-      dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
+      dtstart: Temporal.ZonedDateTime.from('2025-02-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(6);
-    expect(dates.every((d) => [1, 6, 12].includes(d.month))).toBe(true);
+    assertDates({rule}, [
+      '2025-06-01T12:00:00.000Z',
+      '2025-06-02T12:00:00.000Z',
+      '2025-06-03T12:00:00.000Z',
+      '2025-06-04T12:00:00.000Z',
+      '2025-06-05T12:00:00.000Z',
+      '2025-06-06T12:00:00.000Z',
+    ]);
   });
 
-  // TODO
-  it.skip('should handle BYMONTH with WEEKLY frequency', () => {
+  it('should handle BYMONTH with WEEKLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
       byMonth: [3, 9],
       count: 4,
-      dtstart: Temporal.ZonedDateTime.from('2025-03-01T12:00:00[UTC]'),
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => [3, 9].includes(d.month))).toBe(true);
+    assertDates({rule}, [
+      '2025-03-05T12:00:00.000Z',
+      '2025-03-12T12:00:00.000Z',
+      '2025-03-19T12:00:00.000Z',
+      '2025-03-26T12:00:00.000Z',
+    ]);
   });
 });
 
 describe('RRuleTemporal - Complex BYDAY patterns', () => {
-  // TODO
-  it.skip('should handle BYDAY with DAILY frequency', () => {
+  it('should handle BYDAY with DAILY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
       byDay: ['MO', 'WE', 'FR'],
       count: 6,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(6);
-    expect(dates.every((d) => [1, 3, 5].includes(d.dayOfWeek))).toBe(true);
+    assertDates({rule}, [
+      '2025-01-01T12:00:00.000Z',
+      '2025-01-03T12:00:00.000Z',
+      '2025-01-06T12:00:00.000Z',
+      '2025-01-08T12:00:00.000Z',
+      '2025-01-10T12:00:00.000Z',
+      '2025-01-13T12:00:00.000Z',
+    ]);
   });
 
-  // TODO
-  it.skip('should handle ordinal BYDAY with YEARLY frequency', () => {
+  it('should handle ordinal BYDAY with YEARLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byDay: ['2MO', '-1FR'],
       count: 4,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => [1, 5].includes(d.dayOfWeek))).toBe(true);
+    assertDates({rule}, [
+      '2025-01-13T12:00:00.000Z',
+      '2025-12-26T12:00:00.000Z',
+      '2026-01-12T12:00:00.000Z',
+      '2026-12-25T12:00:00.000Z',
+    ]);
   });
 });
