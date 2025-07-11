@@ -195,7 +195,7 @@ export default function App() {
           } catch {
             try {
               out.push(
-                Temporal.PlainDateTime.from(p).toZonedDateTime({ timeZone: tzid })
+                Temporal.PlainDateTime.from(p).toZonedDateTime(tzid)
               );
             } catch {
               /* ignore */
