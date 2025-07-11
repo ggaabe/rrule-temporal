@@ -1,0 +1,64 @@
+name: Deploy Demo to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # Or your primary branch name
+    paths:
+      - 'demo/**' # Only run if demo files change
+      - '.github/workflows/deploy-demo.yml' # Or the name of this workflow file
+  workflow_dispatch: # Allows manual triggering from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Demo
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+          cache-dependency-path: demo/package-lock.json
+
+      - name: Clean demo node_modules and npm cache
+        run: |
+          rm -rf demo/node_modules
+          npm cache clean --force
+
+
+      - name: Clean demo node_modules
+        working-directory: ./demo
+        run: rm -rf node_modules
+
+      - name: Install demo dependencies
+        run: npm ci
+        working-directory: ./demo
+
+      - name: Build demo application
+        working-directory: ./demo
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./demo/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4 
