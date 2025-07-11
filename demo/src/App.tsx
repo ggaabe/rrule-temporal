@@ -53,11 +53,15 @@ export default function App() {
 
   // Apply dark mode to document
   useEffect(() => {
+    const root = document.documentElement;
     if (darkMode) {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
+      root.style.colorScheme = 'light';
     }
+    console.log('Dark mode:', darkMode, 'Classes:', root.classList.toString());
   }, [darkMode]);
 
   // -------- derived rule + occurrences -------------------------------------
