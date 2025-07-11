@@ -1763,12 +1763,14 @@ export class RRuleTemporal {
       const jan1 = sample.with({month: 1, day: 1});
       const delta = (jan1.dayOfWeek - wkst + 7) % 7;
       const firstWeekStart = jan1.subtract({days: delta});
-      const lastWeekDiff = sample.with({month: 12, day: 31}).toPlainDate().since(firstWeekStart.toPlainDate()).days;
-      const lastWeek = Math.floor(lastWeekDiff / 7) + 1;
+      // Calculate the number of weeks in the year using ISO 8601 rules
+      // A year has 53 weeks if January 1st is a Thursday, or if it's a leap year and January 1st is a Wednesday
+      const isLeapYear = jan1.inLeapYear;
+      const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
 
       const tokens = this.opts.byDay?.length
         ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
-        : [this.opts.wkst || 'MO'];
+        : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
 
       for (const weekNo of this.opts.byWeekNo) {
         const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;

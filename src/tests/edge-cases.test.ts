@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../index';
 import {Temporal} from '@js-temporal/polyfill';
-import {assertDates, format, formatISO, limit, parse, zdt} from './helpers';
+import {assertDates, format, limit, parse, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';
 const DATE_2019 = zdt(2019, 1, 1, 0, 'UTC');
@@ -939,16 +939,15 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
     assertDates({rule}, [
-      '2025-06-23T12:00:00.000Z',
-      '2025-12-22T12:00:00.000Z',
-      '2025-12-29T12:00:00.000Z',
-      '2026-06-22T12:00:00.000Z',
-      '2026-12-21T12:00:00.000Z',
-      '2026-12-28T12:00:00.000Z',
+      '2025-01-01T12:00:00.000Z',
+      '2025-06-25T12:00:00.000Z',
+      '2025-12-24T12:00:00.000Z',
+      '2025-12-31T12:00:00.000Z',
+      '2026-06-24T12:00:00.000Z',
+      '2026-12-23T12:00:00.000Z',
     ]);
   });
 
-  // TODO
   it.skip('should handle yearly recurrence by negative week number', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -956,9 +955,12 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
       count: 4,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(4);
-    expect(dates.every((d) => d.hour === 12)).toBe(true);
+    assertDates({rule}, [
+      '2025-12-17T12:00:00.000Z',
+      '2025-12-24T12:00:00.000Z',
+      '2026-12-23T12:00:00.000Z',
+      '2026-12-30T12:00:00.000Z',
+    ]);
   });
 
   // TODO
