@@ -335,8 +335,16 @@ export class RRuleTemporal {
         return zdt.add({months: interval});
       case 'YEARLY':
         return zdt.add({years: interval});
-      case 'HOURLY':
-        return zdt.add({hours: interval});
+      case 'HOURLY': {
+        const originalHour = zdt.hour;
+        let next = zdt.add({hours: interval});
+        // Handle DST fallback case: if the hour didn't advance as expected,
+        // add the interval again to skip over the repeated hour
+        if (next.hour === originalHour && interval === 1) {
+          next = next.add({hours: interval});
+        }
+        return next;
+      }
       case 'MINUTELY':
         return zdt.add({minutes: interval});
       case 'SECONDLY':

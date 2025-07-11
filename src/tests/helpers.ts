@@ -44,7 +44,7 @@ export function assertDates({rule, between, limit: max, inc = true, print = form
   }
 }
 
-export async function verifyWithLibRecur(rule: RRuleTemporal) {
+export async function verifyWithLibRecur(rule: RRuleTemporal, tz?: string) {
   const params: Record<string, any> = {
     skip: '',
     max_instances: 100,
@@ -64,6 +64,11 @@ export async function verifyWithLibRecur(rule: RRuleTemporal) {
   const json = (await response.json()) as {instances: string[]};
   return (json.instances ?? []).map((i) => {
     const date = `${i.slice(0, 4)}-${i.slice(4, 6)}-${i.slice(6, 8)}T${i.slice(9)}`;
-    return formatISO(Temporal.PlainDateTime.from(date).toZonedDateTime('UTC'));
+    const utc = Temporal.PlainDateTime.from(date).toZonedDateTime('UTC');
+    if (tz) {
+      return format(tz)(utc);
+    } else {
+      return formatISO(utc);
+    }
   });
 }
