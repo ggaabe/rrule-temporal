@@ -223,7 +223,7 @@ export default function App() {
       /* ignore parse failure */
       console.log(e);
     }
-  }, [mode, ics]);
+  }, [mode]);
 
   // --- rebuild ics when visual state changes --------------------------------
   useEffect(() => {
@@ -315,7 +315,6 @@ export default function App() {
       setErr(e as string);
     }
   }, [
-    mode,
     freq,
     interval,
     count,
