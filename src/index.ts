@@ -847,11 +847,11 @@ export class RRuleTemporal {
 
   private matchesAll(zdt: Temporal.ZonedDateTime): boolean {
     return (
-      this.matchesByDay(zdt) &&
       this.matchesByMonth(zdt) &&
-      this.matchesByMonthDay(zdt) &&
-      this.matchesByYearDay(zdt) &&
       this.matchesByWeekNo(zdt) &&
+      this.matchesByYearDay(zdt) &&
+      this.matchesByMonthDay(zdt) &&
+      this.matchesByDay(zdt) &&
       this.matchesByHour(zdt) &&
       this.matchesByMinute(zdt) &&
       this.matchesBySecond(zdt)
@@ -958,6 +958,30 @@ export class RRuleTemporal {
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
   all(iterator?: (date: Temporal.ZonedDateTime, i: number) => boolean): Temporal.ZonedDateTime[] {
+    if (this.opts.byWeekNo && this.opts.byYearDay) {
+      // If both byWeekNo and byYearDay are present, there is a high chance of conflict.
+      // To avoid an infinite loop, we can check if any of the byYearDay dates fall within any of the byWeekNo weeks.
+      const year = this.originalDtstart.year;
+      const yearStart = this.originalDtstart.with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0});
+      const yearDays = this.opts.byYearDay.map((yd) => {
+        const lastDayOfYear = yearStart.with({month: 12, day: 31}).dayOfYear;
+        return yd > 0 ? yd : lastDayOfYear + yd + 1;
+      });
+
+      let possibleDate = false;
+      for (const yd of yearDays) {
+        const date = yearStart.add({days: yd - 1});
+        if (this.matchesByWeekNo(date)) {
+          possibleDate = true;
+          break;
+        }
+      }
+
+      if (!possibleDate) {
+        return [];
+      }
+    }
+
     if (!this.opts.count && !this.opts.until && !iterator) {
       throw new Error('all() requires iterator when no COUNT/UNTIL');
     }
@@ -1907,6 +1931,25 @@ export class RRuleTemporal {
    * large gaps when BYXXX constraints don't match.
    */
   private findNextValidDate(current: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
+    if (this.opts.byWeekNo && this.opts.byYearDay) {
+      // If both byWeekNo and byYearDay are present, there is a high chance of conflict.
+      // To avoid an infinite loop, we can check if any of the byYearDay dates fall within any of the byWeekNo weeks.
+      const year = current.year;
+      const yearStart = current.with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0});
+      const yearDays = this.opts.byYearDay.map((yd) => {
+        const lastDayOfYear = yearStart.with({month: 12, day: 31}).dayOfYear;
+        return yd > 0 ? yd : lastDayOfYear + yd + 1;
+      });
+
+      for (const yd of yearDays) {
+        const date = yearStart.add({days: yd - 1});
+        if (this.matchesByWeekNo(date)) {
+          // At least one combination is possible, so we can proceed with the normal search
+          break;
+        }
+      }
+    }
+
     // Try to jump efficiently based on which constraints are failing
 
     // Check BYMONTH first (largest potential jump)
@@ -1919,6 +1962,14 @@ export class RRuleTemporal {
         // Move to next year and use first valid month
         current = current.add({years: 1}).with({month: months[0], day: 1, hour: 0, minute: 0, second: 0});
       }
+      current = this.applyTimeOverride(current);
+      return current;
+    }
+
+    // Check BYWEEKNO (can jump across weeks/months)
+    if (this.opts.byWeekNo && !this.matchesByWeekNo(current)) {
+      // This is complex, so for now just advance by a week
+      current = current.add({weeks: 1}).with({hour: 0, minute: 0, second: 0});
       current = this.applyTimeOverride(current);
       return current;
     }
@@ -1963,14 +2014,6 @@ export class RRuleTemporal {
       return current;
     }
 
-    // Check BYWEEKNO (can jump across weeks/months)
-    if (this.opts.byWeekNo && !this.matchesByWeekNo(current)) {
-      // This is complex, so for now just advance by a week
-      current = current.add({weeks: 1}).with({hour: 0, minute: 0, second: 0});
-      current = this.applyTimeOverride(current);
-      return current;
-    }
-
     // Check BYMONTHDAY (can jump within month)
     if (this.opts.byMonthDay && !this.matchesByMonthDay(current)) {
       const monthDays = [...this.opts.byMonthDay].sort((a, b) => a - b);
@@ -2000,6 +2043,9 @@ export class RRuleTemporal {
             minute: 0,
             second: 0,
           });
+        } else {
+          // No valid days in the next month, advance by a full month
+          current = current.add({months: 1}).with({day: 1, hour: 0, minute: 0, second: 0});
         }
       }
       current = this.applyTimeOverride(current);
@@ -2008,34 +2054,46 @@ export class RRuleTemporal {
 
     // Check BYDAY (can jump within week)
     if (this.opts.byDay && !this.matchesByDay(current)) {
-      // For simple weekday constraints, jump to next matching day
       const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
-      const currentDow = current.dayOfWeek;
+      const targetDays = this.opts.byDay
+        .map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+        .filter(Boolean)
+        .map((day) => dayMap[day!]!)
+        .filter(Boolean);
 
-      let nextDow = 8; // Invalid day to start with
-      for (const token of this.opts.byDay) {
-        const match = token.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
-        if (match && !match[1]) {
-          // Simple weekday without ordinal
-          const dow = dayMap[match[2] as keyof typeof dayMap];
-          if (dow && dow > currentDow) {
-            nextDow = Math.min(nextDow, dow);
-          }
-        }
-      }
+      const nextDayOfWeek = this.findNextValidValue(current.dayOfWeek, targetDays.sort(), (a, b) => a - b);
 
-      if (nextDow <= 7) {
-        current = current.add({days: nextDow - currentDow}).with({hour: 0, minute: 0, second: 0});
+      if (nextDayOfWeek) {
+        const delta = (nextDayOfWeek - current.dayOfWeek + 7) % 7;
+        current = current.add({days: delta}).with({hour: 0, minute: 0, second: 0});
       } else {
-        // Jump to next week and try first matching day
-        current = current.add({days: 7 - currentDow + 1}).with({hour: 0, minute: 0, second: 0});
+        // Move to next week and use first valid day
+        const delta = (targetDays[0]! - current.dayOfWeek + 7) % 7;
+        current = current.add({days: delta + 7}).with({hour: 0, minute: 0, second: 0});
       }
       current = this.applyTimeOverride(current);
       return current;
     }
 
-    // If no specific constraint detected, just advance by the frequency
-    return this.nextCandidateSameDate(current);
+    // Fallback: if no specific jump can be made, advance by the smallest unit larger than the frequency
+    switch (this.opts.freq) {
+      case 'SECONDLY':
+      case 'MINUTELY':
+        current = current.add({days: 1}).with({hour: 0, minute: 0, second: 0});
+        break;
+      case 'HOURLY':
+        current = current.add({days: 1}).with({hour: 0, minute: 0, second: 0});
+        break;
+      case 'DAILY':
+      case 'WEEKLY':
+        current = current.add({months: 1}).with({day: 1, hour: 0, minute: 0, second: 0});
+        break;
+      case 'MONTHLY':
+      case 'YEARLY':
+        current = current.add({years: 1}).with({month: 1, day: 1, hour: 0, minute: 0, second: 0});
+        break;
+    }
+    return this.applyTimeOverride(current);
   }
 
   private applyBySetPos(list: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
