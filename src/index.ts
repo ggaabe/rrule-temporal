@@ -1001,8 +1001,12 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    // --- 2) WEEKLY + BYDAY (or default to DTSTART’s weekday) ---
-    if (this.opts.freq === 'WEEKLY' && !(this.opts.byYearDay && this.opts.byYearDay.length > 0)) {
+    // --- 2) WEEKLY + BYDAY (or default to DTSTART's weekday) ---
+    if (
+      this.opts.freq === 'WEEKLY' &&
+      !(this.opts.byYearDay && this.opts.byYearDay.length > 0) &&
+      !(this.opts.byWeekNo && this.opts.byWeekNo.length > 0)
+    ) {
       const start = this.originalDtstart;
       if (!this.addDtstartIfNeeded(dates, iterator)) {
         return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1175,11 +1179,12 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    // --- 5) YEARLY + BY... rules (also handles WEEKLY + BYYEARDAY) ---
+    // --- 5) YEARLY + BY... rules (also handles WEEKLY + BYYEARDAY and WEEKLY + BYWEEKNO) ---
     if (
       (this.opts.freq === 'YEARLY' &&
         (this.opts.byDay || this.opts.byMonthDay || this.opts.byYearDay || this.opts.byWeekNo)) ||
-      (this.opts.freq === 'WEEKLY' && this.opts.byYearDay && this.opts.byYearDay.length > 0)
+      (this.opts.freq === 'WEEKLY' && this.opts.byYearDay && this.opts.byYearDay.length > 0) ||
+      (this.opts.freq === 'WEEKLY' && this.opts.byWeekNo && this.opts.byWeekNo.length > 0)
     ) {
       const start = this.originalDtstart;
       if (!this.addDtstartIfNeeded(dates, iterator)) {

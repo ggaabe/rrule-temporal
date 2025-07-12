@@ -118,7 +118,7 @@ describe('BYWEEKNO non-rfc frequencies', () => {
     assertDates({rule}, ['1997-12-28T09:00:00.000Z', '1999-01-03T09:00:00.000Z', '2000-01-02T09:00:00.000Z']);
   });
 
-  it.skip('testMonthlyByWeekNoAndWeekDay53', () => {
+  it('testMonthlyByWeekNoAndWeekDay53', () => {
     const rule = new RRuleTemporal({
       freq: 'MONTHLY',
       count: 3,
@@ -126,10 +126,10 @@ describe('BYWEEKNO non-rfc frequencies', () => {
       byDay: ['MO'],
       dtstart: zdt(1997, 9, 2, 9, 'UTC'),
     });
-    assertDates({rule}, ['1997-12-29T09:00:00.000Z', '1998-12-28T09:00:00.000Z', '1999-12-27T09:00:00.000Z']);
+    assertDates({rule}, ['1998-12-28T09:00:00.000Z', '2004-12-27T09:00:00.000Z', '2009-12-28T09:00:00.000Z']);
   });
 
-  it.skip('testWeeklyByWeekNo', () => {
+  it('testWeeklyByWeekNo', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
       count: 3,
@@ -139,7 +139,7 @@ describe('BYWEEKNO non-rfc frequencies', () => {
     assertDates({rule}, ['1998-05-12T09:00:00.000Z', '1999-05-18T09:00:00.000Z', '2000-05-16T09:00:00.000Z']);
   });
 
-  it.skip('testWeeklyByWeekNoAndWeekDay', () => {
+  it('testWeeklyByWeekNoAndWeekDay', () => {
     // That's a nice one. The first days of week number one
     // may be in the last year.
     const rule = new RRuleTemporal({
@@ -152,7 +152,7 @@ describe('BYWEEKNO non-rfc frequencies', () => {
     assertDates({rule}, ['1997-12-29T09:00:00.000Z', '1999-01-04T09:00:00.000Z', '2000-01-03T09:00:00.000Z']);
   });
 
-  it.skip('testWeeklyByWeekNoAndWeekDayLarge', () => {
+  it('testWeeklyByWeekNoAndWeekDayLarge', () => {
     // Another nice test. The last days of week number 52/53
     // may be in the next year.
     const rule = new RRuleTemporal({
@@ -165,7 +165,7 @@ describe('BYWEEKNO non-rfc frequencies', () => {
     assertDates({rule}, ['1997-12-28T09:00:00.000Z', '1998-12-27T09:00:00.000Z', '2000-01-02T09:00:00.000Z']);
   });
 
-  it.skip('testWeeklyByWeekNoAndWeekDayLast', () => {
+  it('testWeeklyByWeekNoAndWeekDayLast', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
       count: 3,
@@ -176,7 +176,7 @@ describe('BYWEEKNO non-rfc frequencies', () => {
     assertDates({rule}, ['1997-12-28T09:00:00.000Z', '1999-01-03T09:00:00.000Z', '2000-01-02T09:00:00.000Z']);
   });
 
-  it.skip('testWeeklyByWeekNoAndWeekDay53', () => {
+  it('testWeeklyByWeekNoAndWeekDay53', () => {
     const rule = new RRuleTemporal({
       freq: 'WEEKLY',
       count: 3,
@@ -184,6 +184,6 @@ describe('BYWEEKNO non-rfc frequencies', () => {
       byDay: ['MO'],
       dtstart: zdt(1997, 9, 2, 9, 'UTC'),
     });
-    assertDates({rule}, ['1997-12-29T09:00:00.000Z', '1998-12-28T09:00:00.000Z', '1999-12-27T09:00:00.000Z']);
+    assertDates({rule}, ['1998-12-28T09:00:00.000Z', '2004-12-27T09:00:00.000Z', '2009-12-28T09:00:00.000Z']);
   });
 });
