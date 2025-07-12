@@ -1045,7 +1045,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       byWeekNo: [20],
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970512T090000\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO';
-    const dates = ['Mon, 12 May 1997 13:00:00 GMT', 'Mon, 11 May 1998 13:00:00 GMT', 'Mon, 10 May 1999 13:00:00 GMT'];
+    const dates = ['Mon, 12 May 1997 13:00:00 GMT', 'Mon, 11 May 1998 13:00:00 GMT', 'Mon, 17 May 1999 13:00:00 GMT'];
     assertRules({rule, rrule, dates, limit: 3});
   });
 

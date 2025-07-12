@@ -302,12 +302,27 @@ export class RRuleTemporal {
     return sort ? sanitized.sort((a, b) => a - b) : sanitized;
   }
 
-  private sanitizeOpts(opts: ManualOpts): ManualOpts {
+  private sanitizeByDay(byDay?: string[]) {
     const validDay = /^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/;
-    if (opts.byDay) {
-      opts.byDay = opts.byDay.filter((d) => validDay.test(d));
-      if (opts.byDay.length === 0) delete opts.byDay;
+    const days = (byDay ?? []).filter((day) => day && typeof day === 'string');
+    for (const day of days) {
+      const match = day.match(validDay);
+      if (!match) {
+        throw new Error(`Invalid BYDAY value: ${day}`);
+      }
+      const ord = match[1];
+      if (ord) {
+        const ordInt = parseInt(ord, 10);
+        if (ordInt === 0) {
+          throw new Error(`Invalid BYDAY value: ${day}`);
+        }
+      }
     }
+    return days.length > 0 ? days : undefined;
+  }
+
+  private sanitizeOpts(opts: ManualOpts): ManualOpts {
+    opts.byDay = this.sanitizeByDay(opts.byDay);
     opts.byMonth = this.sanitizeNumericArray(opts.byMonth, 1, 12, false, false);
     opts.byMonthDay = this.sanitizeNumericArray(opts.byMonthDay, -31, 31, false, false);
     opts.byYearDay = this.sanitizeNumericArray(opts.byYearDay, -366, 366, false, false);
@@ -414,41 +429,58 @@ export class RRuleTemporal {
     }
 
     if (freq === 'SECONDLY') {
-      let next = zdt.add({seconds: interval});
+      let candidate = zdt;
 
+      // 1. Process Seconds
       if (bySecond && bySecond.length > 0) {
-        const nextSecond = bySecond.find((s) => s > zdt.second);
-        if (nextSecond !== undefined) {
-          next = zdt.with({second: nextSecond});
-        } else {
-          next = zdt.add({minutes: 1}).with({second: bySecond[0]});
+        const nextSecondInList = bySecond.find((s) => s > candidate.second);
+        if (nextSecondInList !== undefined) {
+          return candidate.with({second: nextSecondInList});
         }
+        // Seconds exhausted for current minute, reset second and advance minute
+        candidate = candidate.with({second: bySecond[0]}).add({minutes: 1});
+      } else {
+        // No bySecond, advance by interval seconds
+        candidate = candidate.add({seconds: interval});
       }
 
-      if (byMinute && byMinute.length > 0 && !byMinute.includes(next.minute)) {
-        const nextMinute = byMinute.find((m) => m > next.minute);
-        if (nextMinute !== undefined) {
-          next = next.with({minute: nextMinute, second: bySecond ? bySecond[0] : 0});
-        } else {
-          const nextHour = byHour ? byHour.find((h) => h > next.hour) : undefined;
-          if (nextHour !== undefined) {
-            next = next.with({hour: nextHour, minute: byMinute[0], second: bySecond ? bySecond[0] : 0});
-          } else {
-            next = this.applyTimeOverride(next.add({days: 1}));
+      // 2. Process Minutes (after potential second advancement/rollover)
+      if (byMinute && byMinute.length > 0) {
+        // Check if the new minute is valid or needs further advancement
+        if (
+          !byMinute.includes(candidate.minute) ||
+          (candidate.minute === zdt.minute && candidate.second < zdt.second)
+        ) {
+          const nextMinuteInList = byMinute.find((m) => m > candidate.minute);
+          if (nextMinuteInList !== undefined) {
+            return candidate.with({minute: nextMinuteInList, second: bySecond ? bySecond[0] : 0});
           }
+          // Minutes exhausted for current hour, reset minute and advance hour
+          candidate = candidate.with({minute: byMinute[0], second: bySecond ? bySecond[0] : 0}).add({hours: 1});
         }
       }
 
-      if (byHour && byHour.length > 0 && !byHour.includes(next.hour)) {
-        const nextHour = byHour.find((h) => h > next.hour);
-        if (nextHour !== undefined) {
-          next = next.with({hour: nextHour, minute: byMinute ? byMinute[0] : 0, second: bySecond ? bySecond[0] : 0});
-        } else {
-          next = this.applyTimeOverride(next.add({days: 1}));
+      // 3. Process Hours (after potential minute advancement/rollover)
+      if (byHour && byHour.length > 0) {
+        // Check if the new hour is valid or needs further advancement
+        if (!byHour.includes(candidate.hour) || (candidate.hour === zdt.hour && candidate.minute < zdt.minute)) {
+          const nextHourInList = byHour.find((h) => h > candidate.hour);
+          if (nextHourInList !== undefined) {
+            return candidate.with({
+              hour: nextHourInList,
+              minute: byMinute ? byMinute[0] : 0,
+              second: bySecond ? bySecond[0] : 0,
+            });
+          }
+          // Hours exhausted for current day, reset hour and advance day
+          candidate = candidate
+            .with({hour: byHour[0], minute: byMinute ? byMinute[0] : 0, second: bySecond ? bySecond[0] : 0})
+            .add({days: 1});
         }
       }
 
-      return next;
+      // If we reached here, all time components have been processed and advanced as needed.
+      return candidate;
     }
 
     if (byMinute && byMinute.length > 1) {
@@ -856,11 +888,8 @@ export class RRuleTemporal {
     const {week, year} = this.getIsoWeekInfo(zdt);
 
     const jan1 = zdt.with({year, month: 1, day: 1});
-    const dec31 = zdt.with({year, month: 12, day: 31});
-    let lastWeek = 52;
-    if (jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4) {
-      lastWeek = 53;
-    }
+    const isLeapYear = jan1.inLeapYear;
+    const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
 
     return byWeekNo.some((wn) => {
       if (wn > 0) {
@@ -936,7 +965,7 @@ export class RRuleTemporal {
     let iterationCount = 0;
 
     // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
-    if (this.opts.freq === 'MONTHLY' && (this.opts.byDay || this.opts.byMonthDay)) {
+    if (this.opts.freq === 'MONTHLY' && (this.opts.byDay || this.opts.byMonthDay) && !this.opts.byWeekNo) {
       const start = this.originalDtstart;
       if (!this.addDtstartIfNeeded(dates, iterator)) {
         return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1165,7 +1194,16 @@ export class RRuleTemporal {
         }
 
         const occs = this.generateYearlyOccurrences(yearCursor);
-        const {shouldBreak} = this.processOccurrences(occs, dates, start, iterator);
+        const uniqueOccs = [];
+        if (occs.length > 0) {
+          uniqueOccs.push(occs[0]!);
+          for (let i = 1; i < occs.length; i++) {
+            if (Temporal.ZonedDateTime.compare(occs[i]!, occs[i - 1]!) !== 0) {
+              uniqueOccs.push(occs[i]!);
+            }
+          }
+        }
+        const {shouldBreak} = this.processOccurrences(uniqueOccs, dates, start, iterator);
 
         if (shouldBreak) {
           break;
@@ -1220,7 +1258,63 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    // --- 6c) MONTHLY + BYYEARDAY (special case) ---
+    // --- 6c) MONTHLY + BYWEEKNO (special case) ---
+    if (this.opts.freq === 'MONTHLY' && this.opts.byWeekNo && this.opts.byWeekNo.length > 0) {
+      const start = this.originalDtstart;
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
+      }
+
+      let current = start;
+      const weekNos = [...this.opts.byWeekNo].sort((a, b) => a - b);
+      const interval = this.opts.interval!;
+      let monthsAdvanced = 0;
+      let lastYearProcessed = -1;
+
+      outer_loop: while (true) {
+        if (this.shouldBreakForCountLimit(dates.length)) {
+          break;
+        }
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        const year = current.year;
+
+        // Only process each year once, and only when we've advanced enough to reach a new year
+        if (year !== lastYearProcessed && current.month >= start.month) {
+          lastYearProcessed = year;
+
+          // Generate occurrences for each week number in this year
+          for (const weekNo of weekNos) {
+            const occs = this.generateOccurrencesForWeekInYear(year, weekNo);
+            for (const occ of occs) {
+              if (Temporal.ZonedDateTime.compare(occ, start) >= 0) {
+                if (iterator && !iterator(occ, dates.length)) {
+                  break outer_loop;
+                }
+                dates.push(occ);
+                if (this.shouldBreakForCountLimit(dates.length)) {
+                  break outer_loop;
+                }
+              }
+            }
+          }
+        }
+
+        // Advance by the specified monthly interval
+        monthsAdvanced += interval;
+        current = start.add({months: monthsAdvanced});
+
+        if (this.opts.until && Temporal.ZonedDateTime.compare(current, this.opts.until) > 0) {
+          break;
+        }
+      }
+
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // --- 6d) MONTHLY + BYYEARDAY (special case) ---
     if (
       this.opts.freq === 'MONTHLY' &&
       this.opts.byYearDay &&
@@ -1395,9 +1489,10 @@ export class RRuleTemporal {
    * @returns Merged and deduplicated array of dates
    */
   private mergeAndDeduplicateRDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
-    if (!this.opts.rDate) return dates;
+    if (this.opts.rDate) {
+      dates.push(...this.opts.rDate);
+    }
 
-    dates.push(...this.opts.rDate);
     dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
 
     // Deduplicate
@@ -1707,7 +1802,7 @@ export class RRuleTemporal {
   private generateYearlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
     const months = this.opts.byMonth
       ? [...this.opts.byMonth].sort((a, b) => a - b)
-      : this.opts.byMonthDay
+      : this.opts.byMonthDay || this.opts.byDay
         ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
         : [this.originalDtstart.month];
 
@@ -1746,6 +1841,7 @@ export class RRuleTemporal {
       const last = sample.with({month: 12, day: 31}).dayOfYear;
       for (const d of this.opts.byYearDay) {
         const dayNum = d > 0 ? d : last + d + 1;
+        if (dayNum <= 0 || dayNum > last) continue;
         const dt =
           this.opts.freq === 'MINUTELY'
             ? sample.with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0}).add({days: dayNum - 1})
@@ -1760,8 +1856,9 @@ export class RRuleTemporal {
       const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
       const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
       const jan1 = sample.with({month: 1, day: 1});
-      const delta = (jan1.dayOfWeek - wkst + 7) % 7;
-      const firstWeekStart = jan1.subtract({days: delta});
+      const jan4 = sample.with({month: 1, day: 4});
+      const delta = (jan4.dayOfWeek - wkst + 7) % 7;
+      const firstWeekStart = jan4.subtract({days: delta});
       // Calculate the number of weeks in the year using ISO 8601 rules
       // A year has 53 weeks if January 1st is a Thursday, or if it's a leap year and January 1st is a Wednesday
       const isLeapYear = jan1.inLeapYear;
@@ -1772,6 +1869,9 @@ export class RRuleTemporal {
         : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
 
       for (const weekNo of this.opts.byWeekNo) {
+        if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
+          continue;
+        }
         const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
         const weekStart = firstWeekStart.add({weeks: weekIndex});
         for (const tok of tokens) {
@@ -1944,5 +2044,47 @@ export class RRuleTemporal {
       if (idx >= 0 && idx < len) out.push(sorted[idx]!);
     }
     return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+  }
+
+  /**
+   * Generate occurrences for a specific week number in a given year
+   */
+  private generateOccurrencesForWeekInYear(year: number, weekNo: number): Temporal.ZonedDateTime[] {
+    const occs: Temporal.ZonedDateTime[] = [];
+    const sample = this.originalDtstart.with({year, month: 1, day: 1});
+
+    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
+    const jan1 = sample.with({month: 1, day: 1});
+    const jan4 = sample.with({month: 1, day: 4});
+    const delta = (jan4.dayOfWeek - wkst + 7) % 7;
+    const firstWeekStart = jan4.subtract({days: delta});
+
+    // Calculate the number of weeks in the year using ISO 8601 rules
+    const isLeapYear = jan1.inLeapYear;
+    const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
+
+    // Skip if week number doesn't exist in this year
+    if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
+      return occs;
+    }
+
+    const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
+    const weekStart = firstWeekStart.add({weeks: weekIndex});
+
+    const tokens = this.opts.byDay?.length
+      ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
+      : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
+
+    for (const tok of tokens) {
+      if (!tok) continue;
+      const targetDow = dayMap[tok as keyof typeof dayMap]!;
+      const inst = weekStart.add({days: (targetDow - wkst + 7) % 7});
+      if (!this.opts.byMonth || this.opts.byMonth!.includes(inst.month)) {
+        occs.push(...this.expandByTime(inst));
+      }
+    }
+
+    return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 }
