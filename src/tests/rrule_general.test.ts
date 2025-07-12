@@ -125,12 +125,16 @@ describe('General RRule tests', () => {
     ).toThrow('bySetPos may not contain 0');
   });
 
-  it.skip('testInvalidNthWeekday', () => {
-    expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['0FR'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow();
+  it('testInvalidNthWeekday', () => {
+    expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['0FR'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow(
+      'Invalid BYDAY value',
+    );
   });
 
-  it.skip('testStrInvalidByDay', () => {
-    expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['-1OK'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow();
+  it('testStrInvalidByDay', () => {
+    expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['-1OK'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow(
+      'Invalid BYDAY value',
+    );
   });
 
   it('testStrInvalidUntil', () => {

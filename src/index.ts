@@ -302,12 +302,27 @@ export class RRuleTemporal {
     return sort ? sanitized.sort((a, b) => a - b) : sanitized;
   }
 
-  private sanitizeOpts(opts: ManualOpts): ManualOpts {
+  private sanitizeByDay(byDay?: string[]) {
     const validDay = /^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/;
-    if (opts.byDay) {
-      opts.byDay = opts.byDay.filter((d) => validDay.test(d));
-      if (opts.byDay.length === 0) delete opts.byDay;
+    const days = (byDay ?? []).filter((day) => day && typeof day === 'string');
+    for (const day of days) {
+      const match = day.match(validDay);
+      if (!match) {
+        throw new Error(`Invalid BYDAY value: ${day}`);
+      }
+      const ord = match[1];
+      if (ord) {
+        const ordInt = parseInt(ord, 10);
+        if (ordInt === 0) {
+          throw new Error(`Invalid BYDAY value: ${day}`);
+        }
+      }
     }
+    return days.length > 0 ? days : undefined;
+  }
+
+  private sanitizeOpts(opts: ManualOpts): ManualOpts {
+    opts.byDay = this.sanitizeByDay(opts.byDay);
     opts.byMonth = this.sanitizeNumericArray(opts.byMonth, 1, 12, false, false);
     opts.byMonthDay = this.sanitizeNumericArray(opts.byMonthDay, -31, 31, false, false);
     opts.byYearDay = this.sanitizeNumericArray(opts.byYearDay, -366, 366, false, false);
