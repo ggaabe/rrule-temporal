@@ -35,6 +35,15 @@ const freqOpts = [
   "SECONDLY",
 ] as const;
 const langOpts = ["en", "es", "hi", "yue", "ar", "he", "zh"] as const;
+const langLabels: { [key in (typeof langOpts)[number]]: string } = {
+  en: "English",
+  es: "Spanish",
+  hi: "Hindi",
+  yue: "Cantonese",
+  ar: "Arabic",
+  he: "Hebrew",
+  zh: "Chinese",
+};
 const dowTokens = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const;
 
 const pad = (n: number, len = 2) => n.toString().padStart(len, "0");
@@ -693,7 +702,7 @@ export default function App() {
             >
               {langOpts.map((l) => (
                 <option key={l} value={l}>
-                  {l}
+                  {langLabels[l]}
                 </option>
               ))}
             </select>
