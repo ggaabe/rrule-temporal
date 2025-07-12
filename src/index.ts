@@ -77,34 +77,24 @@ function unfoldLine(foldedLine: string): string {
  */
 function parseIcsDateTime(dateStr: string, tzid: string, valueType?: string): Temporal.ZonedDateTime {
   const isDate = valueType === 'DATE' || !dateStr.includes('T');
+  const isoDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
 
   if (isDate) {
-    const isoDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
     return Temporal.PlainDate.from(isoDate).toZonedDateTime({timeZone: tzid});
   }
 
-  if (/Z$/.test(dateStr)) {
-    const iso = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}T${dateStr.slice(9, 15)}Z`;
+  if (dateStr.endsWith('Z')) {
+    const iso = `${isoDate}T${dateStr.slice(9, 15)}Z`;
     return Temporal.Instant.from(iso).toZonedDateTimeISO(tzid || 'UTC');
   } else {
-    const isoDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}T${dateStr.slice(9)}`;
-    return Temporal.PlainDateTime.from(isoDate).toZonedDateTime(tzid);
+    const iso = `${isoDate}T${dateStr.slice(9)}`;
+    return Temporal.PlainDateTime.from(iso).toZonedDateTime(tzid);
   }
 }
 
 /**
  * Parse date values from EXDATE or RDATE lines
  */
-function parseDateValues(dateValues: string[], tzid: string, valueType?: string) {
-  const dates: Temporal.ZonedDateTime[] = [];
-
-  for (const dateValue of dateValues) {
-    dates.push(parseIcsDateTime(dateValue, tzid, valueType));
-  }
-
-  return dates;
-}
-
 function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', defaultTzid: string) {
   const dates: Temporal.ZonedDateTime[] = [];
   const regex = new RegExp(`^${linePrefix}(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)`, 'i');
@@ -115,10 +105,18 @@ function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', default
       const [, valueType, tzid, dateValuesStr] = match;
       const timezone = tzid || defaultTzid;
       const dateValues = dateValuesStr!.split(',');
-      dates.push(...parseDateValues(dateValues, timezone, valueType));
+      dates.push(...dateValues.map((dateValue) => parseIcsDateTime(dateValue, timezone, valueType)));
     }
   }
   return dates;
+}
+
+function parseNumberArray(val: string, sort = false): number[] {
+  const arr = val.split(',').map((n) => parseInt(n, 10));
+  if (sort) {
+    return arr.sort((a, b) => a - b);
+  }
+  return arr;
 }
 
 /**
@@ -203,46 +201,37 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
       case 'UNTIL': {
         // RFC5545 UNTIL is YYYYMMDDTHHMMSSZ or without Z
         opts.until = parseIcsDateTime(val!, tzid || 'UTC');
-        if (!/Z$/.test(val!) && tzid !== 'UTC') {
+        if (!val!.endsWith('Z') && tzid !== 'UTC') {
           throw new Error('UNTIL rule part MUST always be specified as a date with UTC time');
         }
         break;
       }
       case 'BYHOUR':
-        opts.byHour = val!
-          .split(',')
-          .map((n) => parseInt(n, 10))
-          .sort((a, b) => a - b);
+        opts.byHour = parseNumberArray(val!, true);
         break;
       case 'BYMINUTE':
-        opts.byMinute = val!
-          .split(',')
-          .map((n) => parseInt(n, 10))
-          .sort((a, b) => a - b);
+        opts.byMinute = parseNumberArray(val!, true);
         break;
       case 'BYDAY':
         opts.byDay = val!.split(','); // e.g. ["MO","2FR","-1SU"]
         break;
       case 'BYMONTH':
-        opts.byMonth = val!.split(',').map((n) => parseInt(n, 10));
+        opts.byMonth = parseNumberArray(val!);
         break;
       case 'BYMONTHDAY':
-        opts.byMonthDay = val!.split(',').map((n) => parseInt(n, 10));
+        opts.byMonthDay = parseNumberArray(val!);
         break;
       case 'BYSECOND':
-        opts.bySecond = val!
-          .split(',')
-          .map((n) => parseInt(n, 10))
-          .sort((a, b) => a - b);
+        opts.bySecond = parseNumberArray(val!, true);
         break;
       case 'BYYEARDAY':
-        opts.byYearDay = val!.split(',').map((n) => parseInt(n, 10));
+        opts.byYearDay = parseNumberArray(val!);
         break;
       case 'BYWEEKNO':
-        opts.byWeekNo = val!.split(',').map((n) => parseInt(n, 10));
+        opts.byWeekNo = parseNumberArray(val!);
         break;
       case 'BYSETPOS':
-        opts.bySetPos = val!.split(',').map((n) => parseInt(n, 10));
+        opts.bySetPos = parseNumberArray(val!);
         break;
       case 'WKST':
         opts.wkst = val!;
@@ -761,7 +750,7 @@ export class RRuleTemporal {
       const weekday = m[2];
       if (!weekday) continue; // now TS knows `weekday` is string
 
-      const wd = dayMap[weekday]; // no more "undefined index" error
+      const wd = dayMap[weekday as keyof typeof dayMap]; // no more "undefined index" error
 
       if (freq === 'DAILY') {
         if (zdt.dayOfWeek === wd) return true;
