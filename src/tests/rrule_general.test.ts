@@ -1,5 +1,5 @@
 import {RRuleTemporal} from '../index';
-import {assertDates, zdt} from './helpers';
+import {assertDates, parse, zdt} from './helpers';
 
 describe('General RRule tests', () => {
   it('testMonthlyNegByMonthDayJanFebForNonLeapYear', () => {
@@ -90,5 +90,61 @@ describe('General RRule tests', () => {
       byMonthDay: [28],
     });
     assertDates({rule}, ['2013-01-28T00:00:00.000Z', '2013-02-28T00:00:00.000Z', '2013-03-28T00:00:00.000Z']);
+  });
+
+  it('testCountZero', () => {
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 0,
+      dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+    });
+    expect(rule.all(() => true)).toEqual([]);
+  });
+
+  it('testBadBySetPos', () => {
+    expect(
+      () =>
+        new RRuleTemporal({
+          freq: 'MONTHLY',
+          count: 1,
+          bySetPos: [0],
+          dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+        }),
+    ).toThrow('bySetPos may not contain 0');
+  });
+
+  it('testBadBySetPosMany', () => {
+    expect(
+      () =>
+        new RRuleTemporal({
+          freq: 'MONTHLY',
+          count: 1,
+          bySetPos: [-1, 0, 1],
+          dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+        }),
+    ).toThrow('bySetPos may not contain 0');
+  });
+
+  it.skip('testInvalidNthWeekday', () => {
+    expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['0FR'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow();
+  });
+
+  it.skip('testStrInvalidByDay', () => {
+    expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['-1OK'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow();
+  });
+
+  it('testStrInvalidUntil', () => {
+    expect(() => parse('DTSTART:19970902T090000\nRRULE:FREQ=YEARLY;UNTIL=TheCowsComeHome;BYDAY=1TU,-1TH')).toThrow(
+      'invalid RFC 9557 string',
+    );
+  });
+
+  it('testStrEmptyByDay', () => {
+    const rule = parse('DTSTART:19970902T090000\nRRULE:FREQ=WEEKLY;BYDAY=;WKST=SU');
+    expect(rule.toString()).toEqual('DTSTART;TZID=UTC:19970902T090000\nRRULE:FREQ=WEEKLY;WKST=SU');
+  });
+
+  it('testStrNoDTStart', () => {
+    expect(() => parse('RRULE:FREQ=YEARLY;COUNT=3')).toThrow('dtstart required when parsing RRULE alone');
   });
 });
