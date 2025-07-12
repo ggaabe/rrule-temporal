@@ -212,6 +212,9 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
       case 'BYMINUTE':
         opts.byMinute = parseNumberArray(val!, true);
         break;
+      case 'BYSECOND':
+        opts.bySecond = parseNumberArray(val!, true);
+        break;
       case 'BYDAY':
         opts.byDay = val!.split(','); // e.g. ["MO","2FR","-1SU"]
         break;
@@ -220,9 +223,6 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
         break;
       case 'BYMONTHDAY':
         opts.byMonthDay = parseNumberArray(val!);
-        break;
-      case 'BYSECOND':
-        opts.bySecond = parseNumberArray(val!, true);
         break;
       case 'BYYEARDAY':
         opts.byYearDay = parseNumberArray(val!);
@@ -243,6 +243,7 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
 }
 
 type RRuleTemporalIterator = (date: Temporal.ZonedDateTime, i: number) => boolean;
+type DateFilter = Date | Temporal.ZonedDateTime;
 
 export class RRuleTemporal {
   private readonly tzid: string;
@@ -656,7 +657,7 @@ export class RRuleTemporal {
         }
       } else {
         // Handle simple weekday tokens or non-BYMONTH cases
-        let deltas: number[] = [];
+        let deltas: number[];
         if (
           ['DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'].includes(this.opts.freq) &&
           this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
@@ -1651,11 +1652,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include the end date in the results.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule within the specified time window.
    */
-  between(
-    after: Date | Temporal.ZonedDateTime,
-    before: Date | Temporal.ZonedDateTime,
-    inc = false,
-  ): Temporal.ZonedDateTime[] {
+  between(after: DateFilter, before: DateFilter, inc = false): Temporal.ZonedDateTime[] {
     const startInst = after instanceof Date ? Temporal.Instant.from(after.toISOString()) : after.toInstant();
     const endInst = before instanceof Date ? Temporal.Instant.from(before.toISOString()) : before.toInstant();
 
@@ -1693,7 +1690,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the start date.
    * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
    */
-  next(after: Date | Temporal.ZonedDateTime = new Date(), inc = false): Temporal.ZonedDateTime | null {
+  next(after: DateFilter = new Date(), inc = false): Temporal.ZonedDateTime | null {
     const afterInst = after instanceof Date ? Temporal.Instant.from(after.toISOString()) : after.toInstant();
 
     let result: Temporal.ZonedDateTime | null = null;
@@ -1716,7 +1713,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the end date.
    * @returns The previous occurrence of the rule before the specified date or null if no occurrences are found.
    */
-  previous(before: Date | Temporal.ZonedDateTime = new Date(), inc = false): Temporal.ZonedDateTime | null {
+  previous(before: DateFilter = new Date(), inc = false): Temporal.ZonedDateTime | null {
     const beforeInst = before instanceof Date ? Temporal.Instant.from(before.toISOString()) : before.toInstant();
 
     let prev: Temporal.ZonedDateTime | null = null;
@@ -1930,41 +1927,35 @@ export class RRuleTemporal {
     }
 
     if (this.opts.byWeekNo) {
-      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
-      const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
-      const jan1 = sample.with({month: 1, day: 1});
-      const jan4 = sample.with({month: 1, day: 4});
-      const delta = (jan4.dayOfWeek - wkst + 7) % 7;
-      const firstWeekStart = jan4.subtract({days: delta});
-      // Calculate the number of weeks in the year using ISO 8601 rules
-      // A year has 53 weeks if January 1st is a Thursday, or if it's a leap year and January 1st is a Wednesday
-      const isLeapYear = jan1.inLeapYear;
-      const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
-
-      const tokens = this.opts.byDay?.length
-        ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
-        : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
-
+      const {lastWeek, firstWeekStart, tokens} = this.isoWeekByDay(sample);
       for (const weekNo of this.opts.byWeekNo) {
         if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
           continue;
         }
         const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
         const weekStart = firstWeekStart.add({weeks: weekIndex});
-        for (const tok of tokens) {
-          if (!tok) continue;
-          const targetDow = dayMap[tok as keyof typeof dayMap]!;
-          const inst = weekStart.add({days: (targetDow - wkst + 7) % 7});
-          if (!this.opts.byMonth || this.opts.byMonth!.includes(inst.month)) {
-            occs.push(...this.expandByTime(inst));
-          }
-        }
+        occs.push(...this.addByDay(tokens, weekStart));
       }
     }
 
     occs = occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
     occs = this.applyBySetPos(occs);
     return occs;
+  }
+
+  private addByDay(tokens: string[], weekStart: Temporal.ZonedDateTime) {
+    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
+    const entries: Temporal.ZonedDateTime[] = [];
+    for (const tok of tokens) {
+      if (!tok) continue;
+      const targetDow = dayMap[tok as keyof typeof dayMap]!;
+      const inst = weekStart.add({days: (targetDow - wkst + 7) % 7});
+      if (!this.opts.byMonth || this.opts.byMonth!.includes(inst.month)) {
+        entries.push(...this.expandByTime(inst));
+      }
+    }
+    return entries;
   }
 
   /**
@@ -2156,13 +2147,7 @@ export class RRuleTemporal {
     return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 
-  /**
-   * Generate occurrences for a specific week number in a given year
-   */
-  private generateOccurrencesForWeekInYear(year: number, weekNo: number): Temporal.ZonedDateTime[] {
-    const occs: Temporal.ZonedDateTime[] = [];
-    const sample = this.originalDtstart.with({year, month: 1, day: 1});
-
+  private isoWeekByDay(sample: Temporal.ZonedDateTime) {
     const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
     const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
     const jan1 = sample.with({month: 1, day: 1});
@@ -2174,6 +2159,22 @@ export class RRuleTemporal {
     const isLeapYear = jan1.inLeapYear;
     const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
 
+    const tokens = this.opts.byDay?.length
+      ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+      : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
+
+    return {lastWeek, firstWeekStart, tokens};
+  }
+
+  /**
+   * Generate occurrences for a specific week number in a given year
+   */
+  private generateOccurrencesForWeekInYear(year: number, weekNo: number): Temporal.ZonedDateTime[] {
+    const occs: Temporal.ZonedDateTime[] = [];
+    const sample = this.originalDtstart.with({year, month: 1, day: 1});
+
+    const {lastWeek, firstWeekStart, tokens} = this.isoWeekByDay(sample);
+
     // Skip if week number doesn't exist in this year
     if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
       return occs;
@@ -2181,19 +2182,7 @@ export class RRuleTemporal {
 
     const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
     const weekStart = firstWeekStart.add({weeks: weekIndex});
-
-    const tokens = this.opts.byDay?.length
-      ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
-      : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
-
-    for (const tok of tokens) {
-      if (!tok) continue;
-      const targetDow = dayMap[tok as keyof typeof dayMap]!;
-      const inst = weekStart.add({days: (targetDow - wkst + 7) % 7});
-      if (!this.opts.byMonth || this.opts.byMonth!.includes(inst.month)) {
-        occs.push(...this.expandByTime(inst));
-      }
-    }
+    occs.push(...this.addByDay(tokens, weekStart));
 
     return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
