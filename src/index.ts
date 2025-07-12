@@ -1184,7 +1184,7 @@ export class RRuleTemporal {
         const occs = this.generateYearlyOccurrences(yearCursor);
         const uniqueOccs = [];
         if (occs.length > 0) {
-          uniqueOccs.push(occs[0]);
+          uniqueOccs.push(occs[0]!);
           for (let i = 1; i < occs.length; i++) {
             if (Temporal.ZonedDateTime.compare(occs[i]!, occs[i - 1]!) !== 0) {
               uniqueOccs.push(occs[i]!);
