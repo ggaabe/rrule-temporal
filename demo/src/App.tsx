@@ -34,6 +34,7 @@ const freqOpts = [
   "MINUTELY",
   "SECONDLY",
 ] as const;
+const langOpts = ["en", "es", "hi", "yue", "ar", "he", "zh"] as const;
 const dowTokens = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const;
 
 const pad = (n: number, len = 2) => n.toString().padStart(len, "0");
@@ -47,9 +48,10 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("visual");
   const [ics, setIcs] = useState(defaultICS);
   const [err, setErr] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(() => 
+  const [darkMode, setDarkMode] = useState(() =>
     window.matchMedia('(prefers-color-scheme: dark)').matches
   );
+  const [lang, setLang] = useState("en");
 
   // Apply dark mode to document
   useEffect(() => {
@@ -152,12 +154,12 @@ export default function App() {
           };
         });
       setErr(null);
-      return { ruleString: rule.toString(), ruleText: toText(rule), rows };
+      return { ruleString: rule.toString(), ruleText: toText(rule, lang), rows };
     } catch (e) {
       setErr((e as Error).message);
       return { ruleString: "", ruleText: "", rows: [] };
     }
-  }, [ics]);
+  }, [ics, lang]);
 
   // -------- VISUAL form state ----------------------------------------------
   const [freq, setFreq] = useState<string>("WEEKLY");
@@ -682,6 +684,20 @@ export default function App() {
         {/* ───────── OUTPUT COLUMN ───────── */}
         <div className="ml-1">
           <h2 className="text-xl font-semibold mb-2">Output</h2>
+          <div className="mb-2 flex items-center space-x-2">
+            <label className="font-medium">Language:</label>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              className="border rounded p-1"
+            >
+              {langOpts.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
           {ruleText && <p className="mb-2 italic">{ruleText}</p>}
           {ruleString && (
             <pre className=" p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto">
