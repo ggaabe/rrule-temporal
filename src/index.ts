@@ -965,7 +965,7 @@ export class RRuleTemporal {
     let iterationCount = 0;
 
     // --- 1) MONTHLY + BYDAY/BYMONTHDAY (multi-day expansions) ---
-    if (this.opts.freq === 'MONTHLY' && (this.opts.byDay || this.opts.byMonthDay)) {
+    if (this.opts.freq === 'MONTHLY' && (this.opts.byDay || this.opts.byMonthDay) && !this.opts.byWeekNo) {
       const start = this.originalDtstart;
       if (!this.addDtstartIfNeeded(dates, iterator)) {
         return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1258,7 +1258,63 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    // --- 6c) MONTHLY + BYYEARDAY (special case) ---
+    // --- 6c) MONTHLY + BYWEEKNO (special case) ---
+    if (this.opts.freq === 'MONTHLY' && this.opts.byWeekNo && this.opts.byWeekNo.length > 0) {
+      const start = this.originalDtstart;
+      if (!this.addDtstartIfNeeded(dates, iterator)) {
+        return this.applyCountLimitAndMergeRDates(dates, iterator);
+      }
+
+      let current = start;
+      const weekNos = [...this.opts.byWeekNo].sort((a, b) => a - b);
+      const interval = this.opts.interval!;
+      let monthsAdvanced = 0;
+      let lastYearProcessed = -1;
+
+      outer_loop: while (true) {
+        if (this.shouldBreakForCountLimit(dates.length)) {
+          break;
+        }
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        const year = current.year;
+
+        // Only process each year once, and only when we've advanced enough to reach a new year
+        if (year !== lastYearProcessed && current.month >= start.month) {
+          lastYearProcessed = year;
+
+          // Generate occurrences for each week number in this year
+          for (const weekNo of weekNos) {
+            const occs = this.generateOccurrencesForWeekInYear(year, weekNo);
+            for (const occ of occs) {
+              if (Temporal.ZonedDateTime.compare(occ, start) >= 0) {
+                if (iterator && !iterator(occ, dates.length)) {
+                  break outer_loop;
+                }
+                dates.push(occ);
+                if (this.shouldBreakForCountLimit(dates.length)) {
+                  break outer_loop;
+                }
+              }
+            }
+          }
+        }
+
+        // Advance by the specified monthly interval
+        monthsAdvanced += interval;
+        current = start.add({months: monthsAdvanced});
+
+        if (this.opts.until && Temporal.ZonedDateTime.compare(current, this.opts.until) > 0) {
+          break;
+        }
+      }
+
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // --- 6d) MONTHLY + BYYEARDAY (special case) ---
     if (
       this.opts.freq === 'MONTHLY' &&
       this.opts.byYearDay &&
@@ -1988,5 +2044,47 @@ export class RRuleTemporal {
       if (idx >= 0 && idx < len) out.push(sorted[idx]!);
     }
     return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+  }
+
+  /**
+   * Generate occurrences for a specific week number in a given year
+   */
+  private generateOccurrencesForWeekInYear(year: number, weekNo: number): Temporal.ZonedDateTime[] {
+    const occs: Temporal.ZonedDateTime[] = [];
+    const sample = this.originalDtstart.with({year, month: 1, day: 1});
+
+    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
+    const jan1 = sample.with({month: 1, day: 1});
+    const jan4 = sample.with({month: 1, day: 4});
+    const delta = (jan4.dayOfWeek - wkst + 7) % 7;
+    const firstWeekStart = jan4.subtract({days: delta});
+
+    // Calculate the number of weeks in the year using ISO 8601 rules
+    const isLeapYear = jan1.inLeapYear;
+    const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
+
+    // Skip if week number doesn't exist in this year
+    if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
+      return occs;
+    }
+
+    const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
+    const weekStart = firstWeekStart.add({weeks: weekIndex});
+
+    const tokens = this.opts.byDay?.length
+      ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
+      : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
+
+    for (const tok of tokens) {
+      if (!tok) continue;
+      const targetDow = dayMap[tok as keyof typeof dayMap]!;
+      const inst = weekStart.add({days: (targetDow - wkst + 7) % 7});
+      if (!this.opts.byMonth || this.opts.byMonth!.includes(inst.month)) {
+        occs.push(...this.expandByTime(inst));
+      }
+    }
+
+    return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 }
