@@ -1127,7 +1127,7 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
     ]);
   });
 
-  it.skip('should handle BYSETPOS with YEARLY frequency', () => {
+  it('should handle BYSETPOS with YEARLY frequency', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byDay: ['SU'],
@@ -1135,9 +1135,14 @@ describe('RRuleTemporal - Advanced BYSETPOS', () => {
       count: 6,
       dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:00[UTC]'),
     });
-    const dates = rule.all();
-    expect(dates).toHaveLength(6);
-    expect(dates.every((d) => d.dayOfWeek === 7)).toBe(true);
+    assertDates({rule}, [
+      '2025-01-05T12:00:00.000Z',
+      '2025-03-09T12:00:00.000Z',
+      '2025-12-28T12:00:00.000Z',
+      '2026-01-04T12:00:00.000Z',
+      '2026-03-08T12:00:00.000Z',
+      '2026-12-27T12:00:00.000Z',
+    ]);
   });
 });
 

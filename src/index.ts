@@ -1724,7 +1724,7 @@ export class RRuleTemporal {
   private generateYearlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
     const months = this.opts.byMonth
       ? [...this.opts.byMonth].sort((a, b) => a - b)
-      : this.opts.byMonthDay
+      : this.opts.byMonthDay || this.opts.byDay
         ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
         : [this.originalDtstart.month];
 
