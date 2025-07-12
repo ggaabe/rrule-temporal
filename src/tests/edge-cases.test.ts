@@ -974,9 +974,9 @@ describe('RRuleTemporal - BYWEEKNO Rules', () => {
     assertDates({rule}, [
       // week 1 monday 2025 is before 2025-01-01 (Dec 30, 2024)
       '2025-01-06T12:00:00.000Z', // week 2 monday 2025 is Jan 6
-      '2025-12-29T12:00:00.000Z', // week 1 monday 2026 is Dec 29, 2025 (RFC 5545 week spans calendar years)
+      '2025-12-29T12:00:00.000Z', // week 1 monday 2026 is Dec 29
       '2026-01-05T12:00:00.000Z', // week 2 monday 2026 is Jan 5
-      '2026-12-28T12:00:00.000Z', // week 1 monday 2027 is Dec 28, 2026 (RFC 5545 week spans calendar years)
+      '2027-01-04T12:00:00.000Z', // week 1 monday 2027 is Jan 4
     ]);
   });
 });

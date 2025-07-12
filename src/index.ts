@@ -888,11 +888,8 @@ export class RRuleTemporal {
     const {week, year} = this.getIsoWeekInfo(zdt);
 
     const jan1 = zdt.with({year, month: 1, day: 1});
-    const dec31 = zdt.with({year, month: 12, day: 31});
-    let lastWeek = 52;
-    if (jan1.dayOfWeek === 4 || dec31.dayOfWeek === 4) {
-      lastWeek = 53;
-    }
+    const isLeapYear = jan1.inLeapYear;
+    const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
 
     return byWeekNo.some((wn) => {
       if (wn > 0) {
@@ -1803,8 +1800,9 @@ export class RRuleTemporal {
       const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
       const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
       const jan1 = sample.with({month: 1, day: 1});
-      const delta = (jan1.dayOfWeek - wkst + 7) % 7;
-      const firstWeekStart = jan1.subtract({days: delta});
+      const jan4 = sample.with({month: 1, day: 4});
+      const delta = (jan4.dayOfWeek - wkst + 7) % 7;
+      const firstWeekStart = jan4.subtract({days: delta});
       // Calculate the number of weeks in the year using ISO 8601 rules
       // A year has 53 weeks if January 1st is a Thursday, or if it's a leap year and January 1st is a Wednesday
       const isLeapYear = jan1.inLeapYear;
@@ -1815,6 +1813,9 @@ export class RRuleTemporal {
         : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
 
       for (const weekNo of this.opts.byWeekNo) {
+        if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
+          continue;
+        }
         const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
         const weekStart = firstWeekStart.add({weeks: weekIndex});
         for (const tok of tokens) {

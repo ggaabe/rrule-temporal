@@ -1,5 +1,6 @@
 import {RRuleTemporal} from '../index';
 import {parse, zdt} from './helpers';
+import {Temporal} from '@js-temporal/polyfill';
 
 function assertRuleReverseRest(rule: RRuleTemporal) {
   const newRule = parse(rule.toString());
@@ -685,6 +686,21 @@ describe('reverse', () => {
       count: 3,
       wkst: 'SU',
       dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+    });
+    assertRuleReverseRest(rule);
+  });
+
+  it('test rDate and exDate', () => {
+    const rDate1 = Temporal.ZonedDateTime.from('2025-01-10T10:00:00[UTC]');
+    const rDate2 = Temporal.ZonedDateTime.from('2025-01-15T10:00:00[UTC]');
+    const exDate1 = Temporal.ZonedDateTime.from('2025-01-02T10:00:00[UTC]');
+    const exDate2 = Temporal.ZonedDateTime.from('2025-01-15T10:00:00[UTC]'); // Exclude one of the rDates
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 10, // Generate more than we need so rDates can be added
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]'),
+      rDate: [rDate1, rDate2],
+      exDate: [exDate1, exDate2],
     });
     assertRuleReverseRest(rule);
   });
