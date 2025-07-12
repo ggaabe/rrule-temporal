@@ -1182,7 +1182,16 @@ export class RRuleTemporal {
         }
 
         const occs = this.generateYearlyOccurrences(yearCursor);
-        const {shouldBreak} = this.processOccurrences(occs, dates, start, iterator);
+        const uniqueOccs = [];
+        if (occs.length > 0) {
+          uniqueOccs.push(occs[0]);
+          for (let i = 1; i < occs.length; i++) {
+            if (Temporal.ZonedDateTime.compare(occs[i]!, occs[i - 1]!) !== 0) {
+              uniqueOccs.push(occs[i]!);
+            }
+          }
+        }
+        const {shouldBreak} = this.processOccurrences(uniqueOccs, dates, start, iterator);
 
         if (shouldBreak) {
           break;
@@ -1412,9 +1421,10 @@ export class RRuleTemporal {
    * @returns Merged and deduplicated array of dates
    */
   private mergeAndDeduplicateRDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
-    if (!this.opts.rDate) return dates;
+    if (this.opts.rDate) {
+      dates.push(...this.opts.rDate);
+    }
 
-    dates.push(...this.opts.rDate);
     dates.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
 
     // Deduplicate
@@ -1763,6 +1773,7 @@ export class RRuleTemporal {
       const last = sample.with({month: 12, day: 31}).dayOfYear;
       for (const d of this.opts.byYearDay) {
         const dayNum = d > 0 ? d : last + d + 1;
+        if (dayNum <= 0 || dayNum > last) continue;
         const dt =
           this.opts.freq === 'MINUTELY'
             ? sample.with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0}).add({days: dayNum - 1})

@@ -1014,7 +1014,7 @@ describe('RRuleTemporal - BYYEARDAY Rules', () => {
     ]);
   });
 
-  it.skip('should handle BYYEARDAY in leap year', () => {
+  it('should handle BYYEARDAY in leap year', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       byYearDay: [366, -1],
