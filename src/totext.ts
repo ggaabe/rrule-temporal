@@ -457,7 +457,10 @@ const zh: LocaleData = {
 };
 
 const ALL_LOCALES: Record<string, LocaleData> = {en, es, hi, yue, ar, he, zh};
-const env = process.env.TOTEXT_LANGS;
+const env =
+  typeof process !== 'undefined' && process.env
+    ? process.env.TOTEXT_LANGS
+    : undefined;
 const active = env
   ? env
       .split(',')

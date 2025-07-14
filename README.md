@@ -140,7 +140,10 @@ toText(weekly, "es");
 `toText()` currently ships translations for **English (`en`)**, 
 **Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
 **Hebrew (`he`)** and **Mandarin (`zh`)**. At build time you can reduce bundle size by
-defining the `TOTEXT_LANGS` environment variable, e.g. `TOTEXT_LANGS=en,es,ar`.
+defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
+e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
+(such as in browser builds where `process` is undefined) all languages are
+included by default.
 
 ### `toText` supported languages
 
