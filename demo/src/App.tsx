@@ -239,6 +239,8 @@ export default function App() {
   // --- rebuild ics when visual state changes --------------------------------
   useEffect(() => {
     if (mode !== "visual") return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dtDate)) return;
+    if (!/^\d{2}:\d{2}(?::\d{2})?$/.test(dtTime)) return;
     try {
       const [y, m, d] = dtDate.split("-").map(Number);
       const [hh, mm, ss] = dtTime.split(":").map(Number);
