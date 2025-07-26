@@ -66,7 +66,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     let styleEl = document.getElementById('dynamic-theme-styles');
-    
+
     if (!styleEl) {
       styleEl = document.createElement('style');
       styleEl.id = 'dynamic-theme-styles';
@@ -298,7 +298,7 @@ export default function App() {
           | "MINUTELY"
           | "SECONDLY",
         interval,
-        count,
+        count: count || undefined,
         until,
         dtstart,
         tzid,
@@ -377,7 +377,7 @@ export default function App() {
           </a>{" "}
           Playground
         </h1>
-        
+
         {/* Dark mode toggle */}
         <button
           onClick={() => setDarkMode(!darkMode)}
@@ -478,9 +478,9 @@ export default function App() {
                 <label className="font-medium w-20">Count:</label>
                 <input
                   type="number"
-                  min={1}
-                  value={count}
-                  onChange={(e) => setCount(parseInt(e.target.value) || 1)}
+                  min={0}
+                  defaultValue={count}
+                  onChange={(e) => setCount(parseInt(e.target.value) || 0)}
                   className="border rounded p-1 w-24"
                 />
               </div>
