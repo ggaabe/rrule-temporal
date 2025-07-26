@@ -40,7 +40,7 @@ const firstTen = rule.all((_, i) => i < 10);
 Instead of a full ICS string you can supply the recurrence parameters directly:
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const rule = new RRuleTemporal({
   freq: "DAILY",
@@ -107,7 +107,7 @@ const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 The `toText` helper converts a rule into a human readable description.
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 import { RRuleTemporal } from "rrule-temporal";
 import { toText } from "rrule-temporal/totext";
 
@@ -137,8 +137,8 @@ toText(weekly, "es");
 // "cada semana en domingo a las 10 AM UTC"
 ```
 
-`toText()` currently ships translations for **English (`en`)**, 
-**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
+`toText()` currently ships translations for **English (`en`)**,
+**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**,
 **Hebrew (`he`)** and **Mandarin (`zh`)**. At build time you can reduce bundle size by
 defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
 e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
@@ -201,7 +201,7 @@ ruleB.all().forEach(dt => console.log(dt.toString()));
 ### Working with extra and excluded dates
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const start = Temporal.ZonedDateTime.from({
   year: 2025, month: 1, day: 1, hour: 12, timeZone: "UTC"

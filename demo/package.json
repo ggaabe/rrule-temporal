@@ -11,10 +11,10 @@
     "gh-pages": "npx gh-pages -d dist"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "rrule-temporal": "^1.1.4"
+    "rrule-temporal": "^1.1.4",
+    "temporal-polyfill": "^0.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",

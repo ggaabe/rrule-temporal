@@ -7,7 +7,7 @@
 // --------------------------------------------------------------------------------
 // Set to use local package
 import { useEffect, useMemo, useState } from "react";
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 import { RRuleTemporal } from "rrule-temporal";
 import { toText } from "rrule-temporal/totext";
 
@@ -66,7 +66,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     let styleEl = document.getElementById('dynamic-theme-styles');
-    
+
     if (!styleEl) {
       styleEl = document.createElement('style');
       styleEl.id = 'dynamic-theme-styles';
@@ -377,7 +377,7 @@ export default function App() {
           </a>{" "}
           Playground
         </h1>
-        
+
         {/* Dark mode toggle */}
         <button
           onClick={() => setDarkMode(!darkMode)}

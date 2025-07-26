@@ -57,6 +57,6 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1"
+    "temporal-polyfill": "^0.3.0"
   }
 }
