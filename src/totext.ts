@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 import {RRuleTemporal} from './index';
 
 interface UnitStrings {
@@ -457,10 +457,7 @@ const zh: LocaleData = {
 };
 
 const ALL_LOCALES: Record<string, LocaleData> = {en, es, hi, yue, ar, he, zh};
-const env =
-  typeof process !== 'undefined' && process.env
-    ? process.env.TOTEXT_LANGS
-    : undefined;
+const env = typeof process !== 'undefined' && process.env ? process.env.TOTEXT_LANGS : undefined;
 const active = env
   ? env
       .split(',')

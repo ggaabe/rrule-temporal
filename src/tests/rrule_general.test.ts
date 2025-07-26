@@ -139,7 +139,7 @@ describe('General RRule tests', () => {
 
   it('testStrInvalidUntil', () => {
     expect(() => parse('DTSTART:19970902T090000\nRRULE:FREQ=YEARLY;UNTIL=TheCowsComeHome;BYDAY=1TU,-1TH')).toThrow(
-      'invalid RFC 9557 string',
+      'Cannot parse: TheC-ow-sCTmeHome',
     );
   });
 

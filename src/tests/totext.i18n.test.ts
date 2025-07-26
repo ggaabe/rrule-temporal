@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../index';
 import {toText} from '../totext';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 
 function make(ruleStr: string): RRuleTemporal {
   const dtstart = Temporal.ZonedDateTime.from({

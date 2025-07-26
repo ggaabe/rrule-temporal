@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 
 // Allowed frequency values
 type Freq = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'HOURLY' | 'MINUTELY' | 'SECONDLY';
