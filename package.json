@@ -18,7 +18,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "rm -rf dist && tsup",
     "test": "jest --coverage=false",
     "coverage": "jest",
     "format": "./node_modules/.bin/prettier --write 'src/**/*.ts'",

@@ -126,3 +126,4 @@ dist
 yarn.lock
 .claude
 .coverage
+.DS_Store
