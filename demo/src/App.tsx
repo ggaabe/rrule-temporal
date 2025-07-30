@@ -6,61 +6,49 @@
 // – TailwindCSS v4 (preflight/utilities) assumed.
 // --------------------------------------------------------------------------------
 // Set to use local package
-import { useEffect, useMemo, useState } from "react";
-import { Temporal } from "@js-temporal/polyfill";
-import { RRuleTemporal } from "rrule-temporal";
-import { toText } from "rrule-temporal/totext";
+import {useEffect, useMemo, useState} from 'react';
+import {Temporal} from '@js-temporal/polyfill';
+import {RRuleTemporal} from 'rrule-temporal';
+import {toText} from 'rrule-temporal/totext';
 
 const defaultICS = `DTSTART;TZID=UTC:20250101T120000\nRRULE:FREQ=WEEKLY;BYHOUR=12;COUNT=30`;
 
-type Mode = "visual" | "raw";
+type Mode = 'visual' | 'raw';
 
-const hourLabels = Array.from({ length: 24 }, (_, h) => h);
+const hourLabels = Array.from({length: 24}, (_, h) => h);
 const tzOptions = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Los_Angeles",
-  "Europe/London",
-  "Europe/Paris",
-  "Asia/Tokyo",
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Europe/Paris',
+  'Asia/Tokyo',
 ];
-const freqOpts = [
-  "YEARLY",
-  "MONTHLY",
-  "WEEKLY",
-  "DAILY",
-  "HOURLY",
-  "MINUTELY",
-  "SECONDLY",
-] as const;
-const langOpts = ["en", "es", "hi", "yue", "ar", "he", "zh"] as const;
-const langLabels: { [key in (typeof langOpts)[number]]: string } = {
-  en: "English",
-  es: "Spanish",
-  hi: "Hindi",
-  yue: "Cantonese",
-  ar: "Arabic",
-  he: "Hebrew",
-  zh: "Chinese",
+const freqOpts = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'] as const;
+const langOpts = ['en', 'es', 'hi', 'yue', 'ar', 'he', 'zh'] as const;
+const langLabels: {[key in (typeof langOpts)[number]]: string} = {
+  en: 'English',
+  es: 'Spanish',
+  hi: 'Hindi',
+  yue: 'Cantonese',
+  ar: 'Arabic',
+  he: 'Hebrew',
+  zh: 'Chinese',
 };
-const dowTokens = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const;
+const dowTokens = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 
-const pad = (n: number, len = 2) => n.toString().padStart(len, "0");
-const toDateInput = (zdt: Temporal.ZonedDateTime) =>
-  `${zdt.year}-${pad(zdt.month)}-${pad(zdt.day)}`;
-const toTimeInput = (zdt: Temporal.ZonedDateTime) =>
-  `${pad(zdt.hour)}:${pad(zdt.minute)}:${pad(zdt.second)}`;
+const pad = (n: number, len = 2) => n.toString().padStart(len, '0');
+const toDateInput = (zdt: Temporal.ZonedDateTime) => `${zdt.year}-${pad(zdt.month)}-${pad(zdt.day)}`;
+const toTimeInput = (zdt: Temporal.ZonedDateTime) => `${pad(zdt.hour)}:${pad(zdt.minute)}:${pad(zdt.second)}`;
 
 export default function App() {
   // -------- shared state ----------------------------------------------------
-  const [mode, setMode] = useState<Mode>("visual");
+  const [mode, setMode] = useState<Mode>('visual');
   const [ics, setIcs] = useState(defaultICS);
   const [err, setErr] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(() =>
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
-  const [lang, setLang] = useState("en");
+  const [darkMode, setDarkMode] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const [lang, setLang] = useState('en');
 
   // Apply dark mode to document
   useEffect(() => {
@@ -131,25 +119,23 @@ export default function App() {
   }, []);
 
   // -------- derived rule + occurrences -------------------------------------
-  const { ruleString, ruleText, rows } = useMemo(() => {
+  const {ruleString, ruleText, rows} = useMemo(() => {
     try {
-      const rule = new RRuleTemporal({ rruleString: ics.trim() });
+      const rule = new RRuleTemporal({rruleString: ics.trim()});
       const fmt = new Intl.DateTimeFormat(undefined, {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        timeZoneName: "short",
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short',
       });
       const rows = rule
         .all((_, i) => i < 30)
         .map((dt, i) => {
-          const parts = fmt.formatToParts(
-            new Date(dt.toInstant().epochMilliseconds)
-          );
+          const parts = fmt.formatToParts(new Date(dt.toInstant().epochMilliseconds));
           const bag: Record<string, string> = {};
           parts.forEach((p) => (bag[p.type] = p.value));
           return {
@@ -163,71 +149,62 @@ export default function App() {
           };
         });
       setErr(null);
-      return { ruleString: rule.toString(), ruleText: toText(rule, lang), rows };
+      return {ruleString: rule.toString(), ruleText: toText(rule, lang), rows};
     } catch (e) {
       setErr((e as Error).message);
-      return { ruleString: "", ruleText: "", rows: [] };
+      return {ruleString: '', ruleText: '', rows: []};
     }
   }, [ics, lang]);
 
   // -------- VISUAL form state ----------------------------------------------
-  const [freq, setFreq] = useState<string>("WEEKLY");
+  const [freq, setFreq] = useState<string>('WEEKLY');
   const [count, setCount] = useState(30);
-  const [tzid, setTzid] = useState("UTC");
-  const [dtDate, setDtDate] = useState("2025-01-01");
-  const [dtTime, setDtTime] = useState("12:00:00");
+  const [tzid, setTzid] = useState('UTC');
+  const [dtDate, setDtDate] = useState('2025-01-01');
+  const [dtTime, setDtTime] = useState('12:00:00');
   const [byDay, setByDay] = useState<string[]>([]);
   const [byHour, setByHour] = useState<number[]>([12]);
   const [interval, setInterval] = useState(1);
-  const [untilDate, setUntilDate] = useState("");
-  const [untilTime, setUntilTime] = useState("00:00:00");
-  const [byMinuteStr, setByMinuteStr] = useState("");
-  const [bySecondStr, setBySecondStr] = useState("");
-  const [byMonthStr, setByMonthStr] = useState("");
-  const [byMonthDayStr, setByMonthDayStr] = useState("");
-  const [byYearDayStr, setByYearDayStr] = useState("");
-  const [byWeekNoStr, setByWeekNoStr] = useState("");
-  const [bySetPosStr, setBySetPosStr] = useState("");
-  const [wkst, setWkst] = useState("");
-  const [rDateStr, setRDateStr] = useState("");
-  const [exDateStr, setExDateStr] = useState("");
+  const [untilDate, setUntilDate] = useState('');
+  const [untilTime, setUntilTime] = useState('00:00:00');
+  const [byMinuteStr, setByMinuteStr] = useState('');
+  const [bySecondStr, setBySecondStr] = useState('');
+  const [byMonthStr, setByMonthStr] = useState('');
+  const [byMonthDayStr, setByMonthDayStr] = useState('');
+  const [byYearDayStr, setByYearDayStr] = useState('');
+  const [byWeekNoStr, setByWeekNoStr] = useState('');
+  const [bySetPosStr, setBySetPosStr] = useState('');
+  const [wkst, setWkst] = useState('');
+  const [rDateStr, setRDateStr] = useState('');
+  const [exDateStr, setExDateStr] = useState('');
   const [maxIterations, setMaxIterations] = useState(10000);
   const [includeDtstart, setIncludeDtstart] = useState(false);
 
   // --- sync visual controls from raw ics when entering visual ---------------
   useEffect(() => {
-    if (mode !== "visual") return;
+    if (mode !== 'visual') return;
     try {
-      const opts = new RRuleTemporal({ rruleString: ics.trim() }).options();
+      const opts = new RRuleTemporal({rruleString: ics.trim()}).options();
       setFreq(opts.freq);
       setInterval(opts.interval ?? 1);
       setCount(opts.count ?? 30);
-      setUntilDate(opts.until ? toDateInput(opts.until) : "");
-      setUntilTime(opts.until ? toTimeInput(opts.until) : "00:00:00");
+      setUntilDate(opts.until ? toDateInput(opts.until) : '');
+      setUntilTime(opts.until ? toTimeInput(opts.until) : '00:00:00');
       setTzid(opts.tzid ?? opts.dtstart.timeZoneId);
       setDtDate(toDateInput(opts.dtstart));
       setDtTime(toTimeInput(opts.dtstart));
       setByDay(opts.byDay ?? []);
-      setByHour(
-        opts.byHour ??
-          (["MINUTELY", "SECONDLY"].includes(opts.freq)
-            ? []
-            : [opts.dtstart.hour])
-      );
-      setByMinuteStr(opts.byMinute ? opts.byMinute.join(",") : "");
-      setBySecondStr(opts.bySecond ? opts.bySecond.join(",") : "");
-      setByMonthStr(opts.byMonth ? opts.byMonth.join(",") : "");
-      setByMonthDayStr(opts.byMonthDay ? opts.byMonthDay.join(",") : "");
-      setByYearDayStr(opts.byYearDay ? opts.byYearDay.join(",") : "");
-      setByWeekNoStr(opts.byWeekNo ? opts.byWeekNo.join(",") : "");
-      setBySetPosStr(opts.bySetPos ? opts.bySetPos.join(",") : "");
-      setWkst(opts.wkst ?? "");
-      setRDateStr(
-        opts.rDate ? opts.rDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(",") : ""
-      );
-      setExDateStr(
-        opts.exDate ? opts.exDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(",") : ""
-      );
+      setByHour(opts.byHour ?? (['MINUTELY', 'SECONDLY'].includes(opts.freq) ? [] : [opts.dtstart.hour]));
+      setByMinuteStr(opts.byMinute ? opts.byMinute.join(',') : '');
+      setBySecondStr(opts.bySecond ? opts.bySecond.join(',') : '');
+      setByMonthStr(opts.byMonth ? opts.byMonth.join(',') : '');
+      setByMonthDayStr(opts.byMonthDay ? opts.byMonthDay.join(',') : '');
+      setByYearDayStr(opts.byYearDay ? opts.byYearDay.join(',') : '');
+      setByWeekNoStr(opts.byWeekNo ? opts.byWeekNo.join(',') : '');
+      setBySetPosStr(opts.bySetPos ? opts.bySetPos.join(',') : '');
+      setWkst(opts.wkst ?? '');
+      setRDateStr(opts.rDate ? opts.rDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(',') : '');
+      setExDateStr(opts.exDate ? opts.exDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(',') : '');
       setMaxIterations(opts.maxIterations ?? 10000);
       setIncludeDtstart(opts.includeDtstart ?? false);
     } catch (e) {
@@ -238,12 +215,12 @@ export default function App() {
 
   // --- rebuild ics when visual state changes --------------------------------
   useEffect(() => {
-    if (mode !== "visual") return;
+    if (mode !== 'visual') return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dtDate)) return;
     if (!/^\d{2}:\d{2}(?::\d{2})?$/.test(dtTime)) return;
     try {
-      const [y, m, d] = dtDate.split("-").map(Number);
-      const [hh, mm, ss] = dtTime.split(":").map(Number);
+      const [y, m, d] = dtDate.split('-').map(Number);
+      const [hh, mm, ss] = dtTime.split(':').map(Number);
       const dtstart = Temporal.ZonedDateTime.from({
         year: y,
         month: m,
@@ -255,19 +232,22 @@ export default function App() {
       });
       const until = untilDate
         ? Temporal.ZonedDateTime.from({
-            year: Number(untilDate.split("-")[0]),
-            month: Number(untilDate.split("-")[1]),
-            day: Number(untilDate.split("-")[2]),
-            hour: Number(untilTime.split(":")[0] || 0),
-            minute: Number(untilTime.split(":")[1] || 0),
-            second: Number(untilTime.split(":")[2] || 0),
+            year: Number(untilDate.split('-')[0]),
+            month: Number(untilDate.split('-')[1]),
+            day: Number(untilDate.split('-')[2]),
+            hour: Number(untilTime.split(':')[0] || 0),
+            minute: Number(untilTime.split(':')[1] || 0),
+            second: Number(untilTime.split(':')[2] || 0),
             timeZone: tzid,
           })
         : undefined;
 
       const numList = (str: string) =>
         str.trim()
-          ? str.split(/\s*,\s*/).map((n) => parseInt(n, 10)).filter((n) => !isNaN(n))
+          ? str
+              .split(/\s*,\s*/)
+              .map((n) => parseInt(n, 10))
+              .filter((n) => !isNaN(n))
           : undefined;
       const dateList = (str: string): Temporal.ZonedDateTime[] | undefined => {
         if (!str.trim()) return undefined;
@@ -278,9 +258,7 @@ export default function App() {
             out.push(Temporal.ZonedDateTime.from(p));
           } catch {
             try {
-              out.push(
-                Temporal.PlainDateTime.from(p).toZonedDateTime(tzid)
-              );
+              out.push(Temporal.PlainDateTime.from(p).toZonedDateTime(tzid));
             } catch {
               /* ignore */
             }
@@ -289,14 +267,7 @@ export default function App() {
         return out.length ? out : undefined;
       };
       const rule = new RRuleTemporal({
-        freq: freq as
-          | "YEARLY"
-          | "MONTHLY"
-          | "WEEKLY"
-          | "DAILY"
-          | "HOURLY"
-          | "MINUTELY"
-          | "SECONDLY",
+        freq: freq as 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'HOURLY' | 'MINUTELY' | 'SECONDLY',
         interval,
         count: count || undefined,
         until,
@@ -305,11 +276,11 @@ export default function App() {
         maxIterations,
         includeDtstart,
         byDay: byDay.length ? byDay : undefined,
-        byHour: ["MINUTELY", "SECONDLY"].includes(freq)
+        byHour: ['MINUTELY', 'SECONDLY'].includes(freq)
           ? undefined
           : byHour.length
-          ? [...byHour].sort((a, b) => a - b)
-          : undefined,
+            ? [...byHour].sort((a, b) => a - b)
+            : undefined,
         byMinute: numList(byMinuteStr),
         bySecond: numList(bySecondStr),
         byMonth: numList(byMonthStr),
@@ -354,19 +325,15 @@ export default function App() {
 
   // helpers ------------------------------------------------------------------
   const toggleDay = (tok: string) =>
-    setByDay((prev) =>
-      prev.includes(tok) ? prev.filter((t) => t !== tok) : [...prev, tok]
-    );
+    setByDay((prev) => (prev.includes(tok) ? prev.filter((t) => t !== tok) : [...prev, tok]));
   const toggleHour = (h: number) =>
-    setByHour((prev) =>
-      prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
-    );
+    setByHour((prev) => (prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]));
 
   // -------------------------------------------------------------------------
   return (
-    <div className="min-h-screen p-4 text-sm">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">
+    <div className="min-h-screen p-2 sm:p-4 text-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">
           <a
             href="https://github.com/ggaabe/rrule-temporal"
             target="_blank"
@@ -374,19 +341,23 @@ export default function App() {
             className="hover:underline text-blue-700"
           >
             rrule-temporal
-          </a>{" "}
+          </a>{' '}
           Playground
         </h1>
 
         {/* Dark mode toggle */}
         <button
           onClick={() => setDarkMode(!darkMode)}
-          className="p-2 rounded-lg border hover:bg-gray-100 transition-colors"
+          className="p-2 rounded-lg border hover:bg-gray-100 transition-colors self-end sm:self-auto"
           aria-label="Toggle dark mode"
         >
           {darkMode ? (
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
+                clipRule="evenodd"
+              />
             </svg>
           ) : (
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -397,28 +368,26 @@ export default function App() {
       </div>
 
       {/* mode switch */}
-      <div className="mb-4 space-x-2">
-        {(["visual", "raw"] as const).map((m) => (
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(['visual', 'raw'] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`px-3 py-1 rounded border ${
-              mode === m ? "bg-blue-600 text-white" : "bg-white text-black"
-            }`}
+            className={`px-3 py-1 rounded border ${mode === m ? 'bg-blue-600 text-white' : 'bg-white text-black'}`}
           >
             {m.charAt(0).toUpperCase() + m.slice(1)}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-1">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ───────── INPUT COLUMN ───────── */}
         <div>
           <h2 className="text-xl font-semibold mb-2">Input</h2>
 
-          {mode === "raw" ? (
+          {mode === 'raw' ? (
             <textarea
-              className="w-full h-64 border rounded p-2 font-mono text-xs shadow"
+              className="w-full h-48 sm:h-64 border rounded p-2 font-mono text-xs shadow"
               value={ics}
               onChange={(e) => setIcs(e.target.value)}
             />
@@ -426,47 +395,47 @@ export default function App() {
             <div className="space-y-3">
               {/* FREQ */}
               <div>
-                <label className="font-medium mr-2">Frequency:</label>
-                {freqOpts.map((f) => (
-                  <label key={f} className="mr-2 inline-flex items-center">
-                    <input
-                      type="radio"
-                      name="freq"
-                      className="mr-1"
-                      checked={freq === f}
-                      onChange={() => setFreq(f)}
-                    />
-                    {f.charAt(0) + f.slice(1).toLowerCase()}
-                  </label>
-                ))}
+                <label className="font-medium block mb-2">Frequency:</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {freqOpts.map((f) => (
+                    <label key={f} className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        name="freq"
+                        className="mr-1"
+                        checked={freq === f}
+                        onChange={() => setFreq(f)}
+                      />
+                      <span className="text-xs sm:text-sm">{f.charAt(0) + f.slice(1).toLowerCase()}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {/* DTSTART date/time */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Start:</label>
-                <input
-                  type="date"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
-                  value={dtDate}
-                  onChange={(e) => setDtDate(e.target.value)}
-                />
-                <input
-                  type="time"
-                  step="1"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
-                  value={dtTime}
-                  onChange={(e) => setDtTime(e.target.value)}
-                />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">Start:</label>
+                <div className="flex gap-2 flex-1">
+                  <input
+                    type="date"
+                    className="border rounded p-1 flex-1 [color-scheme:light] dark:[color-scheme:dark]"
+                    value={dtDate}
+                    onChange={(e) => setDtDate(e.target.value)}
+                  />
+                  <input
+                    type="time"
+                    step="1"
+                    className="border rounded p-1 flex-1 [color-scheme:light] dark:[color-scheme:dark]"
+                    value={dtTime}
+                    onChange={(e) => setDtTime(e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* TZID */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">TZID:</label>
-                <select
-                  value={tzid}
-                  onChange={(e) => setTzid(e.target.value)}
-                  className="border rounded p-1 flex-1"
-                >
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">TZID:</label>
+                <select value={tzid} onChange={(e) => setTzid(e.target.value)} className="border rounded p-1 flex-1">
                   {tzOptions.map((tz) => (
                     <option key={tz}>{tz}</option>
                   ))}
@@ -474,39 +443,41 @@ export default function App() {
               </div>
 
               {/* COUNT */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Count:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">Count:</label>
                 <input
                   type="number"
                   min={0}
                   defaultValue={count}
                   onChange={(e) => setCount(parseInt(e.target.value) || 0)}
-                  className="border rounded p-1 w-24"
+                  className="border rounded p-1 w-full sm:w-24"
                 />
               </div>
 
               {/* BYDAY */}
               <div>
-                <label className="font-medium mr-2">By Weekday:</label>
-                {dowTokens.map((tok) => (
-                  <label key={tok} className="mr-2 inline-flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={byDay.includes(tok)}
-                      onChange={() => toggleDay(tok)}
-                      className="mr-1"
-                    />
-                    {tok}
-                  </label>
-                ))}
+                <label className="font-medium block mb-2">By Weekday:</label>
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  {dowTokens.map((tok) => (
+                    <label key={tok} className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={byDay.includes(tok)}
+                        onChange={() => toggleDay(tok)}
+                        className="mr-1"
+                      />
+                      <span className="text-xs sm:text-sm">{tok}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {/* BYHOUR */}
               <div>
-                <label className="font-medium mr-2 align-top">By Hour:</label>
-                <div className="inline-grid grid-cols-12 gap-1">
+                <label className="font-medium block mb-2">By Hour:</label>
+                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-1">
                   {hourLabels.map((h) => (
-                    <label key={h} className="inline-flex items-center">
+                    <label key={h} className="inline-flex items-center text-xs">
                       <input
                         type="checkbox"
                         className="mr-1"
@@ -520,38 +491,40 @@ export default function App() {
               </div>
 
               {/* INTERVAL */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Interval:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">Interval:</label>
                 <input
                   type="number"
                   min={1}
                   value={interval}
                   onChange={(e) => setInterval(parseInt(e.target.value) || 1)}
-                  className="border rounded p-1 w-24"
+                  className="border rounded p-1 w-full sm:w-24"
                 />
               </div>
 
               {/* UNTIL */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Until:</label>
-                <input
-                  type="date"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
-                  value={untilDate}
-                  onChange={(e) => setUntilDate(e.target.value)}
-                />
-                <input
-                  type="time"
-                  step="1"
-                  className="border rounded p-1 [color-scheme:light] dark:[color-scheme:dark]"
-                  value={untilTime}
-                  onChange={(e) => setUntilTime(e.target.value)}
-                />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">Until:</label>
+                <div className="flex gap-2 flex-1">
+                  <input
+                    type="date"
+                    className="border rounded p-1 flex-1 [color-scheme:light] dark:[color-scheme:dark]"
+                    value={untilDate}
+                    onChange={(e) => setUntilDate(e.target.value)}
+                  />
+                  <input
+                    type="time"
+                    step="1"
+                    className="border rounded p-1 flex-1 [color-scheme:light] dark:[color-scheme:dark]"
+                    value={untilTime}
+                    onChange={(e) => setUntilTime(e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* BYMINUTE */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">By Minute:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">By Minute:</label>
                 <input
                   type="text"
                   className="border rounded p-1 flex-1"
@@ -561,8 +534,8 @@ export default function App() {
               </div>
 
               {/* BYSECOND */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">By Second:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">By Second:</label>
                 <input
                   type="text"
                   className="border rounded p-1 flex-1"
@@ -572,8 +545,8 @@ export default function App() {
               </div>
 
               {/* BYMONTH */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">By Month:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">By Month:</label>
                 <input
                   type="text"
                   className="border rounded p-1 flex-1"
@@ -583,8 +556,8 @@ export default function App() {
               </div>
 
               {/* BYMONTHDAY */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">By Mo.Day:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">By Mo.Day:</label>
                 <input
                   type="text"
                   className="border rounded p-1 flex-1"
@@ -594,8 +567,8 @@ export default function App() {
               </div>
 
               {/* BYYEARDAY */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">By Yr.Day:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">By Yr.Day:</label>
                 <input
                   type="text"
                   className="border rounded p-1 flex-1"
@@ -605,8 +578,8 @@ export default function App() {
               </div>
 
               {/* BYWEEKNO */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">By WeekNo:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">By WeekNo:</label>
                 <input
                   type="text"
                   className="border rounded p-1 flex-1"
@@ -616,8 +589,8 @@ export default function App() {
               </div>
 
               {/* BYSETPOS */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">By SetPos:</label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">By SetPos:</label>
                 <input
                   type="text"
                   className="border rounded p-1 flex-1"
@@ -627,13 +600,9 @@ export default function App() {
               </div>
 
               {/* WKST */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">WKST:</label>
-                <select
-                  value={wkst}
-                  onChange={(e) => setWkst(e.target.value)}
-                  className="border rounded p-1 flex-1"
-                >
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">WKST:</label>
+                <select value={wkst} onChange={(e) => setWkst(e.target.value)} className="border rounded p-1 flex-1">
                   <option value="">(none)</option>
                   {dowTokens.map((d) => (
                     <option key={d} value={d}>
@@ -641,6 +610,46 @@ export default function App() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* RDATE */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">RDATE:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={rDateStr}
+                  onChange={(e) => setRDateStr(e.target.value)}
+                />
+              </div>
+
+              {/* EXDATE */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">EXDATE:</label>
+                <input
+                  type="text"
+                  className="border rounded p-1 flex-1"
+                  value={exDateStr}
+                  onChange={(e) => setExDateStr(e.target.value)}
+                />
+              </div>
+
+              {/* MAX ITER */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">Max Iter:</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="border rounded p-1 w-full sm:w-24"
+                  value={maxIterations}
+                  onChange={(e) => setMaxIterations(parseInt(e.target.value) || 1)}
+                />
+              </div>
+
+              {/* INCLUDE DTSTART */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-medium sm:w-20">Include DT:</label>
+                <input type="checkbox" checked={includeDtstart} onChange={(e) => setIncludeDtstart(e.target.checked)} />
               </div>
 
               {/* RDATE */}
@@ -680,11 +689,7 @@ export default function App() {
               {/* INCLUDE DTSTART */}
               <div className="flex items-center space-x-2">
                 <label className="font-medium w-20">Include DT:</label>
-                <input
-                  type="checkbox"
-                  checked={includeDtstart}
-                  onChange={(e) => setIncludeDtstart(e.target.checked)}
-                />
+                <input type="checkbox" checked={includeDtstart} onChange={(e) => setIncludeDtstart(e.target.checked)} />
               </div>
             </div>
           )}
@@ -693,14 +698,14 @@ export default function App() {
         </div>
 
         {/* ───────── OUTPUT COLUMN ───────── */}
-        <div className="ml-1">
+        <div className="lg:ml-1">
           <h2 className="text-xl font-semibold mb-2">Output</h2>
-          <div className="mb-2 flex items-center space-x-2">
+          <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
             <label className="font-medium">Language:</label>
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value)}
-              className="border rounded p-1"
+              className="border rounded p-1 w-full sm:w-auto"
             >
               {langOpts.map((l) => (
                 <option key={l} value={l}>
@@ -709,32 +714,32 @@ export default function App() {
               ))}
             </select>
           </div>
-          {ruleText && <p className="mb-2 italic">{ruleText}</p>}
+          {ruleText && <p className="mb-2 italic text-sm">{ruleText}</p>}
           {ruleString && (
-            <pre className=" p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto">
+            <pre className="p-2 border rounded mb-4 text-xs whitespace-pre-wrap overflow-auto max-h-32 sm:max-h-none">
               {ruleString}
             </pre>
           )}
 
-          <div className="overflow-x-auto max-h-[28rem] overflow-y-auto border rounded shadow text-xs">
+          <div className="overflow-x-auto max-h-[20rem] sm:max-h-[28rem] overflow-y-auto border rounded shadow text-xs">
             <table className="min-w-full">
-              <thead className="sticky top-0 ">
+              <thead className="sticky top-0">
                 <tr>
-                  <th className="px-2 py-1 border">#</th>
-                  <th className="px-2 py-1 border">Day</th>
-                  <th className="px-2 py-1 border">Date</th>
-                  <th className="px-2 py-1 border">Time</th>
-                  <th className="px-2 py-1 border">TZ</th>
+                  <th className="px-1 sm:px-2 py-1 border text-xs">#</th>
+                  <th className="px-1 sm:px-2 py-1 border text-xs">Day</th>
+                  <th className="px-1 sm:px-2 py-1 border text-xs">Date</th>
+                  <th className="px-1 sm:px-2 py-1 border text-xs">Time</th>
+                  <th className="px-1 sm:px-2 py-1 border text-xs">TZ</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.idx} className={r.idx % 2 ? "" : undefined}>
-                    <td className="px-2 border text-center">{r.idx}</td>
-                    <td className="px-2  border">{r.dow}</td>
-                    <td className="px-2  border">{`${r.day} ${r.month} ${r.year}`}</td>
-                    <td className="px-2  border">{r.time}</td>
-                    <td className="px-2 border">{r.tz}</td>
+                  <tr key={r.idx} className={r.idx % 2 ? '' : undefined}>
+                    <td className="px-1 sm:px-2 border text-center text-xs">{r.idx}</td>
+                    <td className="px-1 sm:px-2 border text-xs">{r.dow}</td>
+                    <td className="px-1 sm:px-2 border text-xs">{`${r.day} ${r.month} ${r.year}`}</td>
+                    <td className="px-1 sm:px-2 border text-xs">{r.time}</td>
+                    <td className="px-1 sm:px-2 border text-xs">{r.tz}</td>
                   </tr>
                 ))}
               </tbody>
