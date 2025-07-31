@@ -224,3 +224,50 @@ const hits = ruleC.between(
   true
 );
 ```
+
+### Converting between **@js-temporal/polyfill** and **temporal-polyfill**
+
+`rrule-temporal` ships with **`@js-temporal/polyfill`** and therefore returns `Temporal` objects that are from that implementation. If the rest of your codebase (or a third-party package) relies on the lighter **`temporal-polyfill`** package or a native Temporal implementation, those objects will **not** satisfy `instanceof` checks in your app.
+This snippet shows how to re-hydrate each recurrence result into the polyfill your project expects.
+
+```ts
+// rrule-temporal (and its internals) use @js-temporal/polyfill
+import { Temporal as RRTTemporal } from "@js-temporal/polyfill";
+// your application using temporal-polyfill or native Temporal
+import { Temporal as AppTemporal } from "temporal-polyfill";
+
+import { RRuleTemporal } from "rrule-temporal";
+
+/** Weekly rule that fires 4 times starting 5 May 2025, 10 AM America/Chicago. */
+const rule = new RRuleTemporal({
+  freq: "WEEKLY",
+  count: 4,
+  dtstart: RRTTemporal.ZonedDateTime.from(
+    "2025-05-05T10:00[America/Chicago]"
+  ),
+});
+
+// Occurrences are ZonedDateTime instances from @js-temporal/polyfill
+const rawOccurrences = rule.all();
+
+/** Convert each ZonedDateTime to temporal-polyfill ZonedDateTime. */
+const appOccurrences = rawOccurrences.map((zdt) =>
+  AppTemporal.ZonedDateTime.from(zdt.toString())
+);
+
+// …now `appOccurrences` can be passed anywhere that expects temporal-polyfill in your app
+```
+
+#### Why `.toString()`?
+
+`Temporal.*.from()` accepts ISO 8601 strings (including bracketed time-zone annotations), so calling `toString()` sidesteps the internal-slot branding that makes polyfill objects incompatible.
+
+#### Nanosecond precision variant
+
+```ts
+const appOccurrences = rawOccurrences.map((zdt) =>
+  AppTemporal.ZonedDateTime.fromEpochNanoseconds(zdt.epochNanoseconds)
+);
+```
+
+Both approaches preserve the original calendar, time-zone and nanosecond accuracy.
