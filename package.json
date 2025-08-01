@@ -1,6 +1,6 @@
 {
   "name": "rrule-temporal",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Recurrence rule processing using Temporal PlainDate/PlainDateTime",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
