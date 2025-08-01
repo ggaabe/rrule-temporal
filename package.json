@@ -42,7 +42,7 @@
   "bugs": {
     "url": "https://github.com/ggaabe/rrule-temporal/issues"
   },
-  "homepage": "https://github.io/ggaabe/rrule-temporal",
+  "homepage": "https://ggaabe.github.io/rrule-temporal/",
   "files": [
     "dist"
   ],
