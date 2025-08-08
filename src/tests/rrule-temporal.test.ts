@@ -104,6 +104,34 @@ RRULE:FREQ=DAILY;BYHOUR=0;BYMINUTE=0;UNTIL=20250405T000000Z`.trim();
   });
 });
 
+describe('RRuleTemporal - between() with distant start and no COUNT', () => {
+  const rule = new RRuleTemporal({
+    freq: 'DAILY',
+    dtstart: Temporal.ZonedDateTime.from('1970-01-01T00:00:00+00:00[UTC]'),
+  });
+
+  test('between returns occurrences when start is far after dtstart', () => {
+    const start = new Date('2024-01-01T00:00:00Z');
+    const end = new Date('2024-01-05T00:00:00Z');
+    const arr = rule.between(start, end, true);
+    expect(arr.map((d) => d.day)).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe('RRuleTemporal - between() before original dtstart', () => {
+  const rule = new RRuleTemporal({
+    freq: 'DAILY',
+    dtstart: Temporal.ZonedDateTime.from('2025-01-01T00:00:00+00:00[UTC]'),
+  });
+
+  test('between does not return occurrences before dtstart', () => {
+    const start = new Date('2024-12-31T00:00:00Z');
+    const end = new Date('2025-01-02T00:00:00Z');
+    const arr = rule.between(start, end, true);
+    expect(arr.map((d) => d.day)).toEqual([1, 2]);
+  });
+});
+
 describe('RRuleTemporal - next() and previous()', () => {
   const ics = `DTSTART;TZID=UTC:20250101T120000
 RRULE:FREQ=MONTHLY;BYHOUR=12;BYMINUTE=0;COUNT=12`.trim();
