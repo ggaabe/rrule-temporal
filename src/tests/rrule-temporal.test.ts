@@ -132,6 +132,28 @@ describe('RRuleTemporal - between() before original dtstart', () => {
   });
 });
 
+describe('RRuleTemporal - between() honors COUNT', () => {
+  const rule = new RRuleTemporal({
+    freq: 'DAILY',
+    count: 5,
+    dtstart: Temporal.ZonedDateTime.from('2024-01-01T00:00:00+00:00[UTC]'),
+  });
+
+  test('between does not exceed rule count', () => {
+    const start = new Date('2024-01-01T00:00:00Z');
+    const end = new Date('2024-01-10T00:00:00Z');
+    const arr = rule.between(start, end, true);
+    expect(arr.map((d) => d.day)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  test('between after count returns empty array', () => {
+    const start = new Date('2024-01-06T00:00:00Z');
+    const end = new Date('2024-01-10T00:00:00Z');
+    const arr = rule.between(start, end, true);
+    expect(arr).toHaveLength(0);
+  });
+});
+
 describe('RRuleTemporal - next() and previous()', () => {
   const ics = `DTSTART;TZID=UTC:20250101T120000
 RRULE:FREQ=MONTHLY;BYHOUR=12;BYMINUTE=0;COUNT=12`.trim();

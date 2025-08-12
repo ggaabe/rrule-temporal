@@ -1698,8 +1698,6 @@ export class RRuleTemporal {
           : this.opts.dtstart;
     }
 
-    delete tempOpts.count;
-
     const tempRule = new RRuleTemporal(tempOpts);
     const allDates = tempRule.all();
 
