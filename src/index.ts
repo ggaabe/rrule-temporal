@@ -1656,6 +1656,7 @@ export class RRuleTemporal {
     const startInst = after instanceof Date ? Temporal.Instant.from(after.toISOString()) : after.toInstant();
     const endInst = before instanceof Date ? Temporal.Instant.from(before.toISOString()) : before.toInstant();
 
+    const startZdt = Temporal.Instant.from(startInst).toZonedDateTimeISO(this.tzid);
     const beforeZdt = Temporal.Instant.from(endInst).toZonedDateTimeISO(this.tzid);
 
     const tempOpts = {...this.opts};
@@ -1664,8 +1665,38 @@ export class RRuleTemporal {
       tempOpts.until = beforeZdt;
     }
 
-    // We don't want to be limited by count
-    delete tempOpts.count;
+    if (tempOpts.count === undefined) {
+      const interval = tempOpts.interval ?? 1;
+      let duration: Temporal.DurationLike;
+      switch (tempOpts.freq) {
+        case 'YEARLY':
+          duration = {years: interval};
+          break;
+        case 'MONTHLY':
+          duration = {months: interval};
+          break;
+        case 'WEEKLY':
+          duration = {weeks: interval};
+          break;
+        case 'DAILY':
+          duration = {days: interval};
+          break;
+        case 'HOURLY':
+          duration = {hours: interval};
+          break;
+        case 'MINUTELY':
+          duration = {minutes: interval};
+          break;
+        default:
+          duration = {seconds: interval};
+      }
+      const aligned = startZdt.withPlainTime(this.originalDtstart.toPlainTime());
+      const candidate = aligned.subtract(duration);
+      tempOpts.dtstart =
+        Temporal.ZonedDateTime.compare(candidate, this.opts.dtstart) > 0
+          ? candidate
+          : this.opts.dtstart;
+    }
 
     const tempRule = new RRuleTemporal(tempOpts);
     const allDates = tempRule.all();
