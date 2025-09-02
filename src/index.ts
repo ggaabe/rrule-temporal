@@ -898,6 +898,10 @@ export class RRuleTemporal {
 
   private addDtstartIfNeeded(dates: Temporal.ZonedDateTime[], iterator?: RRuleTemporalIterator): boolean {
     if (this.includeDtstart && !this.matchesAll(this.originalDtstart)) {
+      // Skip if dtstart is excluded and we have an iterator
+      if (iterator && this.isExcluded(this.originalDtstart)) {
+        return true; // continue without adding
+      }
       if (iterator && !iterator(this.originalDtstart, dates.length)) {
         return false; // stop
       }
@@ -926,6 +930,10 @@ export class RRuleTemporal {
         break;
       }
       if (extraFilters && !extraFilters(occ)) {
+        continue;
+      }
+      // Skip excluded dates only when iterator is provided
+      if (iterator && this.isExcluded(occ)) {
         continue;
       }
       if (iterator && !iterator(occ, dates.length)) {
@@ -1091,6 +1099,10 @@ export class RRuleTemporal {
       }
 
       if (Temporal.ZonedDateTime.compare(candidate, start) >= 0) {
+        // Skip excluded dates only when iterator is provided
+        if (iterator && this.isExcluded(candidate)) {
+          continue;
+        }
         if (iterator && !iterator(candidate, dates.length)) {
           break;
         }
@@ -1133,10 +1145,13 @@ export class RRuleTemporal {
         if (this.opts.until && Temporal.ZonedDateTime.compare(occ, this.opts.until) > 0) {
           return this.applyCountLimitAndMergeRDates(dates, iterator);
         }
+        // Skip excluded dates only when iterator is provided
+        if (iterator && this.isExcluded(occ)) {
+          continue;
+        }
         if (iterator && !iterator(occ, dates.length)) {
           return this.applyCountLimitAndMergeRDates(dates, iterator);
         }
-
         dates.push(occ);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -1207,6 +1222,11 @@ export class RRuleTemporal {
 
       // Check if current date matches all constraints
       if (this.matchesAll(current)) {
+        // Skip excluded dates only when iterator is provided
+        if (iterator && this.isExcluded(current)) {
+          current = this.nextCandidateSameDate(current);
+          continue;
+        }
         if (iterator && !iterator(current, dates.length)) {
           break;
         }
@@ -1257,6 +1277,10 @@ export class RRuleTemporal {
           const occs = this.generateOccurrencesForWeekInYear(year, weekNo);
           for (const occ of occs) {
             if (Temporal.ZonedDateTime.compare(occ, start) >= 0) {
+              // Skip excluded dates only when iterator is provided
+              if (iterator && this.isExcluded(occ)) {
+                continue;
+              }
               if (iterator && !iterator(occ, dates.length)) {
                 break outer_loop;
               }
@@ -1328,12 +1352,14 @@ export class RRuleTemporal {
             break outer_loop;
           }
 
+          // Skip excluded dates only when iterator is provided
+          if (iterator && this.isExcluded(occ)) {
+            continue;
+          }
           if (iterator && !iterator(occ, dates.length)) {
             break outer_loop;
           }
-
           dates.push(occ);
-
           if (this.shouldBreakForCountLimit(dates.length)) {
             break outer_loop;
           }
@@ -1414,12 +1440,17 @@ export class RRuleTemporal {
     // Include dtstart even if it doesn't match the rule when includeDtstart is true
     if (this.includeDtstart && Temporal.ZonedDateTime.compare(current, this.originalDtstart) > 0) {
       // dtstart doesn't match the rule, but we should include it in non-strict mode
-      if (iterator && !iterator(this.originalDtstart, dates.length)) {
-        return this.applyCountLimitAndMergeRDates(dates, iterator);
-      }
-      dates.push(this.originalDtstart);
-      if (this.shouldBreakForCountLimit(dates.length)) {
-        return this.applyCountLimitAndMergeRDates(dates, iterator);
+      // Skip if dtstart is excluded and we have an iterator
+      if (iterator && this.isExcluded(this.originalDtstart)) {
+        // Skip this date but continue processing
+      } else {
+        if (iterator && !iterator(this.originalDtstart, dates.length)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+        dates.push(this.originalDtstart);
+        if (this.shouldBreakForCountLimit(dates.length)) {
+          return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
       }
     }
 
@@ -1432,12 +1463,17 @@ export class RRuleTemporal {
         break;
       }
       if (this.matchesAll(current)) {
-        if (iterator && !iterator(current, dates.length)) {
-          break;
-        }
-        dates.push(current);
-        if (this.shouldBreakForCountLimit(dates.length)) {
-          break;
+        // Skip excluded dates only when iterator is provided
+        if (iterator && this.isExcluded(current)) {
+          // Skip this date but continue iterating
+        } else {
+          if (iterator && !iterator(current, dates.length)) {
+            break;
+          }
+          dates.push(current);
+          if (this.shouldBreakForCountLimit(dates.length)) {
+            break;
+          }
         }
       }
       current = this.nextCandidateSameDate(current);
@@ -1584,6 +1620,16 @@ export class RRuleTemporal {
   }
 
   /**
+   * Checks if a date is in the exDate list.
+   * @param date - Date to check
+   * @returns True if the date is excluded
+   */
+  private isExcluded(date: Temporal.ZonedDateTime): boolean {
+    if (!this.opts.exDate || this.opts.exDate.length === 0) return false;
+    return this.opts.exDate.some((exDate) => Temporal.ZonedDateTime.compare(date, exDate) === 0);
+  }
+
+  /**
    * Excludes exDate entries from the given array of dates.
    * @param dates - Array of dates to filter
    * @returns Filtered array with exDate entries removed
@@ -1592,7 +1638,7 @@ export class RRuleTemporal {
     if (!this.opts.exDate || this.opts.exDate.length === 0) return dates;
 
     return dates.filter((date) => {
-      return !this.opts.exDate!.some((exDate) => Temporal.ZonedDateTime.compare(date, exDate) === 0);
+      return !this.isExcluded(date);
     });
   }
 
@@ -1693,9 +1739,7 @@ export class RRuleTemporal {
       const aligned = startZdt.withPlainTime(this.originalDtstart.toPlainTime());
       const candidate = aligned.subtract(duration);
       tempOpts.dtstart =
-        Temporal.ZonedDateTime.compare(candidate, this.opts.dtstart) > 0
-          ? candidate
-          : this.opts.dtstart;
+        Temporal.ZonedDateTime.compare(candidate, this.opts.dtstart) > 0 ? candidate : this.opts.dtstart;
     }
 
     const tempRule = new RRuleTemporal(tempOpts);
