@@ -258,7 +258,16 @@ export class RRuleTemporal {
       const parsed = parseRRuleString(params.rruleString, params.tzid);
       this.tzid = parsed.tzid ?? params.tzid ?? 'UTC';
       this.originalDtstart = parsed.dtstart as Temporal.ZonedDateTime;
-      manual = {...params, ...parsed};
+      // Important: do NOT carry `rruleString` into internal opts. If present,
+      // `between()` spreads opts and constructs a new RRuleTemporal; leaking
+      // `rruleString` would trigger the ICS parsing branch again and override
+      // the temporary dtstart/until alignment, leading to excessive iteration.
+      manual = {
+        ...parsed,
+        maxIterations: params.maxIterations,
+        includeDtstart: params.includeDtstart,
+        tzid: this.tzid,
+      } as ManualOpts;
     } else {
       manual = {...params};
       if (typeof manual.dtstart === 'string') {
