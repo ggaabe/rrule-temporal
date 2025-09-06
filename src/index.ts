@@ -1720,30 +1720,32 @@ export class RRuleTemporal {
       tempOpts.until = beforeZdt;
     }
 
-    if (tempOpts.count === undefined) {
-      const interval = tempOpts.interval ?? 1;
+    // Optimize dtstart only when COUNT is not set and INTERVAL is 1.
+    // For INTERVAL > 1, shifting dtstart would change the sequence anchor
+    // and yield occurrences that do not respect the original interval cadence.
+    if (tempOpts.count === undefined && (tempOpts.interval ?? 1) === 1) {
       let duration: Temporal.DurationLike;
       switch (tempOpts.freq) {
         case 'YEARLY':
-          duration = {years: interval};
+          duration = {years: 1};
           break;
         case 'MONTHLY':
-          duration = {months: interval};
+          duration = {months: 1};
           break;
         case 'WEEKLY':
-          duration = {weeks: interval};
+          duration = {weeks: 1};
           break;
         case 'DAILY':
-          duration = {days: interval};
+          duration = {days: 1};
           break;
         case 'HOURLY':
-          duration = {hours: interval};
+          duration = {hours: 1};
           break;
         case 'MINUTELY':
-          duration = {minutes: interval};
+          duration = {minutes: 1};
           break;
         default:
-          duration = {seconds: interval};
+          duration = {seconds: 1};
       }
       const aligned = startZdt.withPlainTime(this.originalDtstart.toPlainTime());
       const candidate = aligned.subtract(duration);
