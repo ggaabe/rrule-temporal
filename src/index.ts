@@ -679,9 +679,15 @@ export class RRuleTemporal {
       // Check if we have ordinal BYDAY tokens (e.g., "1TU", "-1TH")
       const hasOrdinalTokens = this.opts.byDay.some((tok) => /^[+-]?\d/.test(tok));
 
-      if (hasOrdinalTokens && this.opts.byMonth && (this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY')) {
+      if (
+        hasOrdinalTokens &&
+        this.opts.byMonth &&
+        (this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY')
+      ) {
         // Handle ordinal BYDAY tokens with BYMONTH for MINUTELY/SECONDLY frequency - find the first matching occurrence
-        const months = [...this.opts.byMonth].sort((a, b) => a - b);
+        const months = this.opts.byMonth
+          .filter((v): v is number => typeof v === 'number')
+          .sort((a, b) => a - b);
         let foundFirst = false;
 
         // Start from the current year and month, then check future months
@@ -1124,7 +1130,9 @@ export class RRuleTemporal {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
 
-    const months = [...this.opts.byMonth!].sort((a, b) => a - b);
+    const months = (this.opts.byMonth! as Array<number | string>)
+      .filter((v): v is number => typeof v === 'number')
+      .sort((a, b) => a - b);
     let monthOffset = 0;
 
     // Find the first month >= dtstart.month
@@ -1180,7 +1188,9 @@ export class RRuleTemporal {
     if (!this.addDtstartIfNeeded(dates, iterator)) {
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
-    const months = [...this.opts.byMonth!].sort((a, b) => a - b);
+    const months = (this.opts.byMonth! as Array<number | string>)
+      .filter((v): v is number => typeof v === 'number')
+      .sort((a, b) => a - b);
     let yearOffset = 0;
 
     while (true) {
@@ -2138,7 +2148,7 @@ export class RRuleTemporal {
    */
   private generateYearlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
     const months = this.opts.byMonth
-      ? [...this.opts.byMonth].sort((a, b) => a - b)
+      ? (this.opts.byMonth.filter((v): v is number => typeof v === 'number').sort((a, b) => a - b))
       : this.opts.byMonthDay || this.opts.byDay
         ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
         : [this.originalDtstart.month];
@@ -2275,17 +2285,22 @@ export class RRuleTemporal {
     // Try to jump efficiently based on which constraints are failing
 
     // Check BYMONTH first (largest potential jump)
-    if (this.opts.byMonth && !this.opts.byMonth.includes(current.month)) {
-      const months = [...this.opts.byMonth].sort((a, b) => a - b);
-      const nextMonth = this.findNextValidValue(current.month, months, (a, b) => a - b);
+    if (this.opts.byMonth) {
+      const numericMonths = this.opts.byMonth.filter((v): v is number => typeof v === 'number');
+      if (numericMonths.length && !numericMonths.includes(current.month)) {
+        const months = [...numericMonths].sort((a, b) => a - b);
+        const nextMonth = this.findNextValidValue(current.month, months, (a, b) => a - b);
       if (nextMonth) {
         current = current.with({month: nextMonth, day: 1, hour: 0, minute: 0, second: 0});
       } else {
         // Move to next year and use first valid month
-        current = current.add({years: 1}).with({month: months[0], day: 1, hour: 0, minute: 0, second: 0});
+        current = current
+          .add({years: 1})
+          .with({month: months[0], day: 1, hour: 0, minute: 0, second: 0});
       }
       current = this.applyTimeOverride(current);
       return current;
+      }
     }
 
     // Check BYWEEKNO (can jump across weeks/months)
@@ -2677,7 +2692,7 @@ export class RRuleTemporal {
 
     // MONTHLY frequency in RSCALE
     if (this.opts.freq === 'MONTHLY') {
-      let cursor = seed.with({day: 1});
+      let cursor = seed.toPlainDate().with({day: 1});
       while (true) {
         if (++iterationCount > this.maxIterations) {
           throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
