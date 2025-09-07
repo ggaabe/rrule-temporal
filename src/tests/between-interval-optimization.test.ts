@@ -464,3 +464,157 @@ describe('between() – even intervals across frequencies', () => {
     );
   });
 });
+
+describe('between() – misaligned window starts', () => {
+  test('DAILY interval=3 with time-of-day: misaligned window includes only next aligned occurrence', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      interval: 3,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:37:00[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2025-01-02T00:00:00[UTC]');
+    const end = Temporal.ZonedDateTime.from('2025-01-06T23:59:59[UTC]');
+
+    assertDates(
+      {rule, between: [start, end], inc: true, print: format('UTC')},
+      ['2025-01-04T10:37:00+00:00[UTC]'],
+    );
+  });
+
+  test('HOURLY interval=5 with minutes+seconds: misaligned window returns aligned hours', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'HOURLY',
+      interval: 5,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T01:30:15[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2025-01-01T04:00:00[UTC]');
+    const end = Temporal.ZonedDateTime.from('2025-01-01T14:00:00[UTC]');
+
+    assertDates(
+      {rule, between: [start, end], inc: true, print: format('UTC')},
+      ['2025-01-01T06:30:15+00:00[UTC]', '2025-01-01T11:30:15+00:00[UTC]'],
+    );
+  });
+
+  test('MINUTELY interval=7 exact-boundary with inc=false vs inc=true', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'MINUTELY',
+      interval: 7,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T12:00:05[UTC]'),
+      tzid: tz,
+    });
+
+    // On-boundary window, inc=false should exclude exact occurrence
+    let start = Temporal.ZonedDateTime.from('2025-01-01T12:14:05[UTC]');
+    let end = Temporal.ZonedDateTime.from('2025-01-01T12:14:05[UTC]');
+    assertDates({rule, between: [start, end], inc: false, print: format('UTC')}, []);
+
+    // On-boundary window, inc=true should include
+    assertDates(
+      {rule, between: [start, end], inc: true, print: format('UTC')},
+      ['2025-01-01T12:14:05+00:00[UTC]'],
+    );
+  });
+
+  test('SECONDLY interval=13: misaligned window hits only next aligned second', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'SECONDLY',
+      interval: 13,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T00:00:02[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2025-01-01T00:00:27[UTC]');
+    const end = Temporal.ZonedDateTime.from('2025-01-01T00:00:40[UTC]');
+    assertDates(
+      {rule, between: [start, end], inc: true, print: format('UTC')},
+      ['2025-01-01T00:00:28+00:00[UTC]'],
+    );
+  });
+
+  test('WEEKLY interval=2 BYDAY=TU,TH: window inside off-week yields empty', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      interval: 2,
+      byDay: ['TU', 'TH'],
+      dtstart: Temporal.ZonedDateTime.from('2025-01-07T09:15:00[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2025-01-14T00:00:00[UTC]'); // Tuesday one week later (off-week)
+    const end = Temporal.ZonedDateTime.from('2025-01-16T23:59:59[UTC]');
+    assertDates({rule, between: [start, end], inc: true, print: format('UTC')}, []);
+  });
+
+  test('WEEKLY interval=2 BYDAY=TU,TH: misaligned window includes TH in aligned week only', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      interval: 2,
+      byDay: ['TU', 'TH'],
+      dtstart: Temporal.ZonedDateTime.from('2025-01-07T09:15:00[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2025-01-08T00:00:00[UTC]'); // Wed in aligned week
+    const end = Temporal.ZonedDateTime.from('2025-01-20T23:59:59[UTC]');
+    assertDates(
+      {rule, between: [start, end], inc: true, print: format('UTC')},
+      ['2025-01-09T09:15:00+00:00[UTC]'],
+    );
+  });
+
+  test('MONTHLY interval=2 BYDAY=2FR: off-month empty; cross-month window includes only next aligned 2nd Friday', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'MONTHLY',
+      interval: 2,
+      byDay: ['2FR'],
+      dtstart: Temporal.ZonedDateTime.from('2025-01-10T09:00:00[UTC]'), // 2nd Friday of Jan 2025
+      tzid: tz,
+    });
+
+    let start = Temporal.ZonedDateTime.from('2025-02-01T00:00:00[UTC]');
+    let end = Temporal.ZonedDateTime.from('2025-02-28T23:59:59[UTC]');
+    assertDates({rule, between: [start, end], inc: true, print: format('UTC')}, []);
+
+    start = Temporal.ZonedDateTime.from('2025-02-28T00:00:00[UTC]');
+    end = Temporal.ZonedDateTime.from('2025-04-30T23:59:59[UTC]');
+    assertDates(
+      {rule, between: [start, end], inc: true, print: format('UTC')},
+      ['2025-03-14T09:00:00+00:00[UTC]'],
+    );
+  });
+
+  test('YEARLY interval=2 BYMONTH=3,BYMONTHDAY=1: off-year empty; next aligned year included', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      interval: 2,
+      byMonth: [3],
+      byMonthDay: [1],
+      dtstart: Temporal.ZonedDateTime.from('2025-03-01T12:00:00[UTC]'),
+      tzid: tz,
+    });
+
+    let start = Temporal.ZonedDateTime.from('2026-03-01T00:00:00[UTC]');
+    let end = Temporal.ZonedDateTime.from('2026-03-02T23:59:59[UTC]');
+    assertDates({rule, between: [start, end], inc: true, print: format('UTC')}, []);
+
+    start = Temporal.ZonedDateTime.from('2027-02-15T00:00:00[UTC]');
+    end = Temporal.ZonedDateTime.from('2027-03-05T23:59:59[UTC]');
+    assertDates(
+      {rule, between: [start, end], inc: true, print: format('UTC')},
+      ['2027-03-01T12:00:00+00:00[UTC]'],
+    );
+  });
+});
