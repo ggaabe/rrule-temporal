@@ -139,16 +139,23 @@ toText(weekly, "es");
 
 ### RFC 7529 (RSCALE/SKIP)
 
-This library supports the RSCALE and SKIP extensions from RFC 7529 for defining how to treat invalid dates:
+This library supports the RSCALE and SKIP extensions from RFC 7529 for defining how to treat invalid dates and generate non‑Gregorian recurrences:
 
-- Add `RSCALE=GREGORIAN` and optional `SKIP=OMIT|BACKWARD|FORWARD` to `RRULE`.
+- Add `RSCALE=GREGORIAN|CHINESE|HEBREW` and optional `SKIP=OMIT|BACKWARD|FORWARD` to `RRULE`.
 - For yearly patterns like `BYMONTH=2;BYMONTHDAY=29`, non‑leap years are handled per SKIP: omit, use Feb 28 (BACKWARD), or Mar 1 (FORWARD).
 - For simple monthly patterns with DTSTART on days that don’t exist in some months (e.g., Jan 31 with `FREQ=MONTHLY`), SKIP applies as:
   - `OMIT`: skip that month
   - `BACKWARD`: use the last day of the month
   - `FORWARD`: use the first day of the next month
 
-Note: BYMONTH leap‑month tokens (e.g., `5L`) are parsed and preserved when serializing rules, but generation currently targets Gregorian behavior.
+Non‑Gregorian calendars:
+- Chinese and Hebrew calendars are supported for `FREQ=YEARLY|MONTHLY|WEEKLY` and for `BYYEARDAY`/`BYWEEKNO` constraints.
+- `BYMONTH` supports leap‑month tokens (e.g., `5L`) in non‑Gregorian calendars (matched by `monthCode`).
+
+Sub‑daily RSCALE behavior and limits:
+- For `FREQ=DAILY`, `HOURLY`, and `MINUTELY` with RSCALE, the engine filters days by `BYWEEKNO`, `BYYEARDAY`, `BYMONTH`, `BYMONTHDAY`, and simple `BYDAY` (weekday only). It then expands times via `BYHOUR`/`BYMINUTE`/`BYSECOND` and honors `INTERVAL`, `COUNT`, `UNTIL`, `RDATE`, and `EXDATE`.
+- Interval alignment for `HOURLY`/`MINUTELY` is computed against `DTSTART` in real time; occurrences for matching days are kept when the elapsed hours/minutes since `DTSTART` are multiples of `INTERVAL`.
+- Ordinal `BYDAY` (e.g., `1MO` or `-1SU`) is not interpreted at sub‑daily RSCALE levels; use `MONTHLY`/`YEARLY` for ordinal weekday patterns.
 
 `toText()` currently ships translations for **English (`en`)**, 
 **Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
