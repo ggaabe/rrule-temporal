@@ -1754,8 +1754,8 @@ export class RRuleTemporal {
       }
 
       // How many whole units between original DTSTART and the aligned window start?
-      const diffDur = (this.opts.dtstart as any).until(aligned, {largestUnit: unit});
-      const unitsBetween = (diffDur as any)[unit] as number; // may be negative
+      const diffDur = this.opts.dtstart.until(aligned, {largestUnit: unit});
+      const unitsBetween = diffDur[unit]; // may be negative
       const steps = Math.floor(unitsBetween / interval);
 
       // Jump forward by `steps * interval` units from the original DTSTART
