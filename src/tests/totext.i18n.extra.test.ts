@@ -117,7 +117,7 @@ describe('toText i18n advanced cases', () => {
   const rules = buildRules();
   for (const lang of Object.keys(expected) as (keyof typeof expected)[]) {
     test.each(rules.map((r, i) => [expected[lang][i], r]))('%s', (text, rule) => {
-      expect(toText(rule, lang).toLowerCase()).toBe(text.toLowerCase());
+      expect(toText(rule, lang).toLowerCase()).toBe(text?.toLowerCase());
     });
   }
 });

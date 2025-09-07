@@ -1542,6 +1542,12 @@ export class RRuleTemporal {
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
   all(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+    // RSCALE non-Gregorian engines (Chinese, Hebrew) for YEARLY/MONTHLY
+    if (this.opts.rscale && ['CHINESE', 'HEBREW'].includes(this.opts.rscale)) {
+      if (this.opts.freq === 'YEARLY' || this.opts.freq === 'MONTHLY') {
+        return this._allRscaleNonGregorian(iterator);
+      }
+    }
     if (this.opts.byWeekNo && this.opts.byYearDay) {
       // If both byWeekNo and byYearDay are present, there is a high chance of conflict.
       // To avoid an infinite loop, we can check if any of the byYearDay dates fall within any of the byWeekNo weeks.
@@ -2463,5 +2469,246 @@ export class RRuleTemporal {
     occs.push(...this.addByDay(tokens, weekStart));
 
     return occs.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+  }
+
+  // ===== RSCALE (non-Gregorian) support: Chinese and Hebrew =====
+  private getRscaleCalendarId(): string | null {
+    const map: Record<string, string> = {GREGORIAN: 'gregory', CHINESE: 'chinese', HEBREW: 'hebrew'};
+    const r = this.opts.rscale?.toUpperCase() || '';
+    return map[r] || null;
+  }
+
+  private pad2(n: number): string {
+    return String(n).padStart(2, '0');
+  }
+
+  private monthMatchesToken(monthCode: string, token: number | string): boolean {
+    if (typeof token === 'number') {
+      return monthCode === `M${this.pad2(token)}`;
+    }
+    if (/^\d+L$/i.test(token)) {
+      const n = parseInt(token, 10);
+      return monthCode === `M${this.pad2(n)}L`;
+    }
+    // Unknown token format: ignore (match nothing)
+    return false;
+  }
+
+  private monthsOfYear(calId: string, year: number): Temporal.PlainDate[] {
+    const out: Temporal.PlainDate[] = [];
+    for (let m = 1; m <= 20; m++) {
+      try {
+        const d = Temporal.PlainDate.from({calendar: calId, year, month: m, day: 1});
+        out.push(d);
+      } catch {
+        break;
+      }
+    }
+    return out;
+  }
+
+  private lastDayOfMonth(pd: Temporal.PlainDate): number {
+    return pd.add({months: 1}).subtract({days: 1}).day;
+  }
+
+  private buildZdtFromPlainDate(pd: Temporal.PlainDate): Temporal.ZonedDateTime {
+    const t = this.originalDtstart;
+    const pdt = Temporal.PlainDateTime.from({
+      calendar: pd.calendarId,
+      year: pd.year,
+      month: pd.month,
+      day: pd.day,
+      hour: t.hour,
+      minute: t.minute,
+      second: t.second,
+    });
+    return pdt.toZonedDateTime(this.tzid);
+  }
+
+  private applySkipForDay(calId: string, year: number, monthStart: Temporal.PlainDate, targetDay: number): Temporal.PlainDate | null {
+    const last = this.lastDayOfMonth(monthStart);
+    const skip = this.opts.skip || 'OMIT';
+    if (targetDay >= 1 && targetDay <= last) {
+      return monthStart.with({day: targetDay});
+    }
+    if (skip === 'BACKWARD') {
+      return monthStart.with({day: last});
+    }
+    if (skip === 'FORWARD') {
+      // first day of next month
+      const nextMonthStart = monthStart.add({months: 1});
+      return nextMonthStart.with({day: 1});
+    }
+    return null; // OMIT
+  }
+
+  private generateMonthlyOccurrencesRscale(calId: string, year: number, monthStart: Temporal.PlainDate): Temporal.ZonedDateTime[] {
+    const occs: Temporal.ZonedDateTime[] = [];
+    const byMonthDay = this.opts.byMonthDay;
+    const byDay = this.opts.byDay;
+
+    // If no BYDAY/BYMONTHDAY, default to DTSTART's day in this calendar
+    if (!byDay && !byMonthDay) {
+      const targetDay = this.originalDtstart.withCalendar(calId).day;
+      const pd = this.applySkipForDay(calId, year, monthStart, targetDay);
+      if (pd) occs.push(this.buildZdtFromPlainDate(pd));
+      return occs;
+    }
+
+    const addZ = (pd: Temporal.PlainDate) => {
+      occs.push(this.buildZdtFromPlainDate(pd));
+    };
+
+    // BYMONTHDAY handling first
+    const last = this.lastDayOfMonth(monthStart);
+    const resolveDay = (d: number) => (d > 0 ? d : last + d + 1);
+
+    if (byMonthDay && byMonthDay.length > 0) {
+      for (const raw of byMonthDay) {
+        const dayNum = resolveDay(raw);
+        const pd = this.applySkipForDay(calId, year, monthStart, dayNum);
+        if (pd) addZ(pd);
+      }
+    }
+
+    // BYDAY within month (supports ordinals like 1MO, -1SU)
+    if (byDay && byDay.length > 0) {
+      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+      // Bucket days by weekday
+      const buckets: Record<number, Temporal.PlainDate[]> = {};
+      let cur = monthStart;
+      while (cur.month === monthStart.month && cur.year === monthStart.year) {
+        const wd = (cur.dayOfWeek % 7) + 1; // Temporal: 1=Mon..7=Sun already; but keep consistent
+        (buckets[wd] ||= []).push(cur);
+        cur = cur.add({days: 1});
+      }
+      for (const tok of byDay) {
+        const m = tok.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
+        if (!m) continue;
+        const ord = m[1] ? parseInt(m[1], 10) : 0;
+        const wd = dayMap[m[2] as keyof typeof dayMap]!;
+        const list = buckets[wd] || [];
+        if (list.length === 0) continue;
+        if (ord === 0) {
+          for (const pd of list) addZ(pd);
+        } else {
+          const idx = ord > 0 ? ord - 1 : list.length + ord;
+          const pd = list[idx];
+          if (pd) addZ(pd);
+        }
+      }
+    }
+
+    // Apply BYSETPOS if present
+    return this.applyBySetPos(occs).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+  }
+
+  private _allRscaleNonGregorian(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+    const calId = this.getRscaleCalendarId();
+    if (!calId) return this._allFallback(iterator);
+
+    const dates: Temporal.ZonedDateTime[] = [];
+    let iterationCount = 0;
+    const start = this.originalDtstart;
+    const seed = start.withCalendar(calId);
+    const interval = this.opts.interval ?? 1;
+
+    if (!this.addDtstartIfNeeded(dates, iterator)) {
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // Determine year range progression based on freq
+    if (this.opts.freq === 'YEARLY') {
+      let yearOffset = 0;
+      while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        const tgtYear = seed.year + yearOffset * interval;
+
+        let occs: Temporal.ZonedDateTime[] = [];
+
+        const monthsTokens = this.opts.byMonth as Array<number | string> | undefined;
+        const months = this.monthsOfYear(calId, tgtYear);
+
+        if (!monthsTokens || monthsTokens.length === 0) {
+          // No BYMONTH: keep seed month/day (apply SKIP if invalid in this year)
+          try {
+            const pd = Temporal.PlainDate.from({
+              calendar: calId,
+              year: tgtYear,
+              // Prefer monthCode for leap clarity
+              monthCode: seed.monthCode,
+              day: seed.day,
+            });
+            occs.push(this.buildZdtFromPlainDate(pd));
+          } catch {
+            const skip = this.opts.skip || 'OMIT';
+            if (skip === 'FORWARD' || skip === 'BACKWARD') {
+              // Using Temporal mapping via with({year}) as a base
+              const mapped = seed.with({year: tgtYear});
+              const adjusted = skip === 'BACKWARD' ? mapped.subtract({days: 1}) : mapped;
+              occs.push(adjusted.withCalendar('iso8601'));
+            }
+          }
+        } else {
+          // BYMONTH provided: filter months that match tokens
+          const monthStarts = months.filter((m) => monthsTokens.some((tok) => this.monthMatchesToken(m.monthCode, tok)));
+          for (const ms of monthStarts) {
+            occs.push(...this.generateMonthlyOccurrencesRscale(calId, tgtYear, ms));
+          }
+        }
+
+        // Expand time components and process
+        if (occs.length > 0) {
+          // If byHour/minute/second specified, expand per occurrence
+          const expanded = occs.flatMap((z) => this.expandByTime(z));
+          const sorted = expanded.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+          const {shouldBreak} = this.processOccurrences(sorted, dates, start, iterator);
+          if (shouldBreak) break;
+        }
+
+        yearOffset++;
+        // Early break if until passed by advancing seed anchor
+        if (this.opts.until && tgtYear > this.opts.until.withCalendar(calId).year) break;
+      }
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // MONTHLY frequency in RSCALE
+    if (this.opts.freq === 'MONTHLY') {
+      let cursor = seed.with({day: 1});
+      while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+        const year = cursor.year;
+        const monthStart = cursor;
+
+        // BYMONTH filter if provided
+        let proceed = true;
+        const monthsTokens = this.opts.byMonth as Array<number | string> | undefined;
+        if (monthsTokens && monthsTokens.length > 0) {
+          proceed = monthsTokens.some((tok) => this.monthMatchesToken(monthStart.monthCode, tok));
+        }
+        if (proceed) {
+          const occs = this.generateMonthlyOccurrencesRscale(calId, year, monthStart);
+          const expanded = occs.flatMap((z) => this.expandByTime(z));
+          const sorted = expanded.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+          const {shouldBreak} = this.processOccurrences(sorted, dates, start, iterator);
+          if (shouldBreak) break;
+        }
+
+        cursor = cursor.add({months: this.opts.interval ?? 1});
+        // stop if UNTIL passed (compare via ISO ZDT from RSCALE date)
+        if (this.opts.until) {
+          const z = this.buildZdtFromPlainDate(cursor);
+          if (Temporal.ZonedDateTime.compare(z, this.opts.until) > 0) break;
+        }
+      }
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    return this._allFallback(iterator);
   }
 }
