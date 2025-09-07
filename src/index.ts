@@ -2566,6 +2566,64 @@ export class RRuleTemporal {
     return pdt.toZonedDateTime(this.tzid);
   }
 
+  private rscaleMatchesByYearDay(calId: string, pd: Temporal.PlainDate): boolean {
+    const list = this.opts.byYearDay;
+    if (!list || list.length === 0) return true;
+    const last = this.endOfYear(calId, pd.year).dayOfYear;
+    return list.some((d) => (d > 0 ? pd.dayOfYear === d : pd.dayOfYear === last + d + 1));
+  }
+
+  private rscaleMatchesByWeekNo(calId: string, pd: Temporal.PlainDate): boolean {
+    const list = this.opts.byWeekNo;
+    if (!list || list.length === 0) return true;
+    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
+    // Compute which week index this date lies in for its week-year
+    const weekStart = pd.subtract({days: (pd.dayOfWeek - wkst + 7) % 7});
+    const thursday = weekStart.add({days: (4 - wkst + 7) % 7});
+    const weekYear = thursday.year;
+    const firstStart = this.rscaleFirstWeekStart(calId, weekYear, wkst);
+    const lastWeek = this.rscaleLastWeekCount(calId, weekYear, wkst);
+    const idx = Math.floor(pd.since(firstStart).days / 7) + 1;
+    return list.some((wn) => (wn > 0 ? idx === wn : idx === lastWeek + wn + 1));
+  }
+
+  private rscaleMatchesByMonth(calId: string, pd: Temporal.PlainDate): boolean {
+    const tokens = this.opts.byMonth as Array<number | string> | undefined;
+    if (!tokens || tokens.length === 0) return true;
+    return tokens.some((tok) => this.monthMatchesToken(pd.monthCode, tok));
+  }
+
+  private rscaleMatchesByMonthDay(pd: Temporal.PlainDate): boolean {
+    const list = this.opts.byMonthDay;
+    if (!list || list.length === 0) return true;
+    const last = pd.add({days: 1}).with({day: 1}).subtract({days: 1}).day; // end of month
+    const value = pd.day;
+    return list.some((d) => (d > 0 ? value === d : value === last + d + 1));
+  }
+
+  private rscaleMatchesByDayBasic(pd: Temporal.PlainDate): boolean {
+    const byDay = this.opts.byDay;
+    if (!byDay || byDay.length === 0) return true;
+    // Only handle simple weekday tokens (MO..SU). Ordinals are not applied at subdaily level here.
+    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const tokens = byDay
+      .map((tok) => tok.match(/^(?:[+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
+      .filter((x): x is string => !!x);
+    if (tokens.length === 0) return true;
+    return tokens.some((wd) => dayMap[wd as keyof typeof dayMap] === pd.dayOfWeek);
+  }
+
+  private rscaleDateMatches(calId: string, pd: Temporal.PlainDate): boolean {
+    return (
+      this.rscaleMatchesByMonth(calId, pd) &&
+      this.rscaleMatchesByYearDay(calId, pd) &&
+      this.rscaleMatchesByWeekNo(calId, pd) &&
+      this.rscaleMatchesByMonthDay(pd) &&
+      this.rscaleMatchesByDayBasic(pd)
+    );
+  }
+
   private applySkipForDay(calId: string, year: number, monthStart: Temporal.PlainDate, targetDay: number): Temporal.PlainDate | null {
     const last = this.lastDayOfMonth(monthStart);
     const skip = this.opts.skip || 'OMIT';
@@ -2768,8 +2826,10 @@ export class RRuleTemporal {
         ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
         : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
 
-      // Align to week start at or before seed
-      let weekStart = seed.subtract({days: (seed.dayOfWeek - wkst + 7) % 7});
+      // Align to week start at or before seed (use PlainDate)
+      let weekStart = seed
+        .toPlainDate()
+        .subtract({days: (seed.dayOfWeek - wkst + 7) % 7});
 
       while (true) {
         if (++iterationCount > this.maxIterations) {
@@ -2858,6 +2918,67 @@ export class RRuleTemporal {
         // stop if UNTIL passed (compare via ISO ZDT from RSCALE date)
         if (this.opts.until) {
           const z = this.buildZdtFromPlainDate(cursor);
+          if (Temporal.ZonedDateTime.compare(z, this.opts.until) > 0) break;
+        }
+      }
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // DAILY frequency in RSCALE
+    if (this.opts.freq === 'DAILY') {
+      let pd = seed.toPlainDate();
+      while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        if (this.rscaleDateMatches(calId, pd)) {
+          const base = this.buildZdtFromPlainDate(pd);
+          let occs = this.expandByTime(base);
+          occs = this.applyBySetPos(occs);
+          const {shouldBreak} = this.processOccurrences(occs, dates, start, iterator);
+          if (shouldBreak) break;
+        }
+
+        pd = pd.add({days: this.opts.interval ?? 1});
+        if (this.opts.until) {
+          const z = this.buildZdtFromPlainDate(pd);
+          if (Temporal.ZonedDateTime.compare(z, this.opts.until) > 0) break;
+        }
+      }
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // HOURLY/MINUTELY frequency in RSCALE (filter days by BYYEARDAY/BYWEEKNO and apply interval)
+    if (this.opts.freq === 'HOURLY' || this.opts.freq === 'MINUTELY') {
+      const unit = this.opts.freq === 'HOURLY' ? 'hour' : 'minute';
+      const unitMs = this.opts.freq === 'HOURLY' ? 3600000 : 60000;
+      const interval = this.opts.interval ?? 1;
+      let pd = seed.toPlainDate();
+      const startInstantMs = this.originalDtstart.toInstant().epochMilliseconds;
+
+      while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        if (this.rscaleDateMatches(calId, pd)) {
+          const base = this.buildZdtFromPlainDate(pd);
+          // Generate all times within the day per BYHOUR/BYMINUTE/BYSECOND
+          let occs = this.expandByTime(base);
+          // Filter by interval alignment from DTSTART
+          occs = occs.filter((occ) => {
+            const delta = occ.toInstant().epochMilliseconds - startInstantMs;
+            const steps = Math.floor(delta / unitMs);
+            return steps % interval === 0;
+          });
+          const {shouldBreak} = this.processOccurrences(occs, dates, start, iterator);
+          if (shouldBreak) break;
+        }
+
+        pd = pd.add({days: 1});
+        if (this.opts.until) {
+          const z = this.buildZdtFromPlainDate(pd);
           if (Temporal.ZonedDateTime.compare(z, this.opts.until) > 0) break;
         }
       }
