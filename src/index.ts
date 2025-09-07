@@ -1552,9 +1552,13 @@ export class RRuleTemporal {
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
   all(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
-    // RSCALE non-Gregorian engines (Chinese, Hebrew) for YEARLY/MONTHLY
+    // RSCALE non-Gregorian engines (Chinese, Hebrew) for YEARLY/MONTHLY/WEEKLY
     if (this.opts.rscale && ['CHINESE', 'HEBREW'].includes(this.opts.rscale)) {
-      if (this.opts.freq === 'YEARLY' || this.opts.freq === 'MONTHLY') {
+      if (
+        ['YEARLY', 'MONTHLY', 'WEEKLY'].includes(this.opts.freq) ||
+        !!this.opts.byYearDay ||
+        !!this.opts.byWeekNo
+      ) {
         return this._allRscaleNonGregorian(iterator);
       }
     }
@@ -2522,6 +2526,28 @@ export class RRuleTemporal {
     return out;
   }
 
+  private startOfYear(calId: string, year: number): Temporal.PlainDate {
+    return Temporal.PlainDate.from({calendar: calId, year, month: 1, day: 1});
+  }
+
+  private endOfYear(calId: string, year: number): Temporal.PlainDate {
+    return this.startOfYear(calId, year + 1).subtract({days: 1});
+  }
+
+  private rscaleFirstWeekStart(calId: string, year: number, wkst: number): Temporal.PlainDate {
+    // Analogous to ISO: the week containing month=1 day=4 is week 1
+    const jan4 = Temporal.PlainDate.from({calendar: calId, year, month: 1, day: 4});
+    const delta = (jan4.dayOfWeek - wkst + 7) % 7;
+    return jan4.subtract({days: delta});
+  }
+
+  private rscaleLastWeekCount(calId: string, year: number, wkst: number): number {
+    const firstWeekStart = this.rscaleFirstWeekStart(calId, year, wkst);
+    const lastDay = this.endOfYear(calId, year);
+    const diffDays = lastDay.since(firstWeekStart).days;
+    return Math.floor(diffDays / 7) + 1;
+  }
+
   private lastDayOfMonth(pd: Temporal.PlainDate): number {
     return pd.add({months: 1}).subtract({days: 1}).day;
   }
@@ -2646,13 +2672,58 @@ export class RRuleTemporal {
         const monthsTokens = this.opts.byMonth as Array<number | string> | undefined;
         const months = this.monthsOfYear(calId, tgtYear);
 
-        if (!monthsTokens || monthsTokens.length === 0) {
+        const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+        const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
+
+        // BYWEEKNO handling
+        if (this.opts.byWeekNo && this.opts.byWeekNo.length > 0) {
+          const firstStart = this.rscaleFirstWeekStart(calId, tgtYear, wkst);
+          const lastWeek = this.rscaleLastWeekCount(calId, tgtYear, wkst);
+          const tokens = this.opts.byDay?.length
+            ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+            : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
+          for (const wn of this.opts.byWeekNo) {
+            let idx = wn > 0 ? wn - 1 : lastWeek + wn;
+            if (idx < 0 || idx >= lastWeek) continue;
+            const weekStart = firstStart.add({weeks: idx});
+            for (const tok of tokens) {
+              const targetDow = dayMap[tok as keyof typeof dayMap]!;
+              const pd = weekStart.add({days: (targetDow - wkst + 7) % 7});
+              // BYMONTH filter if present
+              if (monthsTokens && monthsTokens.length > 0) {
+                if (!monthsTokens.some((t) => this.monthMatchesToken(pd.monthCode, t))) continue;
+              }
+              // BYYEARDAY filter if present
+              if (this.opts.byYearDay && this.opts.byYearDay.length > 0) {
+                const lastDay = this.endOfYear(calId, tgtYear).dayOfYear;
+                const matches = this.opts.byYearDay.some((d) => {
+                  const target = d > 0 ? d : lastDay + d + 1;
+                  return pd.dayOfYear === target;
+                });
+                if (!matches) continue;
+              }
+              occs.push(this.buildZdtFromPlainDate(pd));
+            }
+          }
+        } else if (this.opts.byYearDay && this.opts.byYearDay.length > 0) {
+          // BYYEARDAY handling without BYWEEKNO
+          const startOfYear = this.startOfYear(calId, tgtYear);
+          const lastDay = this.endOfYear(calId, tgtYear).dayOfYear;
+          for (const d of this.opts.byYearDay) {
+            const target = d > 0 ? d : lastDay + d + 1;
+            if (target < 1 || target > lastDay) continue;
+            let pd = startOfYear.add({days: target - 1});
+            if (monthsTokens && monthsTokens.length > 0) {
+              if (!monthsTokens.some((t) => this.monthMatchesToken(pd.monthCode, t))) continue;
+            }
+            occs.push(this.buildZdtFromPlainDate(pd));
+          }
+        } else if (!monthsTokens || monthsTokens.length === 0) {
           // No BYMONTH: keep seed month/day (apply SKIP if invalid in this year)
           try {
             const pd = Temporal.PlainDate.from({
               calendar: calId,
               year: tgtYear,
-              // Prefer monthCode for leap clarity
               monthCode: seed.monthCode,
               day: seed.day,
             });
@@ -2660,7 +2731,6 @@ export class RRuleTemporal {
           } catch {
             const skip = this.opts.skip || 'OMIT';
             if (skip === 'FORWARD' || skip === 'BACKWARD') {
-              // Using Temporal mapping via with({year}) as a base
               const mapped = seed.with({year: tgtYear});
               const adjusted = skip === 'BACKWARD' ? mapped.subtract({days: 1}) : mapped;
               occs.push(adjusted.withCalendar('iso8601'));
@@ -2686,6 +2756,76 @@ export class RRuleTemporal {
         yearOffset++;
         // Early break if until passed by advancing seed anchor
         if (this.opts.until && tgtYear > this.opts.until.withCalendar(calId).year) break;
+      }
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // WEEKLY frequency in RSCALE
+    if (this.opts.freq === 'WEEKLY') {
+      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+      const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
+      const tokens = this.opts.byDay?.length
+        ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+        : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
+
+      // Align to week start at or before seed
+      let weekStart = seed.subtract({days: (seed.dayOfWeek - wkst + 7) % 7});
+
+      while (true) {
+        if (++iterationCount > this.maxIterations) {
+          throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+        }
+
+        const occs: Temporal.ZonedDateTime[] = [];
+        for (const tok of tokens) {
+          const targetDow = dayMap[tok as keyof typeof dayMap]!;
+          const pd = weekStart.add({days: (targetDow - wkst + 7) % 7});
+
+          // Skip dates before DTSTART in the first week
+          if (Temporal.ZonedDateTime.compare(this.buildZdtFromPlainDate(pd), this.originalDtstart) < 0) {
+            continue;
+          }
+
+          // BYWEEKNO filter if present
+          if (this.opts.byWeekNo && this.opts.byWeekNo.length > 0) {
+            const thursday = weekStart.add({days: (4 - wkst + 7) % 7});
+            const weekYear = thursday.year;
+            const firstStart = this.rscaleFirstWeekStart(calId, weekYear, wkst);
+            const lastWeek = this.rscaleLastWeekCount(calId, weekYear, wkst);
+            const idx = Math.floor(pd.since(firstStart).days / 7) + 1;
+            const match = this.opts.byWeekNo.some((wn) => (wn > 0 ? idx === wn : idx === lastWeek + wn + 1));
+            if (!match) continue;
+          }
+
+          // BYYEARDAY filter if present
+          if (this.opts.byYearDay && this.opts.byYearDay.length > 0) {
+            const last = this.endOfYear(calId, pd.year).dayOfYear;
+            const match = this.opts.byYearDay.some((d) => (d > 0 ? pd.dayOfYear === d : pd.dayOfYear === last + d + 1));
+            if (!match) continue;
+          }
+
+          // BYMONTH filter if present (including leap-month tokens)
+          const monthsTokens = this.opts.byMonth as Array<number | string> | undefined;
+          if (monthsTokens && monthsTokens.length > 0) {
+            if (!monthsTokens.some((t) => this.monthMatchesToken(pd.monthCode, t))) continue;
+          }
+
+          occs.push(this.buildZdtFromPlainDate(pd));
+        }
+
+        if (occs.length) {
+          const expanded = occs.flatMap((z) => this.expandByTime(z));
+          const sorted = expanded.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+          const {shouldBreak} = this.processOccurrences(sorted, dates, start, iterator);
+          if (shouldBreak) return this.applyCountLimitAndMergeRDates(dates, iterator);
+        }
+
+        // Advance to next week
+        weekStart = weekStart.add({weeks: this.opts.interval ?? 1});
+        if (this.opts.until) {
+          const z = this.buildZdtFromPlainDate(weekStart.add({days: 6}));
+          if (Temporal.ZonedDateTime.compare(z, this.opts.until) > 0) break;
+        }
       }
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
