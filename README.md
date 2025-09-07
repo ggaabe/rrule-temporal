@@ -137,6 +137,19 @@ toText(weekly, "es");
 // "cada semana en domingo a las 10 AM UTC"
 ```
 
+### RFC 7529 (RSCALE/SKIP)
+
+This library supports the RSCALE and SKIP extensions from RFC 7529 for defining how to treat invalid dates:
+
+- Add `RSCALE=GREGORIAN` and optional `SKIP=OMIT|BACKWARD|FORWARD` to `RRULE`.
+- For yearly patterns like `BYMONTH=2;BYMONTHDAY=29`, non‑leap years are handled per SKIP: omit, use Feb 28 (BACKWARD), or Mar 1 (FORWARD).
+- For simple monthly patterns with DTSTART on days that don’t exist in some months (e.g., Jan 31 with `FREQ=MONTHLY`), SKIP applies as:
+  - `OMIT`: skip that month
+  - `BACKWARD`: use the last day of the month
+  - `FORWARD`: use the first day of the next month
+
+Note: BYMONTH leap‑month tokens (e.g., `5L`) are parsed and preserved when serializing rules, but generation currently targets Gregorian behavior.
+
 `toText()` currently ships translations for **English (`en`)**, 
 **Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
 **Hebrew (`he`)** and **Mandarin (`zh`)**. At build time you can reduce bundle size by

@@ -13,6 +13,10 @@ interface BaseOpts {
   maxIterations?: number;
   /** Include DTSTART as an occurrence even if it does not match the rule pattern. */
   includeDtstart?: boolean;
+  /** RSCALE per RFC 7529: calendar system for recurrence generation (e.g., GREGORIAN). */
+  rscale?: string;
+  /** SKIP behavior per RFC 7529: OMIT (default), BACKWARD, FORWARD (requires RSCALE). */
+  skip?: 'OMIT' | 'BACKWARD' | 'FORWARD';
 }
 
 /**
@@ -36,8 +40,8 @@ interface ManualOpts extends BaseOpts {
   bySecond?: number[];
   /** BYDAY: list of weekdays e.g. ["MO","WE","FR"] */
   byDay?: string[];
-  /** BYMONTH: months of the year (1-12) */
-  byMonth?: number[];
+  /** BYMONTH: months of the year (1-12). With RSCALE (RFC 7529) may contain values like "5L". */
+  byMonth?: Array<number | string>;
   /** BYMONTHDAY: days of the month (1..31 or negative from end) */
   byMonthDay?: number[];
   /** BYYEARDAY: days of the year (1..366 or negative from end) */
@@ -120,6 +124,19 @@ function parseNumberArray(val: string, sort = false): number[] {
 }
 
 /**
+ * Parse BYMONTH values, supporting RFC 7529 leap-month tokens with an "L" suffix (e.g., "5L").
+ * Returns a heterogeneous array keeping original tokens for serialization.
+ */
+function parseByMonthArray(val: string): Array<number | string> {
+  return val.split(',').map((tok) => {
+    const t = tok.trim();
+    if (/^\d+L$/i.test(t)) return t.toUpperCase();
+    const n = parseInt(t, 10);
+    return Number.isFinite(n) ? n : t;
+  });
+}
+
+/**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts.
  *
  * @param input - String containing a `DTSTART` line followed by `RRULE` and
@@ -189,6 +206,20 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
     const [key, val] = part.split('=');
     if (!key) continue;
     switch (key.toUpperCase()) {
+      case 'RSCALE':
+        if (val) opts.rscale = val.toUpperCase();
+        break;
+      case 'SKIP': {
+        if (!opts.rscale) {
+          throw new Error('SKIP MUST NOT be present unless RSCALE is present');
+        }
+        const v = (val || '').toUpperCase();
+        if (!['OMIT', 'BACKWARD', 'FORWARD'].includes(v)) {
+          throw new Error(`Invalid SKIP value: ${val}`);
+        }
+        opts.skip = v as 'OMIT' | 'BACKWARD' | 'FORWARD';
+        break;
+      }
       case 'FREQ':
         opts.freq = val!.toUpperCase() as Freq;
         break;
@@ -219,7 +250,7 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
         opts.byDay = val!.split(','); // e.g. ["MO","2FR","-1SU"]
         break;
       case 'BYMONTH':
-        opts.byMonth = parseNumberArray(val!);
+        opts.byMonth = parseByMonthArray(val!);
         break;
       case 'BYMONTHDAY':
         opts.byMonthDay = parseNumberArray(val!);
@@ -324,7 +355,19 @@ export class RRuleTemporal {
 
   private sanitizeOpts(opts: ManualOpts): ManualOpts {
     opts.byDay = this.sanitizeByDay(opts.byDay);
-    opts.byMonth = this.sanitizeNumericArray(opts.byMonth, 1, 12, false, false);
+    // BYMONTH can include strings (e.g., "5L") under RFC 7529; keep tokens as-is.
+    if (opts.byMonth) {
+      // Split into numeric and string tokens; sanitize numeric to 1..12 to preserve existing behavior for Gregorian
+      const numeric = opts.byMonth.filter((v): v is number => typeof v === 'number');
+      const stringy = opts.byMonth.filter((v): v is string => typeof v === 'string');
+      const sanitizedNum = this.sanitizeNumericArray(numeric, 1, 12, false, false) ?? [];
+      const merged = [...sanitizedNum, ...stringy];
+      opts.byMonth = merged.length > 0 ? merged : undefined;
+    }
+    // Default SKIP per RFC 7529 only when RSCALE present
+    if (opts.rscale && !opts.skip) {
+      opts.skip = 'OMIT';
+    }
     opts.byMonthDay = this.sanitizeNumericArray(opts.byMonthDay, -31, 31, false, false);
     opts.byYearDay = this.sanitizeNumericArray(opts.byYearDay, -366, 366, false, false);
     opts.byWeekNo = this.sanitizeNumericArray(opts.byWeekNo, -53, 53, false, false);
@@ -796,7 +839,10 @@ export class RRuleTemporal {
   private matchesByMonth(zdt: Temporal.ZonedDateTime): boolean {
     const {byMonth} = this.opts;
     if (!byMonth) return true;
-    return byMonth.includes(zdt.month);
+    // Only numeric BYMONTH values are applicable in the Gregorian engine.
+    const nums = byMonth.filter((v): v is number => typeof v === 'number');
+    if (nums.length === 0) return true; // nothing enforceable here
+    return nums.includes(zdt.month);
   }
 
   private matchesNumericConstraint(value: number, constraints: number[], maxPositiveValue: number): boolean {
@@ -1594,6 +1640,18 @@ export class RRuleTemporal {
       return this._allMonthlyByYearDay(iterator);
     }
 
+    // --- 6e) RFC 7529 RSCALE monthly simple (no BY* constraints) ---
+    if (
+      this.opts.rscale &&
+      this.opts.freq === 'MONTHLY' &&
+      !this.opts.byDay &&
+      !this.opts.byMonthDay &&
+      !this.opts.byWeekNo &&
+      !this.opts.byYearDay
+    ) {
+      return this._allMonthlyRscaleSimple(iterator);
+    }
+
     // --- 7) fallback: step + filter ---
     // Handle MINUTELY/HOURLY/DAILY frequency with BYSETPOS
     if (
@@ -1604,6 +1662,75 @@ export class RRuleTemporal {
     }
 
     return this._allFallback(iterator);
+  }
+
+  /**
+   * RFC 7529: RSCALE present, simple monthly iteration with SKIP behavior.
+   * Handles month-to-month stepping from DTSTART's year/month aiming for DTSTART's day-of-month.
+   * Applies SKIP=OMIT (skip invalid months), BACKWARD (clamp to last day), FORWARD (first day of next month).
+   */
+  private _allMonthlyRscaleSimple(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+    const dates: Temporal.ZonedDateTime[] = [];
+    let iterationCount = 0;
+    const start = this.originalDtstart;
+    const interval = this.opts.interval ?? 1;
+    const targetDom = start.day;
+
+    if (!this.addDtstartIfNeeded(dates, iterator)) {
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // Month cursor moves in calendar months from DTSTART, independent of emitted dates.
+    let cursor = start.with({day: 1});
+
+    while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+
+      // Determine candidate within cursor month according to SKIP
+      const lastDay = cursor.add({months: 1}).subtract({days: 1}).day;
+
+      let occ: Temporal.ZonedDateTime | null = null;
+      if (targetDom <= lastDay) {
+        occ = cursor.with({day: targetDom});
+      } else {
+        const skip = this.opts.skip || 'OMIT';
+        if (skip === 'BACKWARD') {
+          occ = cursor.with({day: lastDay});
+        } else if (skip === 'FORWARD') {
+          // first of next month
+          occ = cursor.add({months: 1}).with({day: 1});
+        } else {
+          // OMIT -> no occurrence for this period
+          occ = null;
+        }
+      }
+
+      if (occ) {
+        // reapply DTSTART's time overrides
+        occ = occ.with({hour: start.hour, minute: start.minute, second: start.second});
+        // Skip excluded when iterator provided
+        if (!(iterator && this.isExcluded(occ))) {
+          if (Temporal.ZonedDateTime.compare(occ, start) >= 0) {
+            if (!iterator || iterator(occ, dates.length)) {
+              dates.push(occ);
+              if (this.shouldBreakForCountLimit(dates.length)) break;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      // Advance month cursor by interval
+      cursor = cursor.add({months: interval});
+      if (this.opts.until && Temporal.ZonedDateTime.compare(cursor, this.opts.until) > 0) {
+        break;
+      }
+    }
+
+    return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
   /**
@@ -1880,6 +2007,9 @@ export class RRuleTemporal {
       exDate,
     } = this.opts;
 
+    // RFC 7529: include RSCALE/SKIP when present
+    if (this.opts.rscale) rule.push(`RSCALE=${this.opts.rscale}`);
+    if (this.opts.rscale && this.opts.skip) rule.push(`SKIP=${this.opts.skip}`);
     rule.push(`FREQ=${freq}`);
     if (interval !== 1) rule.push(`INTERVAL=${interval}`);
     if (count !== undefined) rule.push(`COUNT=${count}`);
@@ -2032,10 +2162,31 @@ export class RRuleTemporal {
         occs.push(...this.expandByTime(dt));
       }
     } else if (!this.opts.byYearDay && !this.opts.byWeekNo) {
-      occs = months.flatMap((m) => {
+      // Build per-month then apply RFC 7529 SKIP if RSCALE present and BYMONTHDAY invalid
+      occs = [];
+      for (const m of months) {
         const monthSample = sample.with({month: m, day: 1});
-        return this.generateMonthlyOccurrences(monthSample);
-      });
+        const monthOccs = this.generateMonthlyOccurrences(monthSample);
+        if (monthOccs.length === 0 && this.opts.rscale && this.opts.byMonthDay && this.opts.byMonthDay.length > 0) {
+          // SKIP for invalid day-of-month (e.g., Feb 29 on non-leap years)
+          const lastDay = monthSample.add({months: 1}).subtract({days: 1}).day;
+          const target = this.opts.byMonthDay[0]!; // assume single DOM for this case
+          const absTarget = target > 0 ? target : lastDay + target + 1;
+          if (absTarget > lastDay || absTarget <= 0) {
+            const skip = this.opts.skip || 'OMIT';
+            if (skip === 'BACKWARD') {
+              occs.push(...this.expandByTime(monthSample.with({day: lastDay})));
+            } else if (skip === 'FORWARD') {
+              const nextMonth = monthSample.add({months: 1}).with({day: 1});
+              occs.push(...this.expandByTime(nextMonth));
+            } else {
+              // OMIT -> no date added
+            }
+          }
+        } else {
+          occs.push(...monthOccs);
+        }
+      }
     }
 
     if (this.opts.byYearDay) {
