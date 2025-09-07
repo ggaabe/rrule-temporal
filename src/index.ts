@@ -1720,37 +1720,78 @@ export class RRuleTemporal {
       tempOpts.until = beforeZdt;
     }
 
-    // Optimize dtstart only when COUNT is not set and INTERVAL is 1.
-    // For INTERVAL > 1, shifting dtstart would change the sequence anchor
-    // and yield occurrences that do not respect the original interval cadence.
-    if (tempOpts.count === undefined && (tempOpts.interval ?? 1) === 1) {
-      let duration: Temporal.DurationLike;
+    // Optimize dtstart when COUNT is not set by anchoring to the original DTSTART
+    // phase and jumping forward in multiples of INTERVAL up to the window start.
+    // This preserves cadence for INTERVAL > 1 and reduces iteration.
+    if (tempOpts.count === undefined) {
+      const interval = tempOpts.interval ?? 1;
+      const aligned = startZdt.withPlainTime(this.originalDtstart.toPlainTime());
+
+      // Determine unit for the current frequency
+      type LargestUnit = 'years' | 'months' | 'weeks' | 'days' | 'hours' | 'minutes' | 'seconds';
+      let unit: LargestUnit;
       switch (tempOpts.freq) {
         case 'YEARLY':
-          duration = {years: 1};
+          unit = 'years';
           break;
         case 'MONTHLY':
-          duration = {months: 1};
+          unit = 'months';
           break;
         case 'WEEKLY':
-          duration = {weeks: 1};
+          unit = 'weeks';
           break;
         case 'DAILY':
-          duration = {days: 1};
+          unit = 'days';
           break;
         case 'HOURLY':
-          duration = {hours: 1};
+          unit = 'hours';
           break;
         case 'MINUTELY':
-          duration = {minutes: 1};
+          unit = 'minutes';
           break;
         default:
-          duration = {seconds: 1};
+          unit = 'seconds';
       }
-      const aligned = startZdt.withPlainTime(this.originalDtstart.toPlainTime());
-      const candidate = aligned.subtract(duration);
-      tempOpts.dtstart =
-        Temporal.ZonedDateTime.compare(candidate, this.opts.dtstart) > 0 ? candidate : this.opts.dtstart;
+
+      // How many whole units between original DTSTART and the aligned window start?
+      const diffDur = this.opts.dtstart.until(aligned, {largestUnit: unit});
+      const unitsBetween = diffDur[unit]; // may be negative
+      const steps = Math.floor(unitsBetween / interval);
+
+      // Jump forward by `steps * interval` units from the original DTSTART
+      let toAdd: Temporal.DurationLike;
+      const jump = steps * interval;
+      switch (unit) {
+        case 'years':
+          toAdd = {years: jump};
+          break;
+        case 'months':
+          toAdd = {months: jump};
+          break;
+        case 'weeks':
+          toAdd = {weeks: jump};
+          break;
+        case 'days':
+          toAdd = {days: jump};
+          break;
+        case 'hours':
+          toAdd = {hours: jump};
+          break;
+        case 'minutes':
+          toAdd = {minutes: jump};
+          break;
+        default:
+          toAdd = {seconds: jump};
+      }
+
+      let candidate = this.opts.dtstart.add(toAdd);
+      // Ensure we never start before the original DTSTART
+      if (Temporal.ZonedDateTime.compare(candidate, this.opts.dtstart) < 0) {
+        candidate = this.opts.dtstart;
+      }
+
+      // Clamp candidate not to exceed the original DTSTART if window starts earlier
+      tempOpts.dtstart = candidate;
     }
 
     const tempRule = new RRuleTemporal(tempOpts);
