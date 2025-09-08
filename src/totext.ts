@@ -686,5 +686,12 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     parts.push(data.words.excluding, `${exDate.length}`, exDate.length === 1 ? data.words.date : data.words.dates);
   }
 
+  // Mention RSCALE/SKIP explicitly when present (language-agnostic annotation)
+  if (opts.rscale) {
+    const rscale = opts.rscale as string;
+    const skip = opts.skip as string | undefined;
+    parts.push(`(RSCALE=${rscale}${skip ? `;SKIP=${skip}` : ''})`);
+  }
+
   return parts.join(' ');
 }
