@@ -146,7 +146,7 @@ This library implements the iCalendar RSCALE and SKIP extensions described in RF
 
 What RSCALE does:
 - Extends `RRULE` with `RSCALE=<calendar>` to choose the calendar used for recurrence generation while keeping DTSTART/RECURRENCE‑ID/RDATE/EXDATE in Gregorian.
-- Supported calendars: `GREGORIAN`, `CHINESE`, `HEBREW`.
+- Supported calendars: `GREGORIAN`, `CHINESE`, `HEBREW`, `INDIAN` (Saka/Indian National Calendar).
 - Interprets `BY*` parts (month, day, week, etc.) in the specified calendar when expanding occurrences, then converts the generated dates back to the requested time zone.
 
 What SKIP does:

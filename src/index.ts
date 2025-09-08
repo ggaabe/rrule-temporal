@@ -1552,8 +1552,8 @@ export class RRuleTemporal {
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
   all(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
-    // RSCALE non-Gregorian engines (Chinese, Hebrew) for YEARLY/MONTHLY/WEEKLY
-    if (this.opts.rscale && ['CHINESE', 'HEBREW'].includes(this.opts.rscale)) {
+    // RSCALE non-Gregorian engines (Chinese, Hebrew, Indian) for YEARLY/MONTHLY/WEEKLY
+    if (this.opts.rscale && ['CHINESE', 'HEBREW', 'INDIAN'].includes(this.opts.rscale)) {
       if (
         ['YEARLY', 'MONTHLY', 'WEEKLY'].includes(this.opts.freq) ||
         !!this.opts.byYearDay ||
@@ -2492,7 +2492,12 @@ export class RRuleTemporal {
 
   // ===== RSCALE (non-Gregorian) support: Chinese and Hebrew =====
   private getRscaleCalendarId(): string | null {
-    const map: Record<string, string> = {GREGORIAN: 'gregory', CHINESE: 'chinese', HEBREW: 'hebrew'};
+    const map: Record<string, string> = {
+      GREGORIAN: 'gregory',
+      CHINESE: 'chinese',
+      HEBREW: 'hebrew',
+      INDIAN: 'indian',
+    };
     const r = this.opts.rscale?.toUpperCase() || '';
     return map[r] || null;
   }
