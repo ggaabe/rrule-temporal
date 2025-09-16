@@ -202,6 +202,7 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
     exDate: exDate.length > 0 ? exDate : undefined,
     rDate: rDate.length > 0 ? rDate : undefined,
   } as ManualOpts;
+  let pendingSkip: string | undefined;
   for (const part of parts) {
     const [key, val] = part.split('=');
     if (!key) continue;
@@ -210,14 +211,12 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
         if (val) opts.rscale = val.toUpperCase();
         break;
       case 'SKIP': {
-        if (!opts.rscale) {
-          throw new Error('SKIP MUST NOT be present unless RSCALE is present');
-        }
         const v = (val || '').toUpperCase();
         if (!['OMIT', 'BACKWARD', 'FORWARD'].includes(v)) {
           throw new Error(`Invalid SKIP value: ${val}`);
         }
-        opts.skip = v as 'OMIT' | 'BACKWARD' | 'FORWARD';
+        // Defer validation until after full parse to allow SKIP before RSCALE per RFC ordering
+        pendingSkip = v;
         break;
       }
       case 'FREQ':
@@ -268,6 +267,14 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
         opts.wkst = val!;
         break;
     }
+  }
+
+  // Validate SKIP only after all parts were parsed, to allow SKIP prior to RSCALE in the string
+  if (pendingSkip) {
+    if (!opts.rscale) {
+      throw new Error('SKIP MUST NOT be present unless RSCALE is present');
+    }
+    opts.skip = pendingSkip as 'OMIT' | 'BACKWARD' | 'FORWARD';
   }
 
   return opts;
@@ -2602,7 +2609,8 @@ export class RRuleTemporal {
   private rscaleMatchesByMonthDay(pd: Temporal.PlainDate): boolean {
     const list = this.opts.byMonthDay;
     if (!list || list.length === 0) return true;
-    const last = pd.add({days: 1}).with({day: 1}).subtract({days: 1}).day; // end of month
+    // Compute end-of-month for the current month in the date's calendar
+    const last = pd.with({day: 1}).add({months: 1}).subtract({days: 1}).day;
     const value = pd.day;
     return list.some((d) => (d > 0 ? value === d : value === last + d + 1));
   }
@@ -2682,7 +2690,7 @@ export class RRuleTemporal {
       const buckets: Record<number, Temporal.PlainDate[]> = {};
       let cur = monthStart;
       while (cur.month === monthStart.month && cur.year === monthStart.year) {
-        const wd = (cur.dayOfWeek % 7) + 1; // Temporal: 1=Mon..7=Sun already; but keep consistent
+        const wd = cur.dayOfWeek; // Temporal already uses 1=Mon..7=Sun
         (buckets[wd] ||= []).push(cur);
         cur = cur.add({days: 1});
       }
