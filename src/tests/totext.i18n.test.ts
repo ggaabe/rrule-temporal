@@ -164,7 +164,7 @@ describe('toText i18n basic cases', () => {
   for (const lang of Object.keys(expected) as (keyof typeof expected)[]) {
     test.each(cases.map((r, i) => [expected[lang][i], r]))('%s', (text, ruleStr) => {
       const rule = make(ruleStr);
-      expect(toText(rule, lang).toLowerCase()).toBe(text.toLowerCase());
+      expect(toText(rule, lang).toLowerCase()).toBe(text?.toLowerCase());
     });
   }
 });

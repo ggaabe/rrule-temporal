@@ -1,12 +1,12 @@
 # rrule-temporal
 
-The first and only fully compliant Recurrence rule (RFC&nbsp;5545) processing JS/TS library built on the Temporal API.
+The first and only fully compliant Recurrence rule ([RFC-5545](https://www.rfc-editor.org/rfc/rfc5545.html)) processing JS/TS library built on the Temporal API, now with support for [RFC-7529](https://www.rfc-editor.org/rfc/rfc7529.html) (RSCALE / SKIP) for non-Gregorian calendars.
 The library accepts the familiar `RRULE` format and returns
 `Temporal.ZonedDateTime` instances for easy time‑zone aware scheduling.
 
 See the [demo site](https://ggaabe.github.io/rrule-temporal/) for an interactive playground.
 
-> This library was created to advance the rrule library to use Temporal, and to provide a more modern API, as the original rrule library is [not maintained anymore](https://github.com/jkbrzt/rrule/issues/615). Maintainers suggested to use Temporal instead of Date:
+> This library was created to advance the rrule library to use Temporal, and to provide a more modern API, as the original rrule.js library is [not maintained anymore](https://github.com/jkbrzt/rrule/issues/615) and based on Date. Its maintainers suggested a new library based on Temporal instead of Date should be created:
 >https://github.com/jkbrzt/rrule/issues/450#issuecomment-1055853095
 
 ## Installation
@@ -137,14 +137,6 @@ toText(weekly, "es");
 // "cada semana en domingo a las 10 AM UTC"
 ```
 
-`toText()` currently ships translations for **English (`en`)**, 
-**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
-**Hebrew (`he`)** and **Mandarin (`zh`)**. At build time you can reduce bundle size by
-defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
-e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
-(such as in browser builds where `process` is undefined) all languages are
-included by default.
-
 ### `toText` supported languages
 
 | Code | Language |
@@ -156,6 +148,87 @@ included by default.
 | ar | Arabic |
 | he | Hebrew |
 | zh | Mandarin |
+
+### RFC 7529 (RSCALE / SKIP)
+
+This library implements the iCalendar RSCALE and SKIP extensions described in RFC 7529 for defining recurrence rules in non‑Gregorian calendars and for controlling how invalid dates are handled.
+
+- Spec: RFC 7529 — Non‑Gregorian Recurrence Rules in iCalendar
+  https://www.rfc-editor.org/rfc/rfc7529.html
+
+What RSCALE does:
+- Extends `RRULE` with `RSCALE=<calendar>` to choose the calendar used for recurrence generation while keeping DTSTART/RECURRENCE‑ID/RDATE/EXDATE in Gregorian.
+- Supported calendars: `GREGORIAN`, `CHINESE`, `HEBREW`, `INDIAN` (Saka/Indian National Calendar).
+- Interprets `BY*` parts (month, day, week, etc.) in the specified calendar when expanding occurrences, then converts the generated dates back to the requested time zone.
+
+What SKIP does:
+- Extends `RRULE` with `SKIP=OMIT|BACKWARD|FORWARD` (only when `RSCALE` is present).
+- Controls how invalid dates produced by the rule are handled (e.g., Feb 29 in non‑leap years, or months that don’t have the desired day):
+  - `OMIT` (default): drop the invalid occurrence.
+  - `BACKWARD`: move to the previous valid day/month (e.g., Feb 28).
+  - `FORWARD`: move to the next valid day/month (e.g., Mar 1).
+- RFC 7529 defines the evaluation order; notably, SKIP may apply after `BYMONTH` (invalid month) and after `BYMONTHDAY` (invalid day). If SKIP changes the month and that leads to an invalid day‑of‑month, SKIP is re‑applied for the day step.
+
+Leap months and BYMONTH:
+- `BYMONTH` accepts leap‑month tokens with an `L` suffix (e.g., `5L`) under RSCALE. These are matched against the target calendar’s `monthCode` (e.g., Chinese `M06L`, Hebrew `M05L`).
+- Example tokens:
+  - Chinese: `5L` matches `monthCode=M05L` (leap 5th) or `M06L` depending on calendar system; we match by the numeric part + `L` via `monthCode`.
+  - Hebrew: `5L` typically corresponds to Adar I (`monthCode=M05L`).
+  - Numeric months without `L` (e.g., `5`) match the regular month (e.g., `monthCode=M05`).
+
+Supported RSCALE coverage in this library:
+- Frequencies: `YEARLY`, `MONTHLY`, `WEEKLY` with Chinese/Hebrew calendars.
+- Constraints: `BYMONTH` (including leap tokens), `BYMONTHDAY`, `BYDAY` (weekday tokens; ordinal support at monthly/yearly levels), `BYYEARDAY`, `BYWEEKNO`, `BYSETPOS`.
+- Sub‑daily (`DAILY`, `HOURLY`, `MINUTELY`) behavior:
+  - The engine first filters eligible calendar days using `BYWEEKNO`, `BYYEARDAY`, `BYMONTH`, `BYMONTHDAY`, and simple `BYDAY` (weekday codes). Then it expands times via `BYHOUR`/`BYMINUTE`/`BYSECOND`.
+  - For `HOURLY`/`MINUTELY`, INTERVAL alignment is based on elapsed real hours/minutes since `DTSTART`. Occurrences are kept when the elapsed units are multiples of `INTERVAL`.
+  - Ordinal `BYDAY` (e.g., `1MO`, `-1SU`) is not interpreted at sub‑daily RSCALE levels; use `MONTHLY`/`YEARLY` for these.
+
+Examples
+
+Chinese New Year (1st day of 1st Chinese month), year over year from a Gregorian DTSTART:
+
+```ics
+DTSTART;VALUE=DATE:20130210
+RRULE:RSCALE=CHINESE;FREQ=YEARLY
+```
+
+Hebrew New Year (Tishrei 1) — using BYYEARDAY=1 in Hebrew calendar:
+
+```ics
+DTSTART;TZID=UTC:20230916T090000
+RRULE:RSCALE=HEBREW;FREQ=YEARLY;BYYEARDAY=1;BYHOUR=9
+```
+
+Feb 29 birthday — SKIP strategies:
+
+```ics
+DTSTART;TZID=UTC:20160229T120000
+RRULE:RSCALE=GREGORIAN;FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=29;SKIP=OMIT
+```
+
+```ics
+DTSTART;TZID=UTC:20160229T120000
+RRULE:RSCALE=GREGORIAN;FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=29;SKIP=BACKWARD
+```
+
+```ics
+DTSTART;TZID=UTC:20160229T120000
+RRULE:RSCALE=GREGORIAN;FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=29;SKIP=FORWARD
+```
+
+Notes
+- SKIP MUST NOT be present unless RSCALE is present (per RFC 7529).
+- Default SKIP is `OMIT` when RSCALE is present.
+- This library surfaces `RSCALE`/`SKIP` in `toText()` at the end of the description: e.g., `(RSCALE=HEBREW;SKIP=OMIT)`.
+
+`toText()` currently ships translations for **English (`en`)**, 
+**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
+**Hebrew (`he`)** and **Mandarin (`zh`)**. At build time you can reduce bundle size by
+defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
+e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
+(such as in browser builds where `process` is undefined) all languages are
+included by default.
 
 ## API
 
