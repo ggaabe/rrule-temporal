@@ -139,6 +139,8 @@ toText(weekly, "es");
 
 ### `toText` supported languages
 
+`toText()` currently ships translations for the following languages:
+
 | Code | Language |
 | ---- | -------- |
 | en | English |
@@ -148,6 +150,12 @@ toText(weekly, "es");
 | ar | Arabic |
 | he | Hebrew |
 | zh | Mandarin |
+
+**NOTE:** At build time you can reduce bundle size by
+defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
+e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
+(such as in browser builds where `process` is undefined) all languages are
+included by default.
 
 ### RFC 7529 (RSCALE / SKIP)
 
@@ -221,14 +229,6 @@ Notes
 - SKIP MUST NOT be present unless RSCALE is present (per RFC 7529).
 - Default SKIP is `OMIT` when RSCALE is present.
 - This library surfaces `RSCALE`/`SKIP` in `toText()` at the end of the description: e.g., `(RSCALE=HEBREW;SKIP=OMIT)`.
-
-`toText()` currently ships translations for **English (`en`)**, 
-**Spanish (`es`)**, **Hindi (`hi`)**, **Cantonese (`yue`)**, **Arabic (`ar`)**, 
-**Hebrew (`he`)** and **Mandarin (`zh`)**. At build time you can reduce bundle size by
-defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
-e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
-(such as in browser builds where `process` is undefined) all languages are
-included by default.
 
 ## API
 
