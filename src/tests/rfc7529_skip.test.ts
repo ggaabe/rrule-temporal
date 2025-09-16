@@ -4,6 +4,16 @@ import {RRuleTemporal} from '../index';
 describe('RFC 7529 RSCALE/SKIP (Gregorian)', () => {
   const tz = 'UTC';
 
+  test('parses SKIP before RSCALE when provided later in rule', () => {
+    expect(() => {
+      const rule = new RRuleTemporal({
+        rruleString: `DTSTART;TZID=${tz}:20250131T080000
+RRULE:SKIP=BACKWARD;RSCALE=GREGORIAN;FREQ=MONTHLY;COUNT=3`,
+      });
+      rule.all();
+    }).not.toThrow();
+  });
+
   test('YEARLY Feb 29 with SKIP=OMIT (leap years only)', () => {
     const rule = new RRuleTemporal({
       rruleString: `DTSTART;TZID=${tz}:20160229T000000\nRRULE:RSCALE=GREGORIAN;SKIP=OMIT;FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=29;COUNT=6`,
