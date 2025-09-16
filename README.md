@@ -1,6 +1,6 @@
 # rrule-temporal
 
-The first and only fully compliant Recurrence rule (RFC&nbsp;5545) processing JS/TS library built on the Temporal API, now with support for RFC-7529 (RSCALE / SKIP) for non-Gregorian calendars.
+The first and only fully compliant Recurrence rule ([RFC-5545](https://www.rfc-editor.org/rfc/rfc5545.html)) processing JS/TS library built on the Temporal API, now with support for [RFC-7529](https://www.rfc-editor.org/rfc/rfc7529.html) (RSCALE / SKIP) for non-Gregorian calendars.
 The library accepts the familiar `RRULE` format and returns
 `Temporal.ZonedDateTime` instances for easy time‑zone aware scheduling.
 
