@@ -202,22 +202,30 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
     exDate: exDate.length > 0 ? exDate : undefined,
     rDate: rDate.length > 0 ? rDate : undefined,
   } as ManualOpts;
+  let pendingSkip: ('OMIT' | 'BACKWARD' | 'FORWARD') | undefined;
   for (const part of parts) {
     const [key, val] = part.split('=');
     if (!key) continue;
     switch (key.toUpperCase()) {
       case 'RSCALE':
-        if (val) opts.rscale = val.toUpperCase();
+        if (val) {
+          opts.rscale = val.toUpperCase();
+          if (pendingSkip && !opts.skip) {
+            opts.skip = pendingSkip;
+            pendingSkip = undefined;
+          }
+        }
         break;
       case 'SKIP': {
-        if (!opts.rscale) {
-          throw new Error('SKIP MUST NOT be present unless RSCALE is present');
-        }
         const v = (val || '').toUpperCase();
         if (!['OMIT', 'BACKWARD', 'FORWARD'].includes(v)) {
           throw new Error(`Invalid SKIP value: ${val}`);
         }
-        opts.skip = v as 'OMIT' | 'BACKWARD' | 'FORWARD';
+        if (opts.rscale) {
+          opts.skip = v as 'OMIT' | 'BACKWARD' | 'FORWARD';
+        } else {
+          pendingSkip = v as 'OMIT' | 'BACKWARD' | 'FORWARD';
+        }
         break;
       }
       case 'FREQ':
@@ -268,6 +276,13 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
         opts.wkst = val!;
         break;
     }
+  }
+
+  if (pendingSkip && !opts.rscale) {
+    throw new Error('SKIP MUST NOT be present unless RSCALE is present');
+  }
+  if (pendingSkip && opts.rscale && !opts.skip) {
+    opts.skip = pendingSkip;
   }
 
   return opts;
@@ -1557,7 +1572,8 @@ export class RRuleTemporal {
       if (
         ['YEARLY', 'MONTHLY', 'WEEKLY'].includes(this.opts.freq) ||
         !!this.opts.byYearDay ||
-        !!this.opts.byWeekNo
+        !!this.opts.byWeekNo ||
+        (this.opts.byMonthDay && this.opts.byMonthDay.length > 0)
       ) {
         return this._allRscaleNonGregorian(iterator);
       }
@@ -2554,7 +2570,7 @@ export class RRuleTemporal {
   }
 
   private lastDayOfMonth(pd: Temporal.PlainDate): number {
-    return pd.add({months: 1}).subtract({days: 1}).day;
+    return pd.with({day: 1}).add({months: 1}).subtract({days: 1}).day;
   }
 
   private buildZdtFromPlainDate(pd: Temporal.PlainDate): Temporal.ZonedDateTime {
@@ -2602,7 +2618,7 @@ export class RRuleTemporal {
   private rscaleMatchesByMonthDay(pd: Temporal.PlainDate): boolean {
     const list = this.opts.byMonthDay;
     if (!list || list.length === 0) return true;
-    const last = pd.add({days: 1}).with({day: 1}).subtract({days: 1}).day; // end of month
+    const last = pd.with({day: 1}).add({months: 1}).subtract({days: 1}).day; // end of month
     const value = pd.day;
     return list.some((d) => (d > 0 ? value === d : value === last + d + 1));
   }
@@ -2682,7 +2698,7 @@ export class RRuleTemporal {
       const buckets: Record<number, Temporal.PlainDate[]> = {};
       let cur = monthStart;
       while (cur.month === monthStart.month && cur.year === monthStart.year) {
-        const wd = (cur.dayOfWeek % 7) + 1; // Temporal: 1=Mon..7=Sun already; but keep consistent
+        const wd = cur.dayOfWeek;
         (buckets[wd] ||= []).push(cur);
         cur = cur.add({days: 1});
       }
