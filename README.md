@@ -1,12 +1,12 @@
 # rrule-temporal
 
-The first and only fully compliant Recurrence rule (RFC&nbsp;5545) processing JS/TS library built on the Temporal API.
+The first and only fully compliant Recurrence rule (RFC&nbsp;5545) processing JS/TS library built on the Temporal API, now with support for RFC-7529 (RSCALE / SKIP) for non-Gregorian calendars.
 The library accepts the familiar `RRULE` format and returns
 `Temporal.ZonedDateTime` instances for easy time‑zone aware scheduling.
 
 See the [demo site](https://ggaabe.github.io/rrule-temporal/) for an interactive playground.
 
-> This library was created to advance the rrule library to use Temporal, and to provide a more modern API, as the original rrule library is [not maintained anymore](https://github.com/jkbrzt/rrule/issues/615). Maintainers suggested to use Temporal instead of Date:
+> This library was created to advance the rrule library to use Temporal, and to provide a more modern API, as the original rrule.js library is [not maintained anymore](https://github.com/jkbrzt/rrule/issues/615) and based on Date. Its maintainers suggested a new library based on Temporal instead of Date should be created:
 >https://github.com/jkbrzt/rrule/issues/450#issuecomment-1055853095
 
 ## Installation
@@ -137,6 +137,18 @@ toText(weekly, "es");
 // "cada semana en domingo a las 10 AM UTC"
 ```
 
+### `toText` supported languages
+
+| Code | Language |
+| ---- | -------- |
+| en | English |
+| es | Spanish |
+| hi | Hindi |
+| yue | Cantonese |
+| ar | Arabic |
+| he | Hebrew |
+| zh | Mandarin |
+
 ### RFC 7529 (RSCALE / SKIP)
 
 This library implements the iCalendar RSCALE and SKIP extensions described in RFC 7529 for defining recurrence rules in non‑Gregorian calendars and for controlling how invalid dates are handled.
@@ -217,18 +229,6 @@ defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
 e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
 (such as in browser builds where `process` is undefined) all languages are
 included by default.
-
-### `toText` supported languages
-
-| Code | Language |
-| ---- | -------- |
-| en | English |
-| es | Spanish |
-| hi | Hindi |
-| yue | Cantonese |
-| ar | Arabic |
-| he | Hebrew |
-| zh | Mandarin |
 
 ## API
 
