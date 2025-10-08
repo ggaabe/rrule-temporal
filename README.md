@@ -1,4 +1,4 @@
-# rrule-temporal
+# RRule Temporal
 
 The first and only fully compliant Recurrence rule ([RFC-5545](https://www.rfc-editor.org/rfc/rfc5545.html)) processing JS/TS library built on the Temporal API, now with support for [RFC-7529](https://www.rfc-editor.org/rfc/rfc7529.html) (RSCALE / SKIP) for non-Gregorian calendars.
 The library accepts the familiar `RRULE` format and returns
@@ -6,7 +6,7 @@ The library accepts the familiar `RRULE` format and returns
 
 See the [demo site](https://ggaabe.github.io/rrule-temporal/) for an interactive playground.
 
-> This library was created to advance the rrule library to use Temporal, and to provide a more modern API, as the original rrule.js library is [not maintained anymore](https://github.com/jkbrzt/rrule/issues/615) and based on Date. Its maintainers suggested a new library based on Temporal instead of Date should be created:
+> RRule-temporal was created to advance the JS RRule ecosystem to use Temporal instead of Date, and to properly support cross-timezone and calendar aware recurrence rules, as per the suggestion of rrule.js contributors.
 >https://github.com/jkbrzt/rrule/issues/450#issuecomment-1055853095
 
 ## Installation
