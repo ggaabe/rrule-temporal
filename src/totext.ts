@@ -114,6 +114,64 @@ const en: LocaleData = {
   },
 };
 
+const de: LocaleData = {
+  weekdayNames: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'],
+  monthNames: [
+    'Januar',
+    'Februar',
+    'März',
+    'April',
+    'Mai',
+    'Juni',
+    'Juli',
+    'August',
+    'September',
+    'Oktober',
+    'November',
+    'Dezember',
+  ],
+  units: {
+    year: {singular: 'Jahr', plural: 'Jahre'},
+    month: {singular: 'Monat', plural: 'Monate'},
+    week: {singular: 'Woche', plural: 'Wochen'},
+    day: {singular: 'Tag', plural: 'Tage'},
+    hour: {singular: 'Stunde', plural: 'Stunden'},
+    minute: {singular: 'Minute', plural: 'Minuten'},
+    second: {singular: 'Sekunde', plural: 'Sekunden'},
+  },
+  words: {
+    every: 'jede/n/s',
+    weekday: 'Werktag',
+    on: 'am',
+    in: 'im',
+    on_the: 'am',
+    day_of_month: 'Tag des Monats',
+    day_of_year: 'Tag des Jahres',
+    in_week: 'in Kalenderwoche',
+    at: 'um',
+    at_minute: 'in Minute',
+    at_second: 'in Sekunde',
+    until: 'bis',
+    for: 'für',
+    time: 'Mal',
+    times: 'Mal',
+    instance: 'Vorkommen',
+    week_starts_on: 'Woche beginnt am',
+    with: 'mit',
+    additional_date: 'zusätzlichem Datum',
+    additional_dates: 'zusätzlichen Daten',
+    excluding: 'ohne',
+    date: 'Datum',
+    dates: 'Daten',
+    and: 'und',
+    last: 'letzter',
+  },
+  ordinal: (n: number) => {
+    if (n < 0) return 'letzten';
+    return `${Math.abs(n)}.`;
+  },
+};
+
 const es: LocaleData = {
   weekdayNames: ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'],
   monthNames: [
@@ -456,7 +514,7 @@ const zh: LocaleData = {
   ordinal: (n: number) => (n < 0 ? '最后' : `第${Math.abs(n)}`),
 };
 
-const ALL_LOCALES: Record<string, LocaleData> = {en, es, hi, yue, ar, he, zh};
+const ALL_LOCALES: Record<string, LocaleData> = {en, de, es, hi, yue, ar, he, zh};
 const env = typeof process !== 'undefined' && process.env ? process.env.TOTEXT_LANGS : undefined;
 const active = env
   ? env
