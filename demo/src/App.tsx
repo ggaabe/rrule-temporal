@@ -6,7 +6,7 @@
 // – TailwindCSS v4 (preflight/utilities) assumed.
 // --------------------------------------------------------------------------------
 // Set to use local package
-import {useEffect, useMemo, useState} from 'react';
+import {startTransition, useEffect, useMemo, useState} from 'react';
 import {Temporal} from '@js-temporal/polyfill';
 import {RRuleTemporal} from 'rrule-temporal';
 import {toText} from 'rrule-temporal/totext';
@@ -46,7 +46,7 @@ export default function App() {
   // -------- shared state ----------------------------------------------------
   const [mode, setMode] = useState<Mode>('visual');
   const [ics, setIcs] = useState(defaultICS);
-  const [err, setErr] = useState<string | null>(null);
+  const [visualErr, setVisualErr] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [lang, setLang] = useState('en');
 
@@ -119,7 +119,7 @@ export default function App() {
   }, []);
 
   // -------- derived rule + occurrences -------------------------------------
-  const {ruleString, ruleText, rows} = useMemo(() => {
+  const {ruleString, ruleText, rows, error: derivedErr} = useMemo(() => {
     try {
       const rule = new RRuleTemporal({rruleString: ics.trim()});
       const fmt = new Intl.DateTimeFormat(undefined, {
@@ -148,13 +148,14 @@ export default function App() {
             tz: bag.timeZoneName,
           };
         });
-      setErr(null);
-      return {ruleString: rule.toString(), ruleText: toText(rule, lang), rows};
+      return {ruleString: rule.toString(), ruleText: toText(rule, lang), rows, error: null};
     } catch (e) {
-      setErr((e as Error).message);
-      return {ruleString: '', ruleText: '', rows: []};
+      const message = e instanceof Error ? e.message : String(e);
+      return {ruleString: '', ruleText: '', rows: [], error: message};
     }
   }, [ics, lang]);
+
+  const err = derivedErr ?? visualErr;
 
   // -------- VISUAL form state ----------------------------------------------
   const [freq, setFreq] = useState<string>('WEEKLY');
@@ -185,33 +186,35 @@ export default function App() {
     if (mode !== 'visual') return;
     try {
       const opts = new RRuleTemporal({rruleString: ics.trim()}).options();
-      setFreq(opts.freq);
-      setInterval(opts.interval ?? 1);
-      setCount(opts.count ?? 30);
-      setUntilDate(opts.until ? toDateInput(opts.until) : '');
-      setUntilTime(opts.until ? toTimeInput(opts.until) : '00:00:00');
-      setTzid(opts.tzid ?? opts.dtstart.timeZoneId);
-      setDtDate(toDateInput(opts.dtstart));
-      setDtTime(toTimeInput(opts.dtstart));
-      setByDay(opts.byDay ?? []);
-      setByHour(opts.byHour ?? (['MINUTELY', 'SECONDLY'].includes(opts.freq) ? [] : [opts.dtstart.hour]));
-      setByMinuteStr(opts.byMinute ? opts.byMinute.join(',') : '');
-      setBySecondStr(opts.bySecond ? opts.bySecond.join(',') : '');
-      setByMonthStr(opts.byMonth ? opts.byMonth.join(',') : '');
-      setByMonthDayStr(opts.byMonthDay ? opts.byMonthDay.join(',') : '');
-      setByYearDayStr(opts.byYearDay ? opts.byYearDay.join(',') : '');
-      setByWeekNoStr(opts.byWeekNo ? opts.byWeekNo.join(',') : '');
-      setBySetPosStr(opts.bySetPos ? opts.bySetPos.join(',') : '');
-      setWkst(opts.wkst ?? '');
-      setRDateStr(opts.rDate ? opts.rDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(',') : '');
-      setExDateStr(opts.exDate ? opts.exDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(',') : '');
-      setMaxIterations(opts.maxIterations ?? 10000);
-      setIncludeDtstart(opts.includeDtstart ?? false);
+      startTransition(() => {
+        setFreq(opts.freq);
+        setInterval(opts.interval ?? 1);
+        setCount(opts.count ?? 30);
+        setUntilDate(opts.until ? toDateInput(opts.until) : '');
+        setUntilTime(opts.until ? toTimeInput(opts.until) : '00:00:00');
+        setTzid(opts.tzid ?? opts.dtstart.timeZoneId);
+        setDtDate(toDateInput(opts.dtstart));
+        setDtTime(toTimeInput(opts.dtstart));
+        setByDay(opts.byDay ?? []);
+        setByHour(opts.byHour ?? (['MINUTELY', 'SECONDLY'].includes(opts.freq) ? [] : [opts.dtstart.hour]));
+        setByMinuteStr(opts.byMinute ? opts.byMinute.join(',') : '');
+        setBySecondStr(opts.bySecond ? opts.bySecond.join(',') : '');
+        setByMonthStr(opts.byMonth ? opts.byMonth.join(',') : '');
+        setByMonthDayStr(opts.byMonthDay ? opts.byMonthDay.join(',') : '');
+        setByYearDayStr(opts.byYearDay ? opts.byYearDay.join(',') : '');
+        setByWeekNoStr(opts.byWeekNo ? opts.byWeekNo.join(',') : '');
+        setBySetPosStr(opts.bySetPos ? opts.bySetPos.join(',') : '');
+        setWkst(opts.wkst ?? '');
+        setRDateStr(opts.rDate ? opts.rDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(',') : '');
+        setExDateStr(opts.exDate ? opts.exDate.map((d) => `${toDateInput(d)}T${toTimeInput(d)}`).join(',') : '');
+        setMaxIterations(opts.maxIterations ?? 10000);
+        setIncludeDtstart(opts.includeDtstart ?? false);
+      });
     } catch (e) {
       /* ignore parse failure */
       console.log(e);
     }
-  }, [mode]);
+  }, [mode, ics]);
 
   // --- rebuild ics when visual state changes --------------------------------
   useEffect(() => {
@@ -292,11 +295,17 @@ export default function App() {
         rDate: dateList(rDateStr),
         exDate: dateList(exDateStr),
       });
-      setIcs(rule.toString());
+      startTransition(() => {
+        setIcs(rule.toString());
+        setVisualErr(null);
+      });
     } catch (e) {
       /* silent */
       console.log(e);
-      setErr(e as string);
+      const message = e instanceof Error ? e.message : String(e);
+      startTransition(() => {
+        setVisualErr(message);
+      });
     }
   }, [
     freq,
@@ -321,6 +330,7 @@ export default function App() {
     exDateStr,
     maxIterations,
     includeDtstart,
+    mode,
   ]);
 
   // helpers ------------------------------------------------------------------
