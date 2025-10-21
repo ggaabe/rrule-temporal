@@ -86,7 +86,7 @@ describe('RRule class methods', () => {
 
     it('throws an error when passed an invalid date', () => {
       const testFn = () => rule.previous(new Date(INVALID_DATE));
-      expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Invalid time value"`);
+      expect(testFn).toThrowErrorMatchingInlineSnapshot(`[RangeError: Invalid time value]`);
     });
   });
 
@@ -113,7 +113,7 @@ describe('RRule class methods', () => {
 
     it('throws an error when passed an invalid date', () => {
       const testFn = () => rule.next(new Date(INVALID_DATE));
-      expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Invalid time value"`);
+      expect(testFn).toThrowErrorMatchingInlineSnapshot(`[RangeError: Invalid time value]`);
     });
   });
 
@@ -179,12 +179,12 @@ describe('RRule class methods', () => {
 
     it('throws an error when passed an invalid start date', () => {
       const testFn = () => rule.between(new Date(INVALID_DATE), new Date('1997-09-10T09:00:00.000-04:00'));
-      expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Invalid time value"`);
+      expect(testFn).toThrowErrorMatchingInlineSnapshot(`[RangeError: Invalid time value]`);
     });
 
     it('throws an error when passed an invalid end date', () => {
       const testFn = () => rule.between(new Date('1997-09-10T09:00:00.000-04:00'), new Date(INVALID_DATE));
-      expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Invalid time value"`);
+      expect(testFn).toThrowErrorMatchingInlineSnapshot(`[RangeError: Invalid time value]`);
     });
   });
 });

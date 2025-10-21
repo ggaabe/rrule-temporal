@@ -424,7 +424,7 @@ describe('Error handling', () => {
         interval: 1,
         tzid: 'UTC',
       });
-    expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Manual dtstart must be a ZonedDateTime"`);
+    expect(testFn).toThrowErrorMatchingInlineSnapshot(`[Error: Manual dtstart must be a ZonedDateTime]`);
   });
 
   it('throws an error on an invalid until', () => {
@@ -437,7 +437,7 @@ describe('Error handling', () => {
         interval: 1,
         tzid: 'UTC',
       });
-    expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Manual until must be a ZonedDateTime"`);
+    expect(testFn).toThrowErrorMatchingInlineSnapshot(`[Error: Manual until must be a ZonedDateTime]`);
   });
 
   it('throws an error on an interval of 0', () => {
@@ -448,7 +448,7 @@ describe('Error handling', () => {
         interval: 0,
         tzid: 'UTC',
       });
-    expect(testFn).toThrowErrorMatchingInlineSnapshot(`"Cannot create RRule: interval must be greater than 0"`);
+    expect(testFn).toThrowErrorMatchingInlineSnapshot(`[Error: Cannot create RRule: interval must be greater than 0]`);
   });
 
   it('throws an error when exceeding the iteration limit', () => {
@@ -462,7 +462,7 @@ describe('Error handling', () => {
       rule.all();
     };
 
-    expect(testFn).toThrowErrorMatchingInlineSnapshot(`"all() requires iterator when no COUNT/UNTIL"`);
+    expect(testFn).toThrowErrorMatchingInlineSnapshot(`[Error: all() requires iterator when no COUNT/UNTIL]`);
   });
 
   it('Can return max-1 entries', function () {
