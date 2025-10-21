@@ -150,6 +150,7 @@ toText(weekly, "es");
 | ar | Arabic |
 | he | Hebrew |
 | zh | Mandarin |
+| de | German |
 
 **NOTE:** At build time you can reduce bundle size by
 defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
