@@ -38,6 +38,26 @@ const cases = [
 ];
 
 const expected = {
+  de: [
+    'jede/n/s Tag',
+    'jede/n/s Tag um 10 AM, 12 PM und 5 PM EDT',
+    'jede/n/s Woche am Sonntag um 10 AM, 12 PM und 5 PM EDT',
+    'jede/n/s Woche',
+    'jede/n/s Stunde',
+    'jede/n/s 4 Stunden',
+    'jede/n/s Woche am Dienstag',
+    'jede/n/s Woche am Montag und Mittwoch',
+    'jede/n/s Werktag',
+    'jede/n/s 2 Wochen',
+    'jede/n/s Monat',
+    'jede/n/s 6 Monate',
+    'jede/n/s Jahr',
+    'jede/n/s Jahr am 1. Freitag',
+    'jede/n/s Jahr am 13. Freitag',
+    'jede/n/s Tag um 5:30 PM EDT',
+    'jede/n/s Woche am Montag und Mittwoch um 10 AM und 4 PM EDT',
+    'jede/n/s Woche am Dienstag und Donnerstag um 9:30 AM und 3:30 PM EDT',
+  ],
   es: [
     'cada día',
     'cada día a las 10 AM, 12 PM y 5 PM EDT',

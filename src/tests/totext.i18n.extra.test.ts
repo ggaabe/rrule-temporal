@@ -7,6 +7,20 @@ function zdt(y: number, m: number, d: number, h: number, tz = 'UTC') {
 }
 
 const expected = {
+  de: [
+    'jede/n/s Tag',
+    'jede/n/s Tag um 10 AM, 12 PM und 5 PM UTC',
+    'jede/n/s Woche am Sonntag um 10 AM, 12 PM und 5 PM UTC',
+    'jede/n/s Tag um 5:30 PM CST',
+    'jede/n/s Tag um 6:15:45 AM UTC',
+    'jede/n/s Werktag',
+    'jede/n/s 2 Minuten',
+    'jede/n/s Woche bis November 10, 2012',
+    'jede/n/s Jahr am 100. Tag des Jahres',
+    'jede/n/s Jahr in Kalenderwoche 20',
+    'jede/n/s Monat am Montag und Mittwoch am 2. Vorkommen',
+    'jede/n/s Monat für 1 Mal mit 1 zusätzlichem Datum ohne 2 Daten',
+  ],
   es: [
     'cada día',
     'cada día a las 10 AM, 12 PM y 5 PM UTC',
