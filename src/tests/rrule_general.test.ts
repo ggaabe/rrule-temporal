@@ -148,8 +148,8 @@ describe('General RRule tests', () => {
     expect(rule.toString()).toEqual('DTSTART;TZID=UTC:19970902T090000\nRRULE:FREQ=WEEKLY;WKST=SU');
   });
 
-  it('testStrNoDTStart', () => {
-    expect(() => parse('RRULE:FREQ=YEARLY;COUNT=3')).toThrow('dtstart required when parsing RRULE alone');
+  it('should throw when neither RRULE string nor parameter provides DTSTART', () => {
+    expect(() => parse('RRULE:FREQ=YEARLY;COUNT=3')).toThrow('dtstart is required');
   });
 });
 

@@ -11,7 +11,6 @@ interface BaseOpts {
   tzid?: string;
   /** Safety cap when generating occurrences. */
   maxIterations?: number;
-  /** Include DTSTART as an occurrence even if it does not match the rule pattern. */
   includeDtstart?: boolean;
   /** RSCALE per RFC 7529: calendar system for recurrence generation (e.g., GREGORIAN). */
   rscale?: string;
@@ -61,10 +60,15 @@ interface ManualOpts extends BaseOpts {
 }
 
 interface IcsOpts extends BaseOpts {
-  rruleString: string; // full "DTSTART...\nRRULE..." snippet
+  rruleString: string; // full "DTSTART...\nRRULE..." snippet or bare RRULE/FREQ pattern
+  dtstart?: Temporal.ZonedDateTime; // optional separate DTSTART when rruleString lacks one
 }
 
 export type RRuleOptions = ManualOpts | IcsOpts;
+
+function isIcsOpts(opts: RRuleOptions): opts is IcsOpts {
+  return typeof (opts as IcsOpts).rruleString === 'string';
+}
 
 /**
  * Unfold lines according to RFC 5545 specification.
@@ -140,12 +144,13 @@ function parseByMonthArray(val: string): Array<number | string> {
  * Parse either a full ICS snippet or an RRULE line into ManualOpts.
  *
  * @param input - String containing a `DTSTART` line followed by `RRULE` and
- *   optional `EXDATE`/`RDATE` lines. A single `RRULE:` line without
- *   `DTSTART` will throw an error.
+ *   optional `EXDATE`/`RDATE` lines. Can also be just an `RRULE:` line or
+ *   recurrence pattern without DTSTART (dtstart must be provided separately).
  * @param targetTimezone - Optional IANA time zone identifier used when the
  *   `DTSTART` line omits `TZID`. Floating times are interpreted in this zone
  *   and the resulting `tzid` field in the returned options will be set to this
  *   value. If `DTSTART` already specifies a `TZID` this parameter is ignored.
+ * @param dtstart - Optional DTSTART to use when input doesn't contain one.
  *
  * Examples:
  * ```ts
@@ -159,14 +164,21 @@ function parseByMonthArray(val: string): Array<number | string> {
  *   `DTSTART;TZID=Europe/Paris:20240101T090000\nRRULE:FREQ=DAILY`
  * );
  * // => opts.tzid === 'Europe/Paris' (targetTimezone ignored)
+ *
+ * parseRRuleString(
+ *   `FREQ=DAILY;COUNT=5`,
+ *   'UTC',
+ *   Temporal.ZonedDateTime.from('2025-01-01T09:00:00[UTC]')
+ * );
+ * // => opts.dtstart from parameter
  * ```
  */
-function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
+function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temporal.ZonedDateTime): ManualOpts {
   // Unfold the input according to RFC 5545 specification
   const unfoldedInput = unfoldLine(input).trim();
 
-  let dtstart: Temporal.ZonedDateTime;
-  let tzid: string = 'UTC';
+  let parsedDtstart: Temporal.ZonedDateTime | undefined;
+  let tzid: string | undefined = targetTimezone;
   let rruleLine: string;
   let exDate: Temporal.ZonedDateTime[] = [];
   let rDate: Temporal.ZonedDateTime[] = [];
@@ -183,21 +195,27 @@ function parseRRuleString(input: string, targetTimezone?: string): ManualOpts {
     if (!dtMatch) throw new Error('Invalid DTSTART in ICS snippet');
 
     const [, valueType, dtTzid, dtValue] = dtMatch;
-    tzid = dtTzid ?? targetTimezone ?? tzid;
-    dtstart = parseIcsDateTime(dtValue!, tzid, valueType);
+    const effectiveTzid = dtTzid ?? targetTimezone ?? tzid ?? 'UTC';
+    parsedDtstart = parseIcsDateTime(dtValue!, effectiveTzid, valueType);
+    tzid = dtTzid ?? parsedDtstart.timeZoneId ?? targetTimezone ?? tzid ?? 'UTC';
 
     rruleLine = rrLine!;
 
-    exDate = parseDateLines(exLines, 'EXDATE', tzid);
-    rDate = parseDateLines(rLines, 'RDATE', tzid);
+  exDate = parseDateLines(exLines, 'EXDATE', tzid ?? 'UTC');
+  rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC');
   } else {
-    throw new Error('dtstart required when parsing RRULE alone');
+    // Just RRULE or FREQ pattern - use provided dtstart
+    parsedDtstart = dtstart;
+    rruleLine = unfoldedInput;
+    if (parsedDtstart) {
+      tzid = parsedDtstart.timeZoneId;
+    }
   }
 
   // Parse RRULE
   const parts = rruleLine ? rruleLine.replace(/^RRULE:/i, '').split(';') : [];
   const opts = {
-    dtstart,
+    dtstart: parsedDtstart,
     tzid,
     exDate: exDate.length > 0 ? exDate : undefined,
     rDate: rDate.length > 0 ? rDate : undefined,
@@ -298,10 +316,17 @@ export class RRuleTemporal {
   private readonly maxIterations: number;
   private readonly includeDtstart: boolean;
 
-  constructor(params: ({rruleString: string} & BaseOpts) | ManualOpts) {
+  constructor(params: RRuleOptions) {
     let manual: ManualOpts;
-    if ('rruleString' in params) {
-      const parsed = parseRRuleString(params.rruleString, params.tzid);
+    if (isIcsOpts(params)) {
+      // Allow dtstart to be passed separately when rruleString doesn't contain DTSTART
+      const parsed = parseRRuleString(params.rruleString, params.tzid, params.dtstart);
+      
+      // If no dtstart was found in the string or provided as parameter, throw error
+      if (!parsed.dtstart) {
+        throw new Error('dtstart is required - provide it either in rruleString or as a separate parameter');
+      }
+      
       this.tzid = parsed.tzid ?? params.tzid ?? 'UTC';
       this.originalDtstart = parsed.dtstart as Temporal.ZonedDateTime;
       // Important: do NOT carry `rruleString` into internal opts. If present,

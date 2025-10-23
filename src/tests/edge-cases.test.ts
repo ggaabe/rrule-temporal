@@ -851,10 +851,10 @@ describe('rDate', () => {
 });
 
 describe('RRuleTemporal - Error Handling and Edge Cases', () => {
-  it('should throw when parsing RRULE-only without fallback dtstart', () => {
+  it('should throw when neither RRULE string nor parameter provides DTSTART', () => {
     expect(() => {
       new RRuleTemporal({rruleString: 'RRULE:FREQ=DAILY;COUNT=5'});
-    }).toThrow('dtstart required when parsing RRULE alone');
+    }).toThrow('dtstart is required');
   });
 
   it('should handle string dtstart validation', () => {
