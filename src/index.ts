@@ -11,6 +11,7 @@ interface BaseOpts {
   tzid?: string;
   /** Safety cap when generating occurrences. */
   maxIterations?: number;
+  /** Include DTSTART as an occurrence even if it does not match the rule pattern. */
   includeDtstart?: boolean;
   /** RSCALE per RFC 7529: calendar system for recurrence generation (e.g., GREGORIAN). */
   rscale?: string;
