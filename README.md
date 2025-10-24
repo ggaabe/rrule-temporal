@@ -35,6 +35,26 @@ rule.all().forEach(dt => console.log(dt.toString()));
 const firstTen = rule.all((_, i) => i < 10);
 ```
 
+## Separating DTSTART and RRULE
+
+Per RFC 5545, DTSTART and RRULE are separate properties. You can provide them separately:
+
+```typescript
+import { Temporal } from "@js-temporal/polyfill";
+
+const rule = new RRuleTemporal({
+  rruleString: 'FREQ=DAILY;COUNT=5',
+  dtstart: Temporal.ZonedDateTime.from('2025-01-01T09:00:00[UTC]')
+});
+
+const occurrences = rule.all();
+```
+
+This is useful when:
+- Parsing iCalendar files where DTSTART and RRULE are on different lines
+- Storing recurrence patterns separately from start dates in databases
+- Building rules programmatically from user input
+
 ## Creating a rule with options
 
 Instead of a full ICS string you can supply the recurrence parameters directly:
