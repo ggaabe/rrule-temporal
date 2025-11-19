@@ -63,6 +63,10 @@ interface ManualOpts extends BaseOpts {
 interface IcsOpts extends BaseOpts {
   rruleString: string; // full "DTSTART...\nRRULE..." snippet or bare RRULE/FREQ pattern
   dtstart?: Temporal.ZonedDateTime; // optional separate DTSTART when rruleString lacks one
+  /** COUNT: total number of occurrences, used when missing from rruleString */
+  count?: number;
+  /** UNTIL: last possible occurrence, used when missing from rruleString */
+  until?: Temporal.ZonedDateTime;
 }
 
 export type RRuleOptions = ManualOpts | IcsOpts;
@@ -336,6 +340,9 @@ export class RRuleTemporal {
       // the temporary dtstart/until alignment, leading to excessive iteration.
       manual = {
         ...parsed,
+        // Allow explicit COUNT/UNTIL overrides when omitted from the RRULE string
+        count: params.count ?? parsed.count,
+        until: params.until ?? parsed.until,
         maxIterations: params.maxIterations,
         includeDtstart: params.includeDtstart,
         tzid: this.tzid,
