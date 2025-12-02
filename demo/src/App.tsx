@@ -26,7 +26,7 @@ const tzOptions = [
   'Asia/Tokyo',
 ];
 const freqOpts = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'] as const;
-const langOpts = ['en', 'de', 'es', 'hi', 'yue', 'ar', 'he', 'zh'] as const;
+const langOpts = ['en', 'de', 'es', 'hi', 'yue', 'ar', 'he', 'zh', 'fr'] as const;
 const langLabels: {[key in (typeof langOpts)[number]]: string} = {
   en: 'English',
   de: 'German',

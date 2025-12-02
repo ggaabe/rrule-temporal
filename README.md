@@ -171,6 +171,7 @@ toText(weekly, "es");
 | he | Hebrew |
 | zh | Mandarin |
 | de | German |
+| fr | French |
 
 **NOTE:** At build time you can reduce bundle size by
 defining the `TOTEXT_LANGS` environment variable (read from `process.env`),
@@ -261,7 +262,7 @@ Notes
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`). |
+| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). |
 | `options()` | Return the normalized options object. |
 
 ## Further examples

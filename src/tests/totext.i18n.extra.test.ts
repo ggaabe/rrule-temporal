@@ -105,6 +105,20 @@ const expected = {
     '每 月 在 星期一 和 星期三 在 第2 次',
     '每 月 共 1 次 带有 1 额外日期 排除 2 日期',
   ],
+  fr: [
+    'chaque jour',
+    'chaque jour à 10 AM, 12 PM et 5 PM UTC',
+    'chaque semaine le dimanche à 10 AM, 12 PM et 5 PM UTC',
+    'chaque jour à 5:30 PM CST',
+    'chaque jour à 6:15:45 AM UTC',
+    'chaque jour de semaine',
+    'chaque 2 minutes',
+    "chaque semaine jusqu'à novembre 10, 2012",
+    "chaque année le 100e jour de l'année",
+    'chaque année dans la semaine 20',
+    'chaque mois le lundi et mercredi le 2e occurrence',
+    'chaque mois pendant 1 fois avec 1 date supplémentaire en excluant 2 dates',
+  ],
 };
 
 function buildRules() {

@@ -514,7 +514,67 @@ const zh: LocaleData = {
   ordinal: (n: number) => (n < 0 ? '最后' : `第${Math.abs(n)}`),
 };
 
-const ALL_LOCALES: Record<string, LocaleData> = {en, de, es, hi, yue, ar, he, zh};
+const fr: LocaleData = {
+  weekdayNames: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+  monthNames: [
+    'Janvier',
+    'Février',
+    'Mars',
+    'Avril',
+    'Mai',
+    'Juin',
+    'Juillet',
+    'Août',
+    'Septembre',
+    'Octobre',
+    'Novembre',
+    'Décembre',
+  ],
+  units: {
+    year: {singular: 'année', plural: 'ans'},
+    month: {singular: 'mois', plural: 'mois'},
+    week: {singular: 'semaine', plural: 'semaines'},
+    day: {singular: 'jour', plural: 'jours'},
+    hour: {singular: 'heure', plural: 'heures'},
+    minute: {singular: 'minute', plural: 'minutes'},
+    second: {singular: 'seconde', plural: 'secondes'},
+  },
+  words: {
+    every: 'chaque',
+    weekday: 'jour de semaine',
+    on: 'le',
+    in: 'dans',
+    on_the: 'le',
+    day_of_month: 'jour du mois',
+    day_of_year: "jour de l'année",
+    in_week: 'dans la semaine',
+    at: 'à',
+    at_minute: 'à la minute',
+    at_second: 'à la seconde',
+    until: "jusqu'à",
+    for: 'pendant',
+    time: 'fois',
+    times: 'fois',
+    instance: 'occurrence',
+    week_starts_on: 'la semaine commence le',
+    with: 'avec',
+    additional_date: 'date supplémentaire',
+    additional_dates: 'dates supplémentaires',
+    excluding: 'en excluant',
+    date: 'date',
+    dates: 'dates',
+    and: 'et',
+    last: 'dernier',
+  },
+  ordinal: (n: number) => {
+    const abs = Math.abs(n);
+    if (n < 0) return 'dernier';
+    if (abs === 1) return '1er';
+    return `${abs}e`;
+  },
+};
+
+const ALL_LOCALES: Record<string, LocaleData> = {en, de, es, hi, yue, ar, he, zh, fr};
 const env = typeof process !== 'undefined' && process.env ? process.env.TOTEXT_LANGS : undefined;
 const active = env
   ? env

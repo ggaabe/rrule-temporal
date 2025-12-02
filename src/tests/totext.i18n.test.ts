@@ -178,6 +178,26 @@ const expected = {
     '每 周 在 星期一 和 星期三 在 10 AM 和 4 PM EDT',
     '每 周 在 星期二 和 星期四 在 9:30 AM 和 3:30 PM EDT',
   ],
+  fr: [
+    'chaque jour',
+    'chaque jour à 10 AM, 12 PM et 5 PM EDT',
+    'chaque semaine le dimanche à 10 AM, 12 PM et 5 PM EDT',
+    'chaque semaine',
+    'chaque heure',
+    'chaque 4 heures',
+    'chaque semaine le mardi',
+    'chaque semaine le lundi et mercredi',
+    'chaque jour de semaine',
+    'chaque 2 semaines',
+    'chaque mois',
+    'chaque 6 mois',
+    'chaque année',
+    'chaque année le 1er vendredi',
+    'chaque année le 13e vendredi',
+    'chaque jour à 5:30 PM EDT',
+    'chaque semaine le lundi et mercredi à 10 AM et 4 PM EDT',
+    'chaque semaine le mardi et jeudi à 9:30 AM et 3:30 PM EDT',
+  ],
 };
 
 describe('toText i18n basic cases', () => {
