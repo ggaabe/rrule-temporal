@@ -36,6 +36,7 @@ const langLabels: {[key in (typeof langOpts)[number]]: string} = {
   ar: 'Arabic',
   he: 'Hebrew',
   zh: 'Chinese',
+  fr: 'French',
 };
 const dowTokens = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 
