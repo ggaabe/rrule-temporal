@@ -183,12 +183,20 @@ included by default.
 
 This library implements the iCalendar RSCALE and SKIP extensions described in RFC 7529 for defining recurrence rules in non‑Gregorian calendars and for controlling how invalid dates are handled.
 
+### Supported Calendars
+
+| Calendar | Description                      |
+|--------------------|----------------------------------|
+| GREGORIAN          | Gregorian calendar (default)     |
+| CHINESE            | Chinese calendar                 |
+| HEBREW             | Hebrew calendar                  |
+| INDIAN             | Saka/Indian National Calendar    |
+
 - Spec: RFC 7529 — Non‑Gregorian Recurrence Rules in iCalendar
   https://www.rfc-editor.org/rfc/rfc7529.html
 
 What RSCALE does:
 - Extends `RRULE` with `RSCALE=<calendar>` to choose the calendar used for recurrence generation while keeping DTSTART/RECURRENCE‑ID/RDATE/EXDATE in Gregorian.
-- Supported calendars: `GREGORIAN`, `CHINESE`, `HEBREW`, `INDIAN` (Saka/Indian National Calendar).
 - Interprets `BY*` parts (month, day, week, etc.) in the specified calendar when expanding occurrences, then converts the generated dates back to the requested time zone.
 
 What SKIP does:
