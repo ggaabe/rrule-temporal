@@ -1860,20 +1860,23 @@ export class RRuleTemporal {
     const merged = this.mergeAndDeduplicateRDates(dates);
     const excluded = this.excludeExDates(merged);
 
-    // Apply count limit to the final combined result
-    if (this.opts.count !== undefined) {
-      let finalCount = 0;
-      const finalDates: Temporal.ZonedDateTime[] = [];
-      for (const d of excluded) {
-        if (finalCount >= this.opts.count) break;
-        if (iterator && !iterator(d, finalCount)) break;
-        finalDates.push(d);
-        finalCount++;
-      }
-      return finalDates;
+    const hasCountLimit = this.opts.count !== undefined;
+    if (!hasCountLimit && !iterator) {
+      return excluded;
     }
 
-    return excluded;
+    let emitted = 0;
+    const max = hasCountLimit ? this.opts.count! : Infinity;
+    const finalDates: Temporal.ZonedDateTime[] = [];
+
+    for (const d of excluded) {
+      if (emitted >= max) break;
+      if (iterator && !iterator(d, emitted)) break;
+      finalDates.push(d);
+      emitted++;
+    }
+
+    return finalDates;
   }
 
   /**
@@ -2021,7 +2024,9 @@ export class RRuleTemporal {
       const inst = occ.toInstant();
       const ok = inc ? Temporal.Instant.compare(inst, afterInst) >= 0 : Temporal.Instant.compare(inst, afterInst) > 0;
       if (ok) {
-        result = occ;
+        if (!result || Temporal.ZonedDateTime.compare(occ, result) < 0) {
+          result = occ;
+        }
         return false;
       }
       return true;
