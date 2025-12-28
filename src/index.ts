@@ -320,6 +320,7 @@ export class RRuleTemporal {
   private readonly opts: ManualOpts;
   private readonly maxIterations: number;
   private readonly includeDtstart: boolean;
+  private static readonly rscaleCalendarSupport: Record<string, boolean> = {};
 
   constructor(params: RRuleOptions) {
     let manual: ManualOpts;
@@ -1037,6 +1038,44 @@ export class RRuleTemporal {
     } as ManualOpts;
   }
 
+  private cloneUpdateOptions(updates: Partial<ManualOpts>): Partial<ManualOpts> {
+    const cloned: Partial<ManualOpts> = {};
+    if (Object.prototype.hasOwnProperty.call(updates, 'byHour')) {
+      cloned.byHour = Array.isArray(updates.byHour) ? [...updates.byHour] : updates.byHour;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'byMinute')) {
+      cloned.byMinute = Array.isArray(updates.byMinute) ? [...updates.byMinute] : updates.byMinute;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'bySecond')) {
+      cloned.bySecond = Array.isArray(updates.bySecond) ? [...updates.bySecond] : updates.bySecond;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'byDay')) {
+      cloned.byDay = Array.isArray(updates.byDay) ? [...updates.byDay] : updates.byDay;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'byMonth')) {
+      cloned.byMonth = Array.isArray(updates.byMonth) ? [...updates.byMonth] : updates.byMonth;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'byMonthDay')) {
+      cloned.byMonthDay = Array.isArray(updates.byMonthDay) ? [...updates.byMonthDay] : updates.byMonthDay;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'byYearDay')) {
+      cloned.byYearDay = Array.isArray(updates.byYearDay) ? [...updates.byYearDay] : updates.byYearDay;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'byWeekNo')) {
+      cloned.byWeekNo = Array.isArray(updates.byWeekNo) ? [...updates.byWeekNo] : updates.byWeekNo;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'bySetPos')) {
+      cloned.bySetPos = Array.isArray(updates.bySetPos) ? [...updates.bySetPos] : updates.bySetPos;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'rDate')) {
+      cloned.rDate = Array.isArray(updates.rDate) ? [...updates.rDate] : updates.rDate;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'exDate')) {
+      cloned.exDate = Array.isArray(updates.exDate) ? [...updates.exDate] : updates.exDate;
+    }
+    return cloned;
+  }
+
   /**
    * Create a new {@link RRuleTemporal} instance with modified options while keeping the current one unchanged.
    *
@@ -1049,6 +1088,7 @@ export class RRuleTemporal {
     const merged = {
       ...this.cloneOptions(),
       ...updates,
+      ...this.cloneUpdateOptions(updates),
       tzid: updates.tzid ?? this.opts.tzid,
       dtstart: updates.dtstart ?? this.opts.dtstart,
     } as ManualOpts;
@@ -2607,6 +2647,28 @@ export class RRuleTemporal {
     return map[r] || null;
   }
 
+  private assertRscaleCalendarSupported(calId: string) {
+    if (calId === 'gregory' || calId === 'iso8601') return;
+    const cached = RRuleTemporal.rscaleCalendarSupport[calId];
+    if (cached === true) return;
+    if (cached === false) {
+      throw new Error(`RSCALE=${this.opts.rscale} is not supported by the current Temporal/Intl implementation`);
+    }
+    let supported = true;
+    try {
+      const probe = Temporal.ZonedDateTime.from('2000-01-01T00:00:00+00:00[UTC]').withCalendar(calId);
+      void probe.year;
+      void probe.monthCode;
+      void probe.day;
+    } catch {
+      supported = false;
+    }
+    RRuleTemporal.rscaleCalendarSupport[calId] = supported;
+    if (!supported) {
+      throw new Error(`RSCALE=${this.opts.rscale} is not supported by the current Temporal/Intl implementation`);
+    }
+  }
+
   private pad2(n: number): string {
     return String(n).padStart(2, '0');
   }
@@ -2815,6 +2877,7 @@ export class RRuleTemporal {
   private _allRscaleNonGregorian(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const calId = this.getRscaleCalendarId();
     if (!calId) return this._allFallback(iterator);
+    this.assertRscaleCalendarSupported(calId);
 
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
