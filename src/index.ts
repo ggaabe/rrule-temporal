@@ -1005,6 +1005,57 @@ export class RRuleTemporal {
     return this.opts;
   }
 
+  private cloneOptions(): ManualOpts {
+    const {
+      byHour,
+      byMinute,
+      bySecond,
+      byDay,
+      byMonth,
+      byMonthDay,
+      byYearDay,
+      byWeekNo,
+      bySetPos,
+      rDate,
+      exDate,
+      ...rest
+    } = this.opts;
+
+    return {
+      ...rest,
+      byHour: byHour ? [...byHour] : undefined,
+      byMinute: byMinute ? [...byMinute] : undefined,
+      bySecond: bySecond ? [...bySecond] : undefined,
+      byDay: byDay ? [...byDay] : undefined,
+      byMonth: byMonth ? [...byMonth] : undefined,
+      byMonthDay: byMonthDay ? [...byMonthDay] : undefined,
+      byYearDay: byYearDay ? [...byYearDay] : undefined,
+      byWeekNo: byWeekNo ? [...byWeekNo] : undefined,
+      bySetPos: bySetPos ? [...bySetPos] : undefined,
+      rDate: rDate ? [...rDate] : undefined,
+      exDate: exDate ? [...exDate] : undefined,
+    } as ManualOpts;
+  }
+
+  /**
+   * Create a new {@link RRuleTemporal} instance with modified options while keeping the current one unchanged.
+   *
+   * @example
+   * ```ts
+   * const updated = rule.with({byMonthDay: [3]});
+   * ```
+   */
+  with(updates: Partial<ManualOpts>): RRuleTemporal {
+    const merged = {
+      ...this.cloneOptions(),
+      ...updates,
+      tzid: updates.tzid ?? this.opts.tzid,
+      dtstart: updates.dtstart ?? this.opts.dtstart,
+    } as ManualOpts;
+
+    return new RRuleTemporal(merged);
+  }
+
   private addDtstartIfNeeded(dates: Temporal.ZonedDateTime[], iterator?: RRuleTemporalIterator): boolean {
     if (this.includeDtstart && !this.matchesAll(this.originalDtstart)) {
       // Skip if dtstart is excluded and we have an iterator

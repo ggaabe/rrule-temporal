@@ -844,6 +844,31 @@ RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;UNTIL=20240101T103000Z;BYHOUR=10,14;BYMIN
   });
 });
 
+describe('RRuleTemporal with() method', () => {
+  test('creates a new instance without mutating the original options', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2024-02-01T09:00:00[UTC]');
+    const rule = new RRuleTemporal({freq: 'MONTHLY', byMonthDay: [1], dtstart, count: 3});
+
+    const updated = rule.with({byMonthDay: [3]});
+
+    expect(updated).not.toBe(rule);
+    expect(updated.options().byMonthDay).toEqual([3]);
+    expect(rule.options().byMonthDay).toEqual([1]);
+  });
+
+  test('merges updates using cloned option arrays to avoid shared references', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2024-02-01T09:00:00[UTC]');
+    const rule = new RRuleTemporal({freq: 'MONTHLY', byMonth: [1], dtstart});
+
+    const overrides = {byMonth: [2, 3]};
+    const updated = rule.with(overrides);
+    overrides.byMonth?.push(4);
+
+    expect(updated.options().byMonth).toEqual([2, 3]);
+    expect(rule.options().byMonth).toEqual([1]);
+  });
+});
+
 describe('RRuleTemporal - BYMONTHDAY', () => {
   test('positive month days', () => {
     const ics = `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=10,15;COUNT=4`.trim();
