@@ -5,10 +5,23 @@ function isoStrings(zs: Temporal.ZonedDateTime[]) {
   return zs.map((z) => z.withCalendar('iso8601').toString({smallestUnit: 'second'}));
 }
 
+function supportsCalendar(calId: string) {
+  try {
+    const probe = Temporal.ZonedDateTime.from('2000-01-01T00:00:00+00:00[UTC]').withCalendar(calId);
+    void probe.year;
+    void probe.monthCode;
+    void probe.day;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe('RFC 7529 RSCALE Chinese/Hebrew', () => {
   const tz = 'UTC';
+  const chineseTest = supportsCalendar('chinese') ? test : test.skip;
 
-  test('CHINESE: Chinese New Year yearly from Gregorian DTSTART', () => {
+  chineseTest('CHINESE: Chinese New Year yearly from Gregorian DTSTART', () => {
     // Example from RFC: DTSTART is 2013-02-10 (Gregorian), with RSCALE=CHINESE FREQ=YEARLY
     const rule = new RRuleTemporal({
       rruleString: `DTSTART;VALUE=DATE:20130210\nRRULE:RSCALE=CHINESE;FREQ=YEARLY;COUNT=4`,

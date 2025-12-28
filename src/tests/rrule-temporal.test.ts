@@ -844,6 +844,52 @@ RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=10;UNTIL=20240101T103000Z;BYHOUR=10,14;BYMIN
   });
 });
 
+describe('RRuleTemporal with() method', () => {
+  test('creates a new instance without mutating the original options', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2024-02-01T09:00:00[UTC]');
+    const rule = new RRuleTemporal({freq: 'MONTHLY', byMonthDay: [1], dtstart, count: 3});
+
+    const updated = rule.with({byMonthDay: [3]});
+
+    expect(updated).not.toBe(rule);
+    expect(updated.options().byMonthDay).toEqual([3]);
+    expect(rule.options().byMonthDay).toEqual([1]);
+  });
+
+  test('merges updates using cloned option arrays to avoid shared references', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2024-02-01T09:00:00[UTC]');
+    const rule = new RRuleTemporal({freq: 'MONTHLY', byMonth: [1], dtstart});
+
+    const overrides = {byMonth: [2, 3]};
+    const updated = rule.with(overrides);
+    overrides.byMonth?.push(4);
+
+    expect(updated.options().byMonth).toEqual([2, 3]);
+    expect(rule.options().byMonth).toEqual([1]);
+  });
+
+  test('clones rDate/exDate arrays from updates to keep results immutable', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2024-02-01T09:00:00[UTC]');
+    const rule = new RRuleTemporal({freq: 'MONTHLY', dtstart});
+    const rDate1 = Temporal.ZonedDateTime.from('2024-02-10T09:00:00[UTC]');
+    const exDate1 = Temporal.ZonedDateTime.from('2024-02-12T09:00:00[UTC]');
+    const rDate = [rDate1];
+    const exDate = [exDate1];
+
+    const updated = rule.with({rDate, exDate});
+    const updatedOptions = updated.options();
+
+    expect(updatedOptions.rDate).not.toBe(rDate);
+    expect(updatedOptions.exDate).not.toBe(exDate);
+
+    rDate.push(Temporal.ZonedDateTime.from('2024-02-15T09:00:00[UTC]'));
+    exDate.push(Temporal.ZonedDateTime.from('2024-02-18T09:00:00[UTC]'));
+
+    expect(updatedOptions.rDate?.map((d) => d.toString())).toEqual([rDate1.toString()]);
+    expect(updatedOptions.exDate?.map((d) => d.toString())).toEqual([exDate1.toString()]);
+  });
+});
+
 describe('RRuleTemporal - BYMONTHDAY', () => {
   test('positive month days', () => {
     const ics = `DTSTART;TZID=UTC:20250401T000000\nRRULE:FREQ=MONTHLY;BYMONTHDAY=10,15;COUNT=4`.trim();
