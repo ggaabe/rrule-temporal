@@ -55,6 +55,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1"
+    "temporal-polyfill": "*"
   }
 }
