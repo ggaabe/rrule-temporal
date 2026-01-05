@@ -12,7 +12,7 @@ See the [demo site](https://ggaabe.github.io/rrule-temporal/) for an interactive
 ## Installation
 
 ```bash
-npm install rrule-temporal
+npm install rrule-temporal-polyfill
 ```
 
 ## Quick start
@@ -20,7 +20,7 @@ npm install rrule-temporal
 Parse an ICS snippet and enumerate the occurrences:
 
 ```typescript
-import { RRuleTemporal } from "rrule-temporal";
+import { RRuleTemporal } from "rrule-temporal-polyfill";
 
 const rule = new RRuleTemporal({
   rruleString: `DTSTART;TZID=UTC:20250101T090000\nRRULE:FREQ=DAILY;COUNT=3`
