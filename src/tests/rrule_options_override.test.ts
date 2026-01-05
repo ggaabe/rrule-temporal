@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 import {RRuleTemporal} from '../index';
 
 describe('ICS options override missing COUNT/UNTIL', () => {

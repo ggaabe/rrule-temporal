@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 import {RRuleTemporal} from '../index';
 
 describe('RFC 7529 RSCALE/SKIP (Gregorian)', () => {

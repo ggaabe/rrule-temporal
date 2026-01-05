@@ -7,7 +7,7 @@
 // --------------------------------------------------------------------------------
 // Set to use local package
 import {startTransition, useEffect, useMemo, useState} from 'react';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 import {RRuleTemporal} from 'rrule-temporal';
 import {toText} from 'rrule-temporal/totext';
 

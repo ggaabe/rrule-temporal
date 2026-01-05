@@ -1,5 +1,5 @@
 import {RRuleTemporal} from '../index';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 import {assertDates, format} from './helpers';
 
 describe('between() – respects INTERVAL when optimizing dtstart', () => {

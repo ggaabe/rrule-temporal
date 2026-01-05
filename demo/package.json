@@ -12,7 +12,7 @@
     "gh-pages": "npx gh-pages -d dist"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1",
+    "temporal-polyfill": "^0.5.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "rrule-temporal": "^1.2.7"

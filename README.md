@@ -40,7 +40,7 @@ const firstTen = rule.all((_, i) => i < 10);
 Per RFC 5545, DTSTART and RRULE are separate properties. You can provide them separately:
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const rule = new RRuleTemporal({
   rruleString: 'FREQ=DAILY;COUNT=5',
@@ -60,7 +60,7 @@ This is useful when:
 Instead of a full ICS string you can supply the recurrence parameters directly:
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const rule = new RRuleTemporal({
   freq: "DAILY",
@@ -127,7 +127,7 @@ const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 The `toText` helper converts a rule into a human readable description.
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 import { RRuleTemporal } from "rrule-temporal";
 import { toText } from "rrule-temporal/totext";
 
@@ -304,7 +304,7 @@ ruleB.all().forEach(dt => console.log(dt.toString()));
 ### Working with extra and excluded dates
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const start = Temporal.ZonedDateTime.from({
   year: 2025, month: 1, day: 1, hour: 12, timeZone: "UTC"
@@ -328,14 +328,14 @@ const hits = ruleC.between(
 );
 ```
 
-### Converting between **@js-temporal/polyfill** and **temporal-polyfill**
+### Converting between **temporal-polyfill** and **temporal-polyfill**
 
-`rrule-temporal` ships with **`@js-temporal/polyfill`** and therefore returns `Temporal` objects that are from that implementation. If the rest of your codebase (or a third-party package) relies on the lighter **`temporal-polyfill`** package or a native Temporal implementation, those objects will **not** satisfy `instanceof` checks in your app.
+`rrule-temporal` ships with **`temporal-polyfill`** and therefore returns `Temporal` objects that are from that implementation. If the rest of your codebase (or a third-party package) relies on the lighter **`temporal-polyfill`** package or a native Temporal implementation, those objects will **not** satisfy `instanceof` checks in your app.
 This snippet shows how to re-hydrate each recurrence result into the polyfill your project expects.
 
 ```ts
-// rrule-temporal (and its internals) use @js-temporal/polyfill
-import { Temporal as RRTTemporal } from "@js-temporal/polyfill";
+// rrule-temporal (and its internals) use temporal-polyfill
+import { Temporal as RRTTemporal } from "temporal-polyfill";
 // your application using temporal-polyfill or native Temporal
 import { Temporal as AppTemporal } from "temporal-polyfill";
 
@@ -350,7 +350,7 @@ const rule = new RRuleTemporal({
   ),
 });
 
-// Occurrences are ZonedDateTime instances from @js-temporal/polyfill
+// Occurrences are ZonedDateTime instances from temporal-polyfill
 const rawOccurrences = rule.all();
 
 /** Convert each ZonedDateTime to temporal-polyfill ZonedDateTime. */

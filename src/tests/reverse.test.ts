@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../index';
 import {parse, zdt} from './helpers';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 
 function assertRuleReverseRest(rule: RRuleTemporal) {
   const newRule = parse(rule.toString());
