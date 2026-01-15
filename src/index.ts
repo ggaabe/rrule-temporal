@@ -2143,6 +2143,27 @@ export class RRuleTemporal {
   }
 
   /**
+   * Convenience helper: true if the exact instant is an occurrence of the rule.
+   * This checks full date-time equality (including time and time zone).
+   */
+  matches(date: DateFilter): boolean {
+    return this.between(date, date, true).length > 0;
+  }
+
+  /**
+   * Convenience helper: true if any occurrence falls on the given calendar day
+   * in the rule's time zone. This ignores time-of-day granularity.
+   */
+  occursOn(date: Temporal.PlainDate): boolean {
+    const startOfDay = date.toZonedDateTime({
+      timeZone: this.tzid,
+      plainTime: Temporal.PlainTime.from('00:00'),
+    });
+    const endOfDay = startOfDay.add({days: 1}).subtract({nanoseconds: 1});
+    return this.between(startOfDay, endOfDay, true).length > 0;
+  }
+
+  /**
    * Returns the next occurrence of the rule after a specified date.
    * @param after - The start date or Temporal.ZonedDateTime object.
    * @param inc - Optional boolean flag to include occurrences on the start date.

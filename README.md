@@ -268,6 +268,8 @@ Notes
 | `new RRuleTemporal(opts)` | Create a rule from an ICS snippet or manual options. |
 | `all(iterator?)` | Return every occurrence. When the rule has no end the optional iterator is required. |
 | `between(after, before, inclusive?)` | Occurrences within a time range. |
+| `matches(date)` | Convenience helper: true if the exact instant is an occurrence (accepts `Date` or `Temporal.ZonedDateTime`). |
+| `occursOn(date)` | Convenience helper: true if any occurrence falls on the given `Temporal.PlainDate` in the rule's time zone (date-only, ignores time). |
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
