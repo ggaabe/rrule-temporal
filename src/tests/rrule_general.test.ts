@@ -125,6 +125,32 @@ describe('General RRule tests', () => {
     ).toThrow('bySetPos may not contain 0');
   });
 
+  it('strict rejects BYWEEKNO with non-YEARLY freq', () => {
+    expect(
+      () =>
+        new RRuleTemporal({
+          freq: 'MONTHLY',
+          count: 1,
+          byWeekNo: [15],
+          dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+          strict: true,
+        }),
+    ).toThrow('BYWEEKNO MUST NOT be used unless FREQ=YEARLY');
+  });
+
+  it('strict rejects BYSETPOS without other BYxxx', () => {
+    expect(
+      () =>
+        new RRuleTemporal({
+          freq: 'MONTHLY',
+          count: 1,
+          bySetPos: [1],
+          dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+          strict: true,
+        }),
+    ).toThrow('BYSETPOS MUST be used with another BYxxx rule part');
+  });
+
   it('testInvalidNthWeekday', () => {
     expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['0FR'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow(
       'Invalid BYDAY value',

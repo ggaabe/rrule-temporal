@@ -105,6 +105,7 @@ below. These correspond to the recurrence rule parts defined in RFC&nbsp;5545:
 | `tzid` | Time zone identifier for interpreting dates. |
 | `maxIterations` | Safety cap when generating occurrences. |
 | `includeDtstart` | Include `DTSTART` even if it does not match the pattern. |
+| `strict` | Enforce RFC 5545 constraints strictly (defaults to false). |
 | `dtstart` | First occurrence as `Temporal.ZonedDateTime`. |
 
 ## Querying occurrences
