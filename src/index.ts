@@ -13,6 +13,8 @@ interface BaseOpts {
   maxIterations?: number;
   /** Include DTSTART as an occurrence even if it does not match the rule pattern. */
   includeDtstart?: boolean;
+  /** Enforce RFC 5545 constraints strictly (defaults to false). */
+  strict?: boolean;
   /** RSCALE per RFC 7529: calendar system for recurrence generation (e.g., GREGORIAN). */
   rscale?: string;
   /** SKIP behavior per RFC 7529: OMIT (default), BACKWARD, FORWARD (requires RSCALE). */
@@ -344,6 +346,7 @@ export class RRuleTemporal {
         // Allow explicit COUNT/UNTIL overrides when omitted from the RRULE string
         count: params.count ?? parsed.count,
         until: params.until ?? parsed.until,
+        strict: params.strict,
         maxIterations: params.maxIterations,
         includeDtstart: params.includeDtstart,
         tzid: this.tzid,
@@ -402,6 +405,43 @@ export class RRuleTemporal {
     return days.length > 0 ? days : undefined;
   }
 
+  private enforceStrictRfc(opts: ManualOpts) {
+    if (!opts.strict) return;
+
+    const freq = opts.freq;
+    if (opts.byWeekNo && freq !== 'YEARLY') {
+      throw new Error('BYWEEKNO MUST NOT be used unless FREQ=YEARLY');
+    }
+    if (opts.byYearDay && ['DAILY', 'WEEKLY', 'MONTHLY'].includes(freq)) {
+      throw new Error('BYYEARDAY MUST NOT be used when FREQ is DAILY, WEEKLY, or MONTHLY');
+    }
+    if (opts.byMonthDay && freq === 'WEEKLY') {
+      throw new Error('BYMONTHDAY MUST NOT be used when FREQ is WEEKLY');
+    }
+
+    const hasNumericByDay = (opts.byDay ?? []).some((day) => /^[+-]?\d/.test(day));
+    if (hasNumericByDay && !['MONTHLY', 'YEARLY'].includes(freq)) {
+      throw new Error('BYDAY with numeric value MUST NOT be used unless FREQ is MONTHLY or YEARLY');
+    }
+    if (hasNumericByDay && freq === 'YEARLY' && opts.byWeekNo) {
+      throw new Error('BYDAY with numeric value MUST NOT be used with FREQ=YEARLY when BYWEEKNO is present');
+    }
+
+    const hasOtherBy = Boolean(
+      opts.byDay ||
+        opts.byMonth ||
+        opts.byMonthDay ||
+        opts.byYearDay ||
+        opts.byWeekNo ||
+        opts.byHour ||
+        opts.byMinute ||
+        opts.bySecond,
+    );
+    if (opts.bySetPos && !hasOtherBy) {
+      throw new Error('BYSETPOS MUST be used with another BYxxx rule part');
+    }
+  }
+
   private sanitizeOpts(opts: ManualOpts): ManualOpts {
     opts.byDay = this.sanitizeByDay(opts.byDay);
     // BYMONTH can include strings (e.g., "5L") under RFC 7529; keep tokens as-is.
@@ -429,6 +469,7 @@ export class RRuleTemporal {
       }
       opts.bySetPos = this.sanitizeNumericArray(opts.bySetPos, -Infinity, Infinity, false, false);
     }
+    this.enforceStrictRfc(opts);
     return opts;
   }
 
@@ -2099,6 +2140,27 @@ export class RRuleTemporal {
 
       return afterStart && beforeEnd;
     });
+  }
+
+  /**
+   * Convenience helper: true if the exact instant is an occurrence of the rule.
+   * This checks full date-time equality (including time and time zone).
+   */
+  matches(date: DateFilter): boolean {
+    return this.between(date, date, true).length > 0;
+  }
+
+  /**
+   * Convenience helper: true if any occurrence falls on the given calendar day
+   * in the rule's time zone. This ignores time-of-day granularity.
+   */
+  occursOn(date: Temporal.PlainDate): boolean {
+    const startOfDay = date.toZonedDateTime({
+      timeZone: this.tzid,
+      plainTime: Temporal.PlainTime.from('00:00'),
+    });
+    const endOfDay = startOfDay.add({days: 1}).subtract({nanoseconds: 1});
+    return this.between(startOfDay, endOfDay, true).length > 0;
   }
 
   /**

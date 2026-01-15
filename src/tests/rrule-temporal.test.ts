@@ -118,6 +118,62 @@ describe('RRuleTemporal - between() with distant start and no COUNT', () => {
   });
 });
 
+describe('RRuleTemporal - matches() and occursOn()', () => {
+  const rule = new RRuleTemporal({
+    freq: 'WEEKLY',
+    byDay: ['MO', 'WE', 'FR'],
+    dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:00:00+00:00[UTC]'),
+  });
+
+  test('matches returns true for exact occurrences and false otherwise', () => {
+    const hit = Temporal.ZonedDateTime.from('2025-01-03T10:00:00+00:00[UTC]');
+    const miss = Temporal.ZonedDateTime.from('2025-01-03T10:30:00+00:00[UTC]');
+
+    expect(rule.matches(hit)).toBe(true);
+    expect(rule.matches(miss)).toBe(false);
+    expect(rule.matches(new Date('2025-01-03T10:00:00Z'))).toBe(true);
+  });
+
+  test('occursOn returns true when any occurrence falls on that day', () => {
+    const dayHit = Temporal.PlainDate.from('2025-01-03');
+    const dayMiss = Temporal.PlainDate.from('2025-01-04');
+
+    expect(rule.occursOn(dayHit)).toBe(true);
+    expect(rule.occursOn(dayMiss)).toBe(false);
+  });
+});
+
+describe('RRuleTemporal - matches() respects rDate/exDate', () => {
+  const base = Temporal.ZonedDateTime.from('2025-01-01T10:00:00+00:00[UTC]');
+  const rule = new RRuleTemporal({
+    freq: 'DAILY',
+    dtstart: base,
+    exDate: [base.add({days: 1})],
+    rDate: [base.add({days: 4})],
+  });
+
+  test('exDate is not a match, rDate is a match', () => {
+    expect(rule.matches(base.add({days: 1}))).toBe(false);
+    expect(rule.matches(base.add({days: 4}))).toBe(true);
+  });
+});
+
+describe('RRuleTemporal - occursOn() uses rule time zone', () => {
+  const rule = new RRuleTemporal({
+    freq: 'WEEKLY',
+    byDay: ['MO'],
+    dtstart: Temporal.ZonedDateTime.from('2025-01-06T23:30:00[America/Chicago]'),
+  });
+
+  test('occursOn checks local day rather than UTC day', () => {
+    const mondayLocal = Temporal.PlainDate.from('2025-01-06');
+    const tuesdayLocal = Temporal.PlainDate.from('2025-01-07');
+
+    expect(rule.occursOn(mondayLocal)).toBe(true);
+    expect(rule.occursOn(tuesdayLocal)).toBe(false);
+  });
+});
+
 describe('RRuleTemporal - between() before original dtstart', () => {
   const rule = new RRuleTemporal({
     freq: 'DAILY',
