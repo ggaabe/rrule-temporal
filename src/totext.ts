@@ -645,6 +645,11 @@ function formatTime(hour: number, minute = 0, second = 0): string {
   return `${hr12} ${ampm}`;
 }
 
+function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
+  const tokens = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+  return tokens[zdt.dayOfWeek - 1]!;
+}
+
 function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: zdt.timeZoneId,
@@ -679,6 +684,16 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     exDate,
   } = opts;
 
+  const dayOrLarger = freq === 'YEARLY' || freq === 'MONTHLY' || freq === 'WEEKLY' || freq === 'DAILY';
+  const hasExplicitTime = Boolean(byHour || byMinute || bySecond);
+  const dtstartHasTime = opts.dtstart.hour !== 0 || opts.dtstart.minute !== 0 || opts.dtstart.second !== 0;
+  const shouldDefaultTime = dayOrLarger && (hasExplicitTime || dtstartHasTime);
+
+  const textByDay = byDay ?? (freq === 'WEEKLY' ? [weekdayTokenFromZdt(opts.dtstart)] : undefined);
+  const textByHour = byHour ?? (shouldDefaultTime ? [opts.dtstart.hour] : undefined);
+  const textByMinute = textByHour ? byMinute ?? [opts.dtstart.minute] : byMinute;
+  const textBySecond = textByHour ? bySecond ?? [opts.dtstart.second] : bySecond;
+
   const parts: string[] = [data.words.every];
 
   const baseKey = {
@@ -692,7 +707,7 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
   }[freq] as keyof LocaleData['units'];
   const base = data.units[baseKey];
 
-  const daysNormalized = byDay?.map((d) => d.toUpperCase());
+  const daysNormalized = textByDay?.map((d) => d.toUpperCase());
   const isWeekdays =
     daysNormalized &&
     daysNormalized.length === 5 &&
@@ -714,15 +729,15 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     }
   }
 
-  if (freq === 'WEEKLY' && byDay && !isWeekdays && !isEveryday) {
+  if (freq === 'WEEKLY' && textByDay && !isWeekdays && !isEveryday) {
     parts.push(
       data.words.on,
-      list(byDay, (t) => formatByDayToken(t, data), data.words.and),
+      list(textByDay, (t) => formatByDayToken(t, data), data.words.and),
     );
-  } else if (byDay && freq !== 'WEEKLY') {
+  } else if (textByDay && freq !== 'WEEKLY') {
     parts.push(
       data.words.on,
-      list(byDay, (t) => formatByDayToken(t, data), data.words.and),
+      list(textByDay, (t) => formatByDayToken(t, data), data.words.and),
     );
   }
 
@@ -756,20 +771,20 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     );
   }
 
-  if (byHour) {
-    const minutes = byMinute ?? [0];
-    const seconds = bySecond ?? [0];
-    const times = byHour.flatMap((h) => minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s))));
+  if (textByHour) {
+    const minutes = textByMinute ?? [0];
+    const seconds = textBySecond ?? [0];
+    const times = textByHour.flatMap((h) => minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s))));
     parts.push(data.words.at, list(times, undefined, data.words.and));
     parts.push(tzAbbreviation(opts.dtstart));
   }
 
-  if (!byHour && byMinute) {
-    parts.push(data.words.at_minute, list(byMinute, undefined, data.words.and));
+  if (!textByHour && textByMinute) {
+    parts.push(data.words.at_minute, list(textByMinute, undefined, data.words.and));
   }
 
-  if (!byHour && !byMinute && bySecond) {
-    parts.push(data.words.at_second, list(bySecond, undefined, data.words.and));
+  if (!textByHour && !textByMinute && textBySecond) {
+    parts.push(data.words.at_second, list(textBySecond, undefined, data.words.and));
   }
 
   if (until) {
