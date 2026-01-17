@@ -389,7 +389,8 @@ export default function App() {
         >
           PostalForm 💌
         </a>{' '}
-        — upload a PDF and we print + mail it via USPS (no printer or stamps needed).
+        — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The easiest mailing
+        platform for both AI Agents via MCP and humans!
       </div>
 
       {/* mode switch */}
