@@ -379,7 +379,7 @@ export default function App() {
         </button>
       </div>
 
-      <div className="mb-4 rounded border bg-white/70 px-3 py-2 text-xs sm:text-sm">
+      <div className="mb-4 rounded border border-gray-200 bg-white/70 px-3 py-2 text-xs sm:text-sm text-gray-800 dark:border-gray-600 dark:bg-slate-800/80 dark:text-gray-100">
         Sponsored by{' '}
         <a
           href="https://postalform.com/?utm_source=github&utm_medium=demo&utm_campaign=rrule-temporal"
