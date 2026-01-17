@@ -379,6 +379,19 @@ export default function App() {
         </button>
       </div>
 
+      <div className="mb-4 rounded border bg-white/70 px-3 py-2 text-xs sm:text-sm">
+        Sponsored by{' '}
+        <a
+          href="https://postalform.com/?utm_source=github&utm_medium=demo&utm_campaign=rrule-temporal"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-700 hover:underline"
+        >
+          PostalForm 💌
+        </a>{' '}
+        — upload a PDF and we print + mail it via USPS (no printer or stamps needed).
+      </div>
+
       {/* mode switch */}
       <div className="mb-4 flex flex-wrap gap-2">
         {(['visual', 'raw'] as const).map((m) => (
