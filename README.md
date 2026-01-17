@@ -1,5 +1,7 @@
 # RRule Temporal
 
+> Sponsored by [PostalForm 💌](https://postalform.com/?utm_source=github&utm_medium=readme&utm_campaign=rrule-temporal) — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The only mailing platform for AI Agents via MCP, and the easiest one for humans!
+
 The first and only fully compliant Recurrence rule ([RFC-5545](https://www.rfc-editor.org/rfc/rfc5545.html)) processing JS/TS library built on the Temporal API, now with support for [RFC-7529](https://www.rfc-editor.org/rfc/rfc7529.html) (RSCALE / SKIP) for non-Gregorian calendars.
 The library accepts the familiar `RRULE` format and returns
 `Temporal.ZonedDateTime` instances for easy time‑zone aware scheduling.
@@ -377,3 +379,9 @@ const appOccurrences = rawOccurrences.map((zdt) =>
 ```
 
 Both approaches preserve the original calendar, time-zone and nanosecond accuracy.
+
+## Sponsor
+
+If this library saves you time, sponsorship helps keep it maintained.
+
+Primary sponsor: [PostalForm](https://postalform.com/?utm_source=github&utm_medium=readme&utm_campaign=rrule-temporal)
