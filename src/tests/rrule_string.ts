@@ -90,6 +90,15 @@ describe('String parsing tests', () => {
     assertDates({rule: parse(rruleString)}, ['1997-09-02T00:00:00.000Z', '1998-09-02T00:00:00.000Z']);
   });
 
+  it('testStrUntilWithDateValue', () => {
+    const rruleString = 'DTSTART;VALUE=DATE:19970902\nRRULE:FREQ=DAILY;UNTIL=19970904';
+    assertDates({rule: parse(rruleString)}, [
+      '1997-09-02T00:00:00.000Z',
+      '1997-09-03T00:00:00.000Z',
+      '1997-09-04T00:00:00.000Z',
+    ]);
+  });
+
   it('testStrMultipleDTStartComma', () => {
     expect(() => {
       parse('DTSTART:19970101T000000,19970202T000000\nRRULE:FREQ=YEARLY;COUNT=1');

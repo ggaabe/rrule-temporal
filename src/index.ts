@@ -186,6 +186,9 @@ function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temp
 
   let parsedDtstart: Temporal.ZonedDateTime | undefined;
   let tzid: string | undefined = targetTimezone;
+  let dtstartValueType: 'DATE' | 'DATE-TIME' = 'DATE-TIME';
+  let dtstartHasTzid = false;
+  let dtstartIsUtc = false;
   let rruleLine: string;
   let exDate: Temporal.ZonedDateTime[] = [];
   let rDate: Temporal.ZonedDateTime[] = [];
@@ -202,8 +205,12 @@ function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temp
     if (!dtMatch) throw new Error('Invalid DTSTART in ICS snippet');
 
     const [, valueType, dtTzid, dtValue] = dtMatch;
+    const normalizedValueType = (valueType || (dtValue?.includes('T') ? 'DATE-TIME' : 'DATE')).toUpperCase();
+    dtstartValueType = normalizedValueType === 'DATE' ? 'DATE' : 'DATE-TIME';
+    dtstartHasTzid = Boolean(dtTzid);
+    dtstartIsUtc = Boolean(dtValue?.endsWith('Z'));
     const effectiveTzid = dtTzid ?? targetTimezone ?? tzid ?? 'UTC';
-    parsedDtstart = parseIcsDateTime(dtValue!, effectiveTzid, valueType);
+    parsedDtstart = parseIcsDateTime(dtValue!, effectiveTzid, dtstartValueType);
     tzid = dtTzid ?? parsedDtstart.timeZoneId ?? targetTimezone ?? tzid ?? 'UTC';
 
     rruleLine = rrLine!;
@@ -216,6 +223,9 @@ function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temp
     rruleLine = unfoldedInput;
     if (parsedDtstart) {
       tzid = parsedDtstart.timeZoneId;
+      dtstartValueType = 'DATE-TIME';
+      dtstartHasTzid = true;
+      dtstartIsUtc = parsedDtstart.timeZoneId === 'UTC';
     }
   }
 
@@ -263,11 +273,22 @@ function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temp
         opts.count = parseInt(val!, 10);
         break;
       case 'UNTIL': {
-        // RFC5545 UNTIL is YYYYMMDDTHHMMSSZ or without Z
-        opts.until = parseIcsDateTime(val!, tzid || 'UTC');
-        if (!val!.endsWith('Z') && tzid !== 'UTC') {
+        const untilHasTime = val!.includes('T');
+        if (dtstartValueType === 'DATE') {
+          if (untilHasTime) {
+            throw new Error('UNTIL rule part MUST have the same value type as DTSTART');
+          }
+          opts.until = parseIcsDateTime(val!, tzid || 'UTC', 'DATE');
+          break;
+        }
+        if (!untilHasTime) {
+          throw new Error('UNTIL rule part MUST have the same value type as DTSTART');
+        }
+        const requiresUtc = dtstartHasTzid || dtstartIsUtc;
+        if (requiresUtc && !val!.endsWith('Z')) {
           throw new Error('UNTIL rule part MUST always be specified as a date with UTC time');
         }
+        opts.until = parseIcsDateTime(val!, tzid || 'UTC', 'DATE-TIME');
         break;
       }
       case 'BYHOUR':

@@ -57,6 +57,11 @@ This is useful when:
 - Storing recurrence patterns separately from start dates in databases
 - Building rules programmatically from user input
 
+Note on `UNTIL` (RFC 5545): if `DTSTART` is a DATE-TIME with a `TZID` or UTC (`Z`),
+`UNTIL` must be a DATE-TIME in UTC (trailing `Z`). If `DTSTART` is `VALUE=DATE`,
+`UNTIL` must be a DATE (no time). Floating DATE-TIME rules (no `TZID`, no `Z`)
+allow a floating `UNTIL`.
+
 ## Creating a rule with options
 
 Instead of a full ICS string you can supply the recurrence parameters directly:
