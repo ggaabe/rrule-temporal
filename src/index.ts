@@ -350,12 +350,12 @@ export class RRuleTemporal {
     if (isIcsOpts(params)) {
       // Allow dtstart to be passed separately when rruleString doesn't contain DTSTART
       const parsed = parseRRuleString(params.rruleString, params.tzid, params.dtstart);
-      
+
       // If no dtstart was found in the string or provided as parameter, throw error
       if (!parsed.dtstart) {
         throw new Error('dtstart is required - provide it either in rruleString or as a separate parameter');
       }
-      
+
       this.tzid = parsed.tzid ?? params.tzid ?? 'UTC';
       this.originalDtstart = parsed.dtstart as Temporal.ZonedDateTime;
       // Important: do NOT carry `rruleString` into internal opts. If present,
@@ -2105,8 +2105,13 @@ export class RRuleTemporal {
           unit = 'seconds';
       }
 
-      // How many whole units between original DTSTART and the aligned window start?
-      const diffDur = this.opts.dtstart.until(aligned, {largestUnit: unit});
+      // Normalize to polyfill to avoid native/polyfill type mismatches
+      const dtstartNormalized = Temporal.ZonedDateTime.from(this.opts.dtstart.toString());
+      const alignedNormalized = Temporal.ZonedDateTime.from(
+        aligned.withPlainTime(this.originalDtstart.toPlainTime()).toString()
+      ).withTimeZone(dtstartNormalized.timeZoneId);
+
+      const diffDur = dtstartNormalized.until(alignedNormalized, {largestUnit: unit});
       const unitsBetween = diffDur[unit]; // may be negative
       const steps = Math.floor(unitsBetween / interval);
 
@@ -2136,10 +2141,12 @@ export class RRuleTemporal {
           toAdd = {seconds: jump};
       }
 
-      let candidate = this.opts.dtstart.add(toAdd);
+      let candidate = Temporal.ZonedDateTime.from(this.opts.dtstart.add(toAdd).toString());
+      const dtstartForCompare = Temporal.ZonedDateTime.from(this.opts.dtstart.toString());
+
       // Ensure we never start before the original DTSTART
-      if (Temporal.ZonedDateTime.compare(candidate, this.opts.dtstart) < 0) {
-        candidate = this.opts.dtstart;
+      if (Temporal.ZonedDateTime.compare(candidate, dtstartForCompare) < 0) {
+        candidate = dtstartForCompare;
       }
 
       // Clamp candidate not to exceed the original DTSTART if window starts earlier
