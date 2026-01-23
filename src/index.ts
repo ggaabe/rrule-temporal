@@ -345,6 +345,14 @@ export class RRuleTemporal {
   private readonly includeDtstart: boolean;
   private static readonly rscaleCalendarSupport: Record<string, boolean> = {};
 
+  /**
+   * Normalize a ZonedDateTime to the polyfill implementation.
+   * This prevents type mismatches when mixing native and polyfill Temporal objects.
+   */
+  private static normalizeToPolyfill(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
+    return Temporal.ZonedDateTime.from(zdt.toString());
+  }
+
   constructor(params: RRuleOptions) {
     let manual: ManualOpts;
     if (isIcsOpts(params)) {
@@ -357,7 +365,7 @@ export class RRuleTemporal {
       }
 
       this.tzid = parsed.tzid ?? params.tzid ?? 'UTC';
-      this.originalDtstart = parsed.dtstart as Temporal.ZonedDateTime;
+      this.originalDtstart = RRuleTemporal.normalizeToPolyfill(parsed.dtstart as Temporal.ZonedDateTime);
       // Important: do NOT carry `rruleString` into internal opts. If present,
       // `between()` spreads opts and constructs a new RRuleTemporal; leaking
       // `rruleString` would trigger the ICS parsing branch again and override
@@ -379,7 +387,7 @@ export class RRuleTemporal {
       }
       manual.tzid = manual.tzid || manual.dtstart.timeZoneId;
       this.tzid = manual.tzid;
-      this.originalDtstart = manual.dtstart as Temporal.ZonedDateTime;
+      this.originalDtstart = RRuleTemporal.normalizeToPolyfill(manual.dtstart as Temporal.ZonedDateTime);
     }
     if (!manual.freq) throw new Error('RRULE must include FREQ');
     manual.interval = manual.interval ?? 1;
@@ -388,6 +396,9 @@ export class RRuleTemporal {
     }
     if (manual.until && !(manual.until instanceof Temporal.ZonedDateTime)) {
       throw new Error('Manual until must be a ZonedDateTime');
+    }
+    if (manual.until) {
+      manual.until = RRuleTemporal.normalizeToPolyfill(manual.until);
     }
     this.opts = this.sanitizeOpts(manual);
     this.maxIterations = manual.maxIterations ?? 10000;
@@ -2105,10 +2116,9 @@ export class RRuleTemporal {
           unit = 'seconds';
       }
 
-      // Normalize to polyfill to avoid native/polyfill type mismatches
-      const dtstartNormalized = Temporal.ZonedDateTime.from(this.opts.dtstart.toString());
-      const alignedNormalized = Temporal.ZonedDateTime.from(
-        aligned.withPlainTime(this.originalDtstart.toPlainTime()).toString()
+      const dtstartNormalized = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart);
+      const alignedNormalized = RRuleTemporal.normalizeToPolyfill(
+        aligned.withPlainTime(this.originalDtstart.toPlainTime())
       ).withTimeZone(dtstartNormalized.timeZoneId);
 
       const diffDur = dtstartNormalized.until(alignedNormalized, {largestUnit: unit});
@@ -2141,8 +2151,8 @@ export class RRuleTemporal {
           toAdd = {seconds: jump};
       }
 
-      let candidate = Temporal.ZonedDateTime.from(this.opts.dtstart.add(toAdd).toString());
-      const dtstartForCompare = Temporal.ZonedDateTime.from(this.opts.dtstart.toString());
+      let candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(toAdd));
+      const dtstartForCompare = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart);
 
       // Ensure we never start before the original DTSTART
       if (Temporal.ZonedDateTime.compare(candidate, dtstartForCompare) < 0) {
