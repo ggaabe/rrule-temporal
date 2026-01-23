@@ -886,8 +886,13 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     }).toThrow('interval must be greater than 0');
   });
 
-  it('should throw non-UTC UNTIL values', () => {
+  it('should throw non-UTC UNTIL values when DTSTART has time zone reference', () => {
     const ics = `DTSTART;TZID=America/Chicago:20250320T170000\nRRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
+    expect(() => new RRuleTemporal({rruleString: ics})).toThrow();
+  });
+
+  it('should throw non-UTC UNTIL values when DTSTART is UTC', () => {
+    const ics = `DTSTART:20250320T170000Z\nRRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
     expect(() => new RRuleTemporal({rruleString: ics})).toThrow();
   });
 
