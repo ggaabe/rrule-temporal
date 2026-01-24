@@ -6,4 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   base: "/rrule-temporal/",
   plugins: [react(), tailwindcss()],
+  server: {
+    open: true
+  }
 });
