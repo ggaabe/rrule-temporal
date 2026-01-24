@@ -677,46 +677,6 @@ export default function App() {
                 <label className="font-medium sm:w-20">Include DT:</label>
                 <input type="checkbox" checked={includeDtstart} onChange={(e) => setIncludeDtstart(e.target.checked)} />
               </div>
-
-              {/* RDATE */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">RDATE:</label>
-                <input
-                  type="text"
-                  className="border rounded p-1 flex-1"
-                  value={rDateStr}
-                  onChange={(e) => setRDateStr(e.target.value)}
-                />
-              </div>
-
-              {/* EXDATE */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">EXDATE:</label>
-                <input
-                  type="text"
-                  className="border rounded p-1 flex-1"
-                  value={exDateStr}
-                  onChange={(e) => setExDateStr(e.target.value)}
-                />
-              </div>
-
-              {/* MAX ITER */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Max Iter:</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="border rounded p-1 w-24"
-                  value={maxIterations}
-                  onChange={(e) => setMaxIterations(parseInt(e.target.value) || 1)}
-                />
-              </div>
-
-              {/* INCLUDE DTSTART */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Include DT:</label>
-                <input type="checkbox" checked={includeDtstart} onChange={(e) => setIncludeDtstart(e.target.checked)} />
-              </div>
             </div>
           )}
 
