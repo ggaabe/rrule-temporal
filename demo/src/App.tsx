@@ -774,8 +774,29 @@ export default function App() {
         </div>
       </div>
 
-      <footer className="mt-8 text-xs text-gray-500">
-        Built with <code>rrule-temporal</code>, Temporal API & Tailwind v4.
+      <footer className="mt-8 pt-4 border-t text-center text-xs text-gray-500">
+        <div className="mb-2">
+          <a
+            href="https://github.com/ggaabe/rrule-temporal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline text-blue-700"
+          >
+            GitHub
+          </a>
+          {' · '}
+          <a
+            href="https://www.npmjs.com/package/rrule-temporal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline text-blue-700"
+          >
+            npm
+          </a>
+        </div>
+        <div>
+          Built with <code>rrule-temporal</code>, Temporal API & Tailwind v4.
+        </div>
       </footer>
     </div>
   );
