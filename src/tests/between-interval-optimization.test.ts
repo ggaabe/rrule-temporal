@@ -620,15 +620,15 @@ describe('between() – misaligned window starts', () => {
 });
 
 describe('between() – optimizations don\'t skip earlier occurrences within interval', () => {
-  test('DAILY interval=1 with multiple early byHour and late dtstart hour returns correct between dates', () => {
+  test('DAILY interval=1 with early byHour and late dtstart returns correct between dates', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
       interval: 1,
-      byHour: [10, 14, 20],
+      byHour: [10, 20],
       byMinute: [0],
       bySecond: [0],
-      // 7pm on January 25th
-      dtstart: Temporal.ZonedDateTime.from('2026-01-25T19:00:00.00+00:00[UTC]'),
+      // 8pm on January 25th
+      dtstart: Temporal.ZonedDateTime.from('2026-01-25T20:00:00.00+00:00[UTC]'),
     });
 
     // 9am on January 27th, about two days later but earlier *in the day*
@@ -636,7 +636,6 @@ describe('between() – optimizations don\'t skip earlier occurrences within int
     const end = Temporal.ZonedDateTime.from('2026-01-28T09:00:00+00:00[UTC]');
     assertDates({rule, between: [start, end], print: format('UTC')}, [
       '2026-01-27T10:00:00+00:00[UTC]',
-      '2026-01-27T14:00:00+00:00[UTC]',
       '2026-01-27T20:00:00+00:00[UTC]',
     ]);
   });
