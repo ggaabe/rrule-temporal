@@ -2123,7 +2123,7 @@ export class RRuleTemporal {
 
       const diffDur = dtstartNormalized.until(alignedNormalized, {largestUnit: unit});
       const unitsBetween = diffDur[unit]; // may be negative
-      const steps = Math.floor(unitsBetween / interval);
+      const steps = Math.floor(unitsBetween / interval) - 1;
 
       // Jump forward by `steps * interval` units from the original DTSTART
       let toAdd: Temporal.DurationLike;

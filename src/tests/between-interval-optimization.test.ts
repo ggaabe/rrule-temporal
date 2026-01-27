@@ -624,37 +624,20 @@ describe('between() – optimizations don\'t skip earlier occurrences within int
     const rule = new RRuleTemporal({
       freq: 'DAILY',
       interval: 1,
-      // This event is due daily at 10am, 2pm, and 8pm UTC
       byHour: [10, 14, 20],
       byMinute: [0],
       bySecond: [0],
-      dtstart: Temporal.ZonedDateTime.from(
-        // 7:00pm UTC on January 25th, 2026
-        // (note that this test passes if we set the dtstart to 9:00am UTC,
-        // before any of the `byHour` hours)
-        '2026-01-25T19:00:00.00+00:00[UTC]'
-      ),
+      // 7pm on January 25th
+      dtstart: Temporal.ZonedDateTime.from('2026-01-25T19:00:00.00+00:00[UTC]'),
     });
-    assertDates(
-      {
-        rule,
-        print: format('UTC'),
-        between: [
-          Temporal.ZonedDateTime.from(
-            // 9:00am UTC on January 27th, 2026
-            '2026-01-27T09:00:00+00:00[UTC]'
-          ),
-          Temporal.ZonedDateTime.from(
-            // 9:00am UTC the next day, January 28th, 2026
-            '2026-01-28T09:00:00+00:00[UTC]'
-          ),
-        ],
-      },
-      [
-        '2026-01-27T10:00:00+00:00[UTC]',
-        '2026-01-27T14:00:00+00:00[UTC]',
-        '2026-01-27T20:00:00+00:00[UTC]'
-      ],
-    );
+
+    // 9am on January 27th, about two days later but earlier *in the day*
+    const start = Temporal.ZonedDateTime.from('2026-01-27T09:00:00+00:00[UTC]');
+    const end = Temporal.ZonedDateTime.from('2026-01-28T09:00:00+00:00[UTC]');
+    assertDates({rule, between: [start, end], print: format('UTC')}, [
+      '2026-01-27T10:00:00+00:00[UTC]',
+      '2026-01-27T14:00:00+00:00[UTC]',
+      '2026-01-27T20:00:00+00:00[UTC]',
+    ]);
   });
 });
