@@ -2063,6 +2063,38 @@ export class RRuleTemporal {
     return matchCount >= targetRuleCount + safetyMargin;
   }
 
+  private hasTimeOfDayBetween(startTime: Temporal.PlainTime, endTime: Temporal.PlainTime): boolean {
+    if (Temporal.PlainTime.compare(startTime, endTime) >= 0) return false;
+
+    const base = this.originalDtstart;
+    const hours = this.opts.byHour ?? [base.hour];
+    const minutes = this.opts.byMinute ?? [base.minute];
+    const seconds = this.opts.bySecond ?? [base.second];
+
+    for (const hour of hours) {
+      for (const minute of minutes) {
+        for (const second of seconds) {
+          const candidate = Temporal.PlainTime.from({
+            hour,
+            minute,
+            second,
+            millisecond: base.millisecond,
+            microsecond: base.microsecond,
+            nanosecond: base.nanosecond,
+          });
+          if (
+            Temporal.PlainTime.compare(candidate, startTime) >= 0 &&
+            Temporal.PlainTime.compare(candidate, endTime) < 0
+          ) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   /**
    * Returns all occurrences of the rule within a specified time window.
    * @param after - The start date or Temporal.ZonedDateTime object.
@@ -2117,41 +2149,47 @@ export class RRuleTemporal {
       }
 
       const dtstartNormalized = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart);
+      const startZdtNormalized = RRuleTemporal.normalizeToPolyfill(startZdt).withTimeZone(dtstartNormalized.timeZoneId);
       const alignedNormalized = RRuleTemporal.normalizeToPolyfill(
         aligned.withPlainTime(this.originalDtstart.toPlainTime())
       ).withTimeZone(dtstartNormalized.timeZoneId);
+      const diffAnchor = ['hours', 'minutes', 'seconds'].includes(unit) ? startZdtNormalized : alignedNormalized;
 
-      const diffDur = dtstartNormalized.until(alignedNormalized, {largestUnit: unit});
+      const diffDur = dtstartNormalized.until(diffAnchor, {largestUnit: unit});
       const unitsBetween = diffDur[unit]; // may be negative
-      const steps = Math.floor(unitsBetween / interval);
+      let steps = Math.floor(unitsBetween / interval);
 
-      // Jump forward by `steps * interval` units from the original DTSTART
-      let toAdd: Temporal.DurationLike;
-      const jump = steps * interval;
-      switch (unit) {
-        case 'years':
-          toAdd = {years: jump};
-          break;
-        case 'months':
-          toAdd = {months: jump};
-          break;
-        case 'weeks':
-          toAdd = {weeks: jump};
-          break;
-        case 'days':
-          toAdd = {days: jump};
-          break;
-        case 'hours':
-          toAdd = {hours: jump};
-          break;
-        case 'minutes':
-          toAdd = {minutes: jump};
-          break;
-        default:
-          toAdd = {seconds: jump};
+      const durationForJump = (jump: number): Temporal.DurationLike => {
+        switch (unit) {
+          case 'years':
+            return {years: jump};
+          case 'months':
+            return {months: jump};
+          case 'weeks':
+            return {weeks: jump};
+          case 'days':
+            return {days: jump};
+          case 'hours':
+            return {hours: jump};
+          case 'minutes':
+            return {minutes: jump};
+          default:
+            return {seconds: jump};
+        }
+      };
+
+      let candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(durationForJump(steps * interval)));
+
+      if (steps > 0 && ['years', 'months', 'weeks', 'days'].includes(unit)) {
+        const sameDate = candidate.toPlainDate().equals(startZdtNormalized.toPlainDate());
+        if (sameDate && Temporal.ZonedDateTime.compare(candidate, startZdtNormalized) > 0) {
+          if (this.hasTimeOfDayBetween(startZdtNormalized.toPlainTime(), candidate.toPlainTime())) {
+            steps -= 1;
+            candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(durationForJump(steps * interval)));
+          }
+        }
       }
 
-      let candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(toAdd));
       const dtstartForCompare = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart);
 
       // Ensure we never start before the original DTSTART
