@@ -1,6 +1,6 @@
 {
   "name": "rrule-temporal",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Recurrence rule (rrule) processing using Temporal PlainDate/PlainDateTime, with cross-timezone and cross-calendar rrule support",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
