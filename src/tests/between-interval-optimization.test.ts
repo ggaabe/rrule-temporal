@@ -639,4 +639,92 @@ describe('between() – optimizations don\'t skip earlier occurrences within int
       '2026-01-27T20:00:00+00:00[UTC]',
     ]);
   });
+
+  test('WEEKLY interval=1 with early byHour returns same-day earlier occurrence', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      interval: 1,
+      byDay: ['MO'],
+      byHour: [10, 20],
+      byMinute: [0],
+      bySecond: [0],
+      // Monday 8pm
+      dtstart: Temporal.ZonedDateTime.from('2026-01-05T20:00:00+00:00[UTC]'),
+      tzid: tz,
+    });
+
+    // Monday, later in the series but earlier in the day
+    const start = Temporal.ZonedDateTime.from('2026-01-26T09:00:00+00:00[UTC]');
+    const end = Temporal.ZonedDateTime.from('2026-01-27T09:00:00+00:00[UTC]');
+    assertDates({rule, between: [start, end], print: format('UTC')}, [
+      '2026-01-26T10:00:00+00:00[UTC]',
+      '2026-01-26T20:00:00+00:00[UTC]',
+    ]);
+  });
+
+  test('MONTHLY interval=1 with early byHour returns same-day earlier occurrence', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'MONTHLY',
+      interval: 1,
+      byMonthDay: [10],
+      byHour: [10, 20],
+      byMinute: [0],
+      bySecond: [0],
+      // 10th of the month at 8pm
+      dtstart: Temporal.ZonedDateTime.from('2026-01-10T20:00:00+00:00[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2026-04-10T09:00:00+00:00[UTC]');
+    const end = Temporal.ZonedDateTime.from('2026-04-11T09:00:00+00:00[UTC]');
+    assertDates({rule, between: [start, end], print: format('UTC')}, [
+      '2026-04-10T10:00:00+00:00[UTC]',
+      '2026-04-10T20:00:00+00:00[UTC]',
+    ]);
+  });
+
+  test('DAILY interval=1 with early byMinute returns same-hour earlier occurrence', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      interval: 1,
+      byMinute: [15, 30],
+      bySecond: [0],
+      // 8:30pm
+      dtstart: Temporal.ZonedDateTime.from('2026-02-01T20:30:00+00:00[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2026-02-03T20:00:00+00:00[UTC]');
+    const end = Temporal.ZonedDateTime.from('2026-02-03T21:00:00+00:00[UTC]');
+    assertDates({rule, between: [start, end], print: format('UTC')}, [
+      '2026-02-03T20:15:00+00:00[UTC]',
+      '2026-02-03T20:30:00+00:00[UTC]',
+    ]);
+  });
+
+  test('YEARLY interval=1 with early byHour returns same-day earlier occurrence', () => {
+    const tz = 'UTC';
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      interval: 1,
+      byMonth: [3],
+      byMonthDay: [15],
+      byHour: [10, 20],
+      byMinute: [0],
+      bySecond: [0],
+      // March 15th at 8pm
+      dtstart: Temporal.ZonedDateTime.from('2026-03-15T20:00:00+00:00[UTC]'),
+      tzid: tz,
+    });
+
+    const start = Temporal.ZonedDateTime.from('2028-03-15T09:00:00+00:00[UTC]');
+    const end = Temporal.ZonedDateTime.from('2028-03-16T09:00:00+00:00[UTC]');
+    assertDates({rule, between: [start, end], print: format('UTC')}, [
+      '2028-03-15T10:00:00+00:00[UTC]',
+      '2028-03-15T20:00:00+00:00[UTC]',
+    ]);
+  });
 });
