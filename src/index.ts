@@ -1,7 +1,7 @@
 import {Temporal} from '@js-temporal/polyfill';
 
 // Allowed frequency values
-type Freq = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'HOURLY' | 'MINUTELY' | 'SECONDLY';
+export type Freq = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'HOURLY' | 'MINUTELY' | 'SECONDLY';
 
 /**
  * Shared options for all rule constructors.
