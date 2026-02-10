@@ -789,7 +789,7 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
 
   if (until) {
     const monthName = data.monthNames[until.month - 1]!;
-    if (locale === 'fr') {
+    if (lang === 'fr') {
       parts.push(data.words.until, `${until.day} ${monthName} ${until.year}`);
     } else {
       parts.push(data.words.until, `${monthName} ${until.day}, ${until.year}`);
