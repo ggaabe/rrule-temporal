@@ -136,6 +136,7 @@ const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 ## Converting to human-readable text
 
 The `toText` helper converts a rule into a human readable description.
+`UNTIL` (and optional `DTSTART`) dates are locale-aware via `toLocaleString`.
 
 ```typescript
 import { Temporal } from "@js-temporal/polyfill";
@@ -150,6 +151,7 @@ rule.toString();
 // "DTSTART;TZID=UTC:20250101T090000\nRRULE:FREQ=DAILY;COUNT=3"
 toText(rule);             // uses the runtime locale, defaults to English
 toText(rule, "es");      // Spanish description
+toText(rule, "en", { includeDtstart: true }); // include "starting from <DTSTART date>"
 toText(rule);
 // "every day for 3 times"
 
@@ -283,7 +285,7 @@ Notes
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). |
+| `toText(rule, locale?, options?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). Options: `{ includeDtstart?: boolean }`. |
 | `options()` | Return the normalized options object. |
 
 ## Further examples

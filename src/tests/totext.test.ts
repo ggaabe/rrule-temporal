@@ -22,6 +22,14 @@ describe('RRuleTemporal.toText', () => {
     expect(toText(rule)).toBe('every day');
   });
 
+  test('can include DTSTART in text output', () => {
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      dtstart: zdt(2025, 1, 1, 0),
+    });
+    expect(toText(rule, 'en', {includeDtstart: true})).toBe('every day starting from January 1, 2025');
+  });
+
   test('daily with hours', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',

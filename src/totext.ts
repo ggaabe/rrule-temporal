@@ -44,6 +44,7 @@ interface LocaleData {
     dates: string;
     and: string;
     last: string;
+    starting_from: string;
   };
   ordinal?: (n: number) => string;
 }
@@ -99,6 +100,7 @@ const en: LocaleData = {
     dates: 'dates',
     and: 'and',
     last: 'last',
+    starting_from: 'starting from',
   },
   ordinal: (n: number) => {
     const abs = Math.abs(n);
@@ -165,6 +167,7 @@ const de: LocaleData = {
     dates: 'Daten',
     and: 'und',
     last: 'letzter',
+    starting_from: 'beginnend am',
   },
   ordinal: (n: number) => {
     if (n < 0) return 'letzten';
@@ -223,6 +226,7 @@ const es: LocaleData = {
     dates: 'fechas',
     and: 'y',
     last: 'último',
+    starting_from: 'a partir de',
   },
   ordinal: (n: number) => (n < 0 ? 'último' : `${Math.abs(n)}º`),
 };
@@ -278,6 +282,7 @@ const hi: LocaleData = {
     dates: 'तारीखें',
     and: 'और',
     last: 'आखिरी',
+    starting_from: 'से शुरू',
   },
   ordinal: (n: number) => (n < 0 ? 'आखिरी' : `${Math.abs(n)}वां`),
 };
@@ -320,6 +325,7 @@ const yue: LocaleData = {
     dates: '日期',
     and: '和',
     last: '最後',
+    starting_from: '由',
   },
   ordinal: (n: number) => (n < 0 ? '最後' : `第${Math.abs(n)}`),
 };
@@ -375,6 +381,7 @@ const ar: LocaleData = {
     dates: 'تواريخ',
     and: 'و',
     last: 'الأخير',
+    starting_from: 'ابتداءً من',
   },
   ordinal: (n: number) => {
     if (n < 0) return 'الأخير';
@@ -449,6 +456,7 @@ const he: LocaleData = {
     dates: 'תאריכים',
     and: 'ו',
     last: 'אחרון',
+    starting_from: 'החל מ',
   },
   ordinal: (n: number) => {
     if (n < 0) return 'אחרון';
@@ -510,6 +518,7 @@ const zh: LocaleData = {
     dates: '日期',
     and: '和',
     last: '最后',
+    starting_from: '从',
   },
   ordinal: (n: number) => (n < 0 ? '最后' : `第${Math.abs(n)}`),
 };
@@ -565,6 +574,7 @@ const fr: LocaleData = {
     dates: 'dates',
     and: 'et',
     last: 'dernier',
+    starting_from: 'à partir du',
   },
   ordinal: (n: number) => {
     const abs = Math.abs(n);
@@ -660,11 +670,25 @@ function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
   return tzPart?.value || zdt.timeZoneId;
 }
 
-export function toText(input: RRuleTemporal | string, locale?: string): string {
+function formatLocalizedDate(zdt: Temporal.ZonedDateTime, locale: string): string {
+  try {
+    return zdt.toLocaleString(locale, {dateStyle: 'long'});
+  } catch {
+    return zdt.toLocaleString('en', {dateStyle: 'long'});
+  }
+}
+
+export interface ToTextOptions {
+  includeDtstart?: boolean;
+}
+
+export function toText(input: RRuleTemporal | string, locale?: string, options: ToTextOptions = {}): string {
   const rule = typeof input === 'string' ? new RRuleTemporal({rruleString: input}) : input;
   const opts = rule.options();
-  const lang = (locale ?? Intl.DateTimeFormat().resolvedOptions().locale).split('-')[0];
+  const resolvedLocale = locale ?? Intl.DateTimeFormat().resolvedOptions().locale;
+  const lang = resolvedLocale.split('-')[0];
   const data = LOCALES[lang!] || en;
+  const dateLocale = LOCALES[lang!] ? resolvedLocale : 'en';
   const {
     freq,
     interval = 1,
@@ -787,13 +811,12 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     parts.push(data.words.at_second, list(textBySecond, undefined, data.words.and));
   }
 
+  if (options.includeDtstart) {
+    parts.push(data.words.starting_from, formatLocalizedDate(opts.dtstart, dateLocale));
+  }
+
   if (until) {
-    const monthName = data.monthNames[until.month - 1]!;
-    if (lang === 'fr') {
-      parts.push(data.words.until, `${until.day} ${monthName} ${until.year}`);
-    } else {
-      parts.push(data.words.until, `${monthName} ${until.day}, ${until.year}`);
-    }
+    parts.push(data.words.until, formatLocalizedDate(until, dateLocale));
   } else if (count !== undefined) {
     parts.push(data.words.for, count.toString(), count === 1 ? data.words.time : data.words.times);
   }
