@@ -113,7 +113,7 @@ const expected = {
     'chaque jour à 6:15:45 AM UTC',
     'chaque jour de semaine',
     'chaque 2 minutes',
-    "chaque semaine le dimanche jusqu'à novembre 10, 2012",
+    "chaque semaine le dimanche jusqu'au 10 novembre 2012",
     "chaque année le 100e jour de l'année",
     'chaque année dans la semaine 20',
     'chaque mois le lundi et mercredi le 2e occurrence',

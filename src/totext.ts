@@ -515,20 +515,20 @@ const zh: LocaleData = {
 };
 
 const fr: LocaleData = {
-  weekdayNames: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+  weekdayNames: ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'],
   monthNames: [
-    'Janvier',
-    'Février',
-    'Mars',
-    'Avril',
-    'Mai',
-    'Juin',
-    'Juillet',
-    'Août',
-    'Septembre',
-    'Octobre',
-    'Novembre',
-    'Décembre',
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
   ],
   units: {
     year: {singular: 'année', plural: 'ans'},
@@ -551,7 +551,7 @@ const fr: LocaleData = {
     at: 'à',
     at_minute: 'à la minute',
     at_second: 'à la seconde',
-    until: "jusqu'à",
+    until: "jusqu'au",
     for: 'pendant',
     time: 'fois',
     times: 'fois',
@@ -789,7 +789,11 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
 
   if (until) {
     const monthName = data.monthNames[until.month - 1]!;
-    parts.push(data.words.until, `${monthName} ${until.day}, ${until.year}`);
+    if (lang === 'fr') {
+      parts.push(data.words.until, `${until.day} ${monthName} ${until.year}`);
+    } else {
+      parts.push(data.words.until, `${monthName} ${until.day}, ${until.year}`);
+    }
   } else if (count !== undefined) {
     parts.push(data.words.for, count.toString(), count === 1 ? data.words.time : data.words.times);
   }
