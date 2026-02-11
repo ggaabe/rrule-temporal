@@ -180,7 +180,12 @@ function parseByMonthArray(val: string): Array<number | string> {
  * // => opts.dtstart from parameter
  * ```
  */
-function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temporal.ZonedDateTime): ManualOpts {
+function parseRRuleString(
+  input: string,
+  targetTimezone?: string,
+  dtstart?: Temporal.ZonedDateTime,
+  strict = false,
+): ManualOpts {
   // Unfold the input according to RFC 5545 specification
   const unfoldedInput = unfoldLine(input).trim();
 
@@ -215,8 +220,8 @@ function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temp
 
     rruleLine = rrLine!;
 
-  exDate = parseDateLines(exLines, 'EXDATE', tzid ?? 'UTC');
-  rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC');
+    exDate = parseDateLines(exLines, 'EXDATE', tzid ?? 'UTC');
+    rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC');
   } else {
     // Just RRULE or FREQ pattern - use provided dtstart
     parsedDtstart = dtstart;
@@ -281,9 +286,27 @@ function parseRRuleString(input: string, targetTimezone?: string, dtstart?: Temp
           opts.until = parseIcsDateTime(val!, tzid || 'UTC', 'DATE');
           break;
         }
+
         if (!untilHasTime) {
-          throw new Error('UNTIL rule part MUST have the same value type as DTSTART');
+          if (strict) {
+            throw new Error('UNTIL rule part MUST have the same value type as DTSTART');
+          }
+
+          // Compatibility fallback: some producers emit DATE UNTIL with DATE-TIME DTSTART.
+          // Treat this as an inclusive end-of-day bound in DTSTART's zone.
+          const localEndOfDay = parseIcsDateTime(val!, tzid || 'UTC', 'DATE').with({
+            hour: 23,
+            minute: 59,
+            second: 59,
+            millisecond: 0,
+            microsecond: 0,
+            nanosecond: 0,
+          });
+          const requiresUtc = dtstartHasTzid || dtstartIsUtc;
+          opts.until = requiresUtc ? localEndOfDay.withTimeZone('UTC') : localEndOfDay;
+          break;
         }
+
         const requiresUtc = dtstartHasTzid || dtstartIsUtc;
         if (requiresUtc && !val!.endsWith('Z')) {
           throw new Error('UNTIL rule part MUST always be specified as a date with UTC time');
@@ -357,7 +380,7 @@ export class RRuleTemporal {
     let manual: ManualOpts;
     if (isIcsOpts(params)) {
       // Allow dtstart to be passed separately when rruleString doesn't contain DTSTART
-      const parsed = parseRRuleString(params.rruleString, params.tzid, params.dtstart);
+      const parsed = parseRRuleString(params.rruleString, params.tzid, params.dtstart, params.strict ?? false);
 
       // If no dtstart was found in the string or provided as parameter, throw error
       if (!parsed.dtstart) {

@@ -896,6 +896,30 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     expect(() => new RRuleTemporal({rruleString: ics})).toThrow();
   });
 
+  it('should coerce DATE UNTIL from Google-style timed rules in default mode', () => {
+    const ics = `DTSTART;TZID=Europe/Oslo:20211216T180000\nRRULE:FREQ=WEEKLY;WKST=MO;UNTIL=20211216`;
+    const rule = new RRuleTemporal({rruleString: ics});
+
+    assertDates({rule}, ['2021-12-16T17:00:00.000Z']);
+    expect(rule.toString()).toContain('UNTIL=20211216T225959Z');
+  });
+
+  it('should coerce DATE UNTIL for UTC DTSTART in default mode', () => {
+    const ics = `DTSTART:20110106T000000Z\nRRULE:FREQ=YEARLY;WKST=MO;UNTIL=20361231;BYMONTHDAY=6;BYMONTH=1`;
+    const rule = new RRuleTemporal({rruleString: ics});
+
+    const all = rule.all();
+    expect(all[0]?.toString()).toBe('2011-01-06T00:00:00+00:00[UTC]');
+    expect(all.at(-1)?.toString()).toBe('2036-01-06T00:00:00+00:00[UTC]');
+  });
+
+  it('should still reject DATE UNTIL with DATE-TIME DTSTART in strict mode', () => {
+    const ics = `DTSTART;TZID=Europe/Oslo:20211216T180000\nRRULE:FREQ=WEEKLY;WKST=MO;UNTIL=20211216`;
+    expect(() => new RRuleTemporal({rruleString: ics, strict: true})).toThrow(
+      'UNTIL rule part MUST have the same value type as DTSTART',
+    );
+  });
+
   it('should allow floating UNTIL values when DTSTART is floating', () => {
     const ics = `DTSTART:20250320T170000\nRRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
     expect(() => new RRuleTemporal({rruleString: ics, tzid: 'America/Chicago'})).not.toThrow();

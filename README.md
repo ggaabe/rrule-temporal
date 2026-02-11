@@ -61,6 +61,9 @@ Note on `UNTIL` (RFC 5545): if `DTSTART` is a DATE-TIME with a `TZID` or UTC (`Z
 `UNTIL` must be a DATE-TIME in UTC (trailing `Z`). If `DTSTART` is `VALUE=DATE`,
 `UNTIL` must be a DATE (no time). Floating DATE-TIME rules (no `TZID`, no `Z`)
 allow a floating `UNTIL`.
+In default mode (`strict: false`), `UNTIL=YYYYMMDD` with a DATE-TIME `DTSTART`
+is accepted for compatibility and treated as inclusive end-of-day in `DTSTART`'s
+zone (converted to UTC when required). Set `strict: true` to reject it.
 
 ## Creating a rule with options
 
