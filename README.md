@@ -118,6 +118,20 @@ below. These correspond to the recurrence rule parts defined in RFC&nbsp;5545:
 | `strict` | Enforce RFC 5545 constraints strictly (defaults to false). |
 | `dtstart` | First occurrence as `Temporal.ZonedDateTime`. |
 
+### Reusable Option Lists
+
+The library also exports runtime option lists you can use to populate UI controls:
+
+```typescript
+import { allowedFreq, allowedWeekdays } from "rrule-temporal";
+
+// ["YEARLY", "MONTHLY", ...]
+console.log(allowedFreq);
+
+// ["MO", "TU", ...]
+console.log(allowedWeekdays);
+```
+
 ## Querying occurrences
 
 Use the provided methods to enumerate or search for occurrences:

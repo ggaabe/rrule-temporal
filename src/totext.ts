@@ -1,5 +1,5 @@
 import {Temporal} from '@js-temporal/polyfill';
-import {RRuleTemporal} from './index';
+import {RRuleTemporal, allowedWeekdays, type Weekday} from './index';
 
 interface UnitStrings {
   singular: string;
@@ -596,6 +596,11 @@ const LOCALES: Record<string, LocaleData> = {};
 for (const l of active) {
   if (ALL_LOCALES[l]) LOCALES[l] = ALL_LOCALES[l];
 }
+const workweekWeekdays = allowedWeekdays.slice(0, 5);
+const byDayTokenRegex = new RegExp(`^([+-]?\\d+)?(${allowedWeekdays.join('|')})$`);
+const weekdayIndexByToken = Object.fromEntries(
+  allowedWeekdays.map((weekday, idx) => [weekday, idx]),
+) as Record<Weekday, number>;
 
 function defaultOrdinal(n: number): string {
   const abs = Math.abs(n);
@@ -622,19 +627,11 @@ function list(arr: (string | number)[], mapFn: (x: string | number) => string = 
 
 function formatByDayToken(tok: string | number, locale: LocaleData): string {
   if (typeof tok === 'number') return tok.toString();
-  const m = tok.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
+  const m = tok.toUpperCase().match(byDayTokenRegex);
   if (!m) return tok;
   const ord = m[1] ? parseInt(m[1], 10) : 0;
-  const weekdayMap: {[key: string]: number} = {
-    MO: 0,
-    TU: 1,
-    WE: 2,
-    TH: 3,
-    FR: 4,
-    SA: 5,
-    SU: 6,
-  };
-  const idx = weekdayMap[m[2] as keyof typeof weekdayMap];
+  const weekday = m[2] as Weekday;
+  const idx = weekdayIndexByToken[weekday];
   const name = locale.weekdayNames[idx!];
   if (ord === 0) return name!;
   if (ord === -1) return `${locale.words.last} ${name}`;
@@ -656,8 +653,7 @@ function formatTime(hour: number, minute = 0, second = 0): string {
 }
 
 function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
-  const tokens = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
-  return tokens[zdt.dayOfWeek - 1]!;
+  return allowedWeekdays[zdt.dayOfWeek - 1]!;
 }
 
 function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
@@ -734,12 +730,12 @@ export function toText(input: RRuleTemporal | string, locale?: string, options: 
   const daysNormalized = textByDay?.map((d) => d.toUpperCase());
   const isWeekdays =
     daysNormalized &&
-    daysNormalized.length === 5 &&
-    ['MO', 'TU', 'WE', 'TH', 'FR'].every((d) => daysNormalized.includes(d));
+    daysNormalized.length === workweekWeekdays.length &&
+    workweekWeekdays.every((d) => daysNormalized.includes(d));
   const isEveryday =
     daysNormalized &&
-    daysNormalized.length === 7 &&
-    ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].every((d) => daysNormalized.includes(d));
+    daysNormalized.length === allowedWeekdays.length &&
+    allowedWeekdays.every((d) => daysNormalized.includes(d));
 
   if (freq === 'WEEKLY' && interval === 1 && isWeekdays) {
     parts.push(data.words.weekday);

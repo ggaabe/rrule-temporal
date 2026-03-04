@@ -1,7 +1,41 @@
 import {Temporal} from '@js-temporal/polyfill';
 
-// Allowed frequency values
-export type Freq = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'HOURLY' | 'MINUTELY' | 'SECONDLY';
+export const allowedFreq = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'] as const;
+export type Freq = (typeof allowedFreq)[number];
+
+export const allowedWeekdays = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
+export type Weekday = (typeof allowedWeekdays)[number];
+
+export const weekdayToIsoDay: Record<Weekday, number> = {
+  MO: 1,
+  TU: 2,
+  WE: 3,
+  TH: 4,
+  FR: 5,
+  SA: 6,
+  SU: 7,
+};
+
+const allowedFreqSet = new Set<string>(allowedFreq);
+const allowedWeekdaysSet = new Set<string>(allowedWeekdays);
+const byDayTokenRegex = new RegExp(`^([+-]?\\d{1,2})?(${allowedWeekdays.join('|')})$`);
+const byDayWeekdaySuffixRegex = new RegExp(`(${allowedWeekdays.join('|')})$`);
+
+function extractWeekdayToken(token: string): Weekday | null {
+  const m = token.toUpperCase().match(byDayWeekdaySuffixRegex);
+  const weekday = m?.[1];
+  if (!weekday || !allowedWeekdaysSet.has(weekday)) return null;
+  return weekday as Weekday;
+}
+
+function parseByDayToken(token: string): {ord: number; weekday: Weekday} | null {
+  const m = token.toUpperCase().match(byDayTokenRegex);
+  if (!m) return null;
+  const ord = m[1] ? parseInt(m[1], 10) : 0;
+  const weekday = m[2];
+  if (!weekday || !allowedWeekdaysSet.has(weekday)) return null;
+  return {ord, weekday: weekday as Weekday};
+}
 
 /**
  * Shared options for all rule constructors.
@@ -324,7 +358,7 @@ function parseRRuleString(
         opts.bySecond = parseNumberArray(val!, true);
         break;
       case 'BYDAY':
-        opts.byDay = val!.split(','); // e.g. ["MO","2FR","-1SU"]
+        opts.byDay = val!.split(',').map((token) => token.toUpperCase()); // e.g. ["MO","2FR","-1SU"]
         break;
       case 'BYMONTH':
         opts.byMonth = parseByMonthArray(val!);
@@ -342,7 +376,7 @@ function parseRRuleString(
         opts.bySetPos = parseNumberArray(val!);
         break;
       case 'WKST':
-        opts.wkst = val!;
+        opts.wkst = val?.toUpperCase();
         break;
     }
   }
@@ -442,22 +476,20 @@ export class RRuleTemporal {
   }
 
   private sanitizeByDay(byDay?: string[]) {
-    const validDay = /^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/;
-    const days = (byDay ?? []).filter((day) => day && typeof day === 'string');
+    const days = (byDay ?? []).filter((day): day is string => Boolean(day) && typeof day === 'string');
+    const normalized: string[] = [];
     for (const day of days) {
-      const match = day.match(validDay);
-      if (!match) {
+      const token = day.toUpperCase();
+      const parsed = parseByDayToken(token);
+      if (!parsed) {
         throw new Error(`Invalid BYDAY value: ${day}`);
       }
-      const ord = match[1];
-      if (ord) {
-        const ordInt = parseInt(ord, 10);
-        if (ordInt === 0) {
-          throw new Error(`Invalid BYDAY value: ${day}`);
-        }
+      if (parsed.ord === 0 && /^[+-]?\d/.test(token)) {
+        throw new Error(`Invalid BYDAY value: ${day}`);
       }
+      normalized.push(token);
     }
-    return days.length > 0 ? days : undefined;
+    return normalized.length > 0 ? normalized : undefined;
   }
 
   private enforceStrictRfc(opts: ManualOpts) {
@@ -498,7 +530,17 @@ export class RRuleTemporal {
   }
 
   private sanitizeOpts(opts: ManualOpts): ManualOpts {
+    if (!allowedFreqSet.has(opts.freq)) {
+      throw new Error(`Invalid FREQ value: ${opts.freq}`);
+    }
     opts.byDay = this.sanitizeByDay(opts.byDay);
+    if (opts.wkst) {
+      const wkst = opts.wkst.toUpperCase();
+      if (!allowedWeekdaysSet.has(wkst)) {
+        throw new Error(`Invalid WKST value: ${opts.wkst}`);
+      }
+      opts.wkst = wkst;
+    }
     // BYMONTH can include strings (e.g., "5L") under RFC 7529; keep tokens as-is.
     if (opts.byMonth) {
       // Split into numeric and string tokens; sanitize numeric to 1..12 to preserve existing behavior for Gregorian
@@ -780,12 +822,12 @@ export class RRuleTemporal {
 
           // If we have BYDAY, find the specific day in that week
           if (this.opts.byDay?.length) {
-            const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+            const dayMap = weekdayToIsoDay;
 
             const targetDays = this.opts.byDay
-              .map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
-              .filter(Boolean)
-              .map((day) => dayMap[day!]!)
+              .map((tok) => extractWeekdayToken(tok))
+              .filter((day): day is Weekday => day !== null)
+              .map((day) => dayMap[day]!)
               .filter(Boolean);
 
             if (targetDays.length) {
@@ -819,7 +861,7 @@ export class RRuleTemporal {
     // slow.  We instead jump directly to the next matching weekday whenever all
     // BYDAY tokens are simple two-letter codes (e.g. "MO").
     if (this.opts.byDay?.length && !this.opts.byWeekNo) {
-      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+      const dayMap = weekdayToIsoDay;
 
       // Check if we have ordinal BYDAY tokens (e.g., "1TU", "-1TH")
       const hasOrdinalTokens = this.opts.byDay.some((tok) => /^[+-]?\d/.test(tok));
@@ -861,18 +903,16 @@ export class RRuleTemporal {
       } else {
         // Handle simple weekday tokens or non-BYMONTH cases
         let deltas: number[];
+        const weekdayTokens = this.opts.byDay
+          .map((tok) => extractWeekdayToken(tok))
+          .filter((tok): tok is Weekday => tok !== null);
         if (
           ['DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'].includes(this.opts.freq) &&
-          this.opts.byDay.every((tok) => /^[A-Z]{2}$/.test(tok))
+          weekdayTokens.length === this.opts.byDay.length
         ) {
-          deltas = this.opts.byDay.map((tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7);
+          deltas = weekdayTokens.map((tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7);
         } else {
-          deltas = this.opts.byDay
-            .map((tok) => {
-              const wdTok = tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1];
-              return wdTok ? (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7 : null;
-            })
-            .filter((d): d is number => d !== null);
+          deltas = weekdayTokens.map((wdTok) => (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7);
         }
 
         if (deltas.length) {
@@ -944,19 +984,13 @@ export class RRuleTemporal {
     if (!byDay) return true;
 
     // map two‑letter to Temporal dayOfWeek (1=Mon … 7=Sun)
-    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const dayMap = weekdayToIsoDay;
 
     for (const token of byDay) {
-      // 1) match and destructure
-      const m = token.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
-      if (!m) continue;
-      const ord = m[1] ? parseInt(m[1], 10) : 0;
-
-      // 2) pull weekday into its own variable and guard
-      const weekday = m[2];
-      if (!weekday) continue; // now TS knows `weekday` is string
-
-      const wd = dayMap[weekday as keyof typeof dayMap]; // no more "undefined index" error
+      const parsed = parseByDayToken(token);
+      if (!parsed) continue;
+      const ord = parsed.ord;
+      const wd = dayMap[parsed.weekday];
 
       if (freq === 'DAILY') {
         if (zdt.dayOfWeek === wd) return true;
@@ -1287,7 +1321,7 @@ export class RRuleTemporal {
     }
 
     // Build the list of target weekdays (1=Mon..7=Sun)
-    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const dayMap = weekdayToIsoDay;
     // If no BYDAY, default to DTSTART’s weekday token
     const tokens = this.opts.byDay
       ? [...this.opts.byDay]
@@ -1307,7 +1341,8 @@ export class RRuleTemporal {
     const firstOccurrence = firstWeekDates.reduce((a, b) => (Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b));
 
     // Get the week start day (default to Monday if not specified)
-    const wkstDay = dayMap[this.opts.wkst || 'MO'] ?? 1;
+    const wkstToken = extractWeekdayToken(this.opts.wkst || 'MO') ?? 'MO';
+    const wkstDay = dayMap[wkstToken] ?? 1;
 
     // Align weekCursor to the week start that contains the first occurrence
     const firstOccWeekOffset = (firstOccurrence.dayOfWeek - wkstDay + 7) % 7;
@@ -2392,14 +2427,14 @@ export class RRuleTemporal {
       return this.expandByTime(sample);
     }
 
-    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const dayMap = weekdayToIsoDay;
 
     type Token = {ord: number; wd: number};
     const tokens: Token[] = byDay
       .map((tok) => {
-        const m = tok.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
-        if (!m) return null;
-        return {ord: m[1] ? parseInt(m[1], 10) : 0, wd: dayMap[m[2]!]};
+        const parsed = parseByDayToken(tok);
+        if (!parsed) return null;
+        return {ord: parsed.ord, wd: dayMap[parsed.weekday]!};
       })
       .filter((x): x is Token => x !== null);
 
@@ -2458,12 +2493,12 @@ export class RRuleTemporal {
     const hasOrdinalByDay = this.opts.byDay && this.opts.byDay.some((t) => /^[+-]?\d/.test(t));
     if (hasOrdinalByDay && !this.opts.byMonth) {
       // nth weekday of year
-      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+      const dayMap = weekdayToIsoDay;
       for (const tok of this.opts.byDay!) {
-        const m = tok.match(/^([+-]?\d{1,2})(MO|TU|WE|TH|FR|SA|SU)$/);
-        if (!m) continue;
-        const ord = parseInt(m[1]!, 10);
-        const wd = dayMap[m[2] as keyof typeof dayMap]!;
+        const parsed = parseByDayToken(tok);
+        if (!parsed || parsed.ord === 0) continue;
+        const ord = parsed.ord;
+        const wd = dayMap[parsed.weekday]!;
         let dt: Temporal.ZonedDateTime;
         if (ord > 0) {
           const jan1 = sample.with({month: 1, day: 1});
@@ -2538,7 +2573,7 @@ export class RRuleTemporal {
   }
 
   private addByDay(tokens: string[], weekStart: Temporal.ZonedDateTime) {
-    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const dayMap = weekdayToIsoDay;
     const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
     const entries: Temporal.ZonedDateTime[] = [];
     for (const tok of tokens) {
@@ -2691,11 +2726,11 @@ export class RRuleTemporal {
 
     // Check BYDAY (can jump within week)
     if (this.opts.byDay && !this.matchesByDay(current)) {
-      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+      const dayMap = weekdayToIsoDay;
       const targetDays = this.opts.byDay
-        .map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
-        .filter(Boolean)
-        .map((day) => dayMap[day!]!)
+        .map((tok) => extractWeekdayToken(tok))
+        .filter((day): day is Weekday => day !== null)
+        .map((day) => dayMap[day]!)
         .filter(Boolean);
 
       const nextDayOfWeek = this.findNextValidValue(current.dayOfWeek, targetDays.sort(), (a, b) => a - b);
@@ -2747,7 +2782,7 @@ export class RRuleTemporal {
   }
 
   private isoWeekByDay(sample: Temporal.ZonedDateTime) {
-    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const dayMap = weekdayToIsoDay;
     const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
     const jan1 = sample.with({month: 1, day: 1});
     const jan4 = sample.with({month: 1, day: 4});
@@ -2759,7 +2794,9 @@ export class RRuleTemporal {
     const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
 
     const tokens = this.opts.byDay?.length
-      ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+      ? this.opts.byDay
+          .map((tok) => extractWeekdayToken(tok))
+          .filter((day): day is Weekday => day !== null)
       : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
 
     return {lastWeek, firstWeekStart, tokens};
@@ -2899,7 +2936,7 @@ export class RRuleTemporal {
   private rscaleMatchesByWeekNo(calId: string, pd: Temporal.PlainDate): boolean {
     const list = this.opts.byWeekNo;
     if (!list || list.length === 0) return true;
-    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const dayMap = weekdayToIsoDay;
     const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
     // Compute which week index this date lies in for its week-year
     const weekStart = pd.subtract({days: (pd.dayOfWeek - wkst + 7) % 7});
@@ -2929,10 +2966,10 @@ export class RRuleTemporal {
     const byDay = this.opts.byDay;
     if (!byDay || byDay.length === 0) return true;
     // Only handle simple weekday tokens (MO..SU). Ordinals are not applied at subdaily level here.
-    const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+    const dayMap = weekdayToIsoDay;
     const tokens = byDay
-      .map((tok) => tok.match(/^(?:[+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/)?.[1])
-      .filter((x): x is string => !!x);
+      .map((tok) => extractWeekdayToken(tok))
+      .filter((x): x is Weekday => x !== null);
     if (tokens.length === 0) return true;
     return tokens.some((wd) => dayMap[wd as keyof typeof dayMap] === pd.dayOfWeek);
   }
@@ -2995,7 +3032,7 @@ export class RRuleTemporal {
 
     // BYDAY within month (supports ordinals like 1MO, -1SU)
     if (byDay && byDay.length > 0) {
-      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+      const dayMap = weekdayToIsoDay;
       // Bucket days by weekday
       const buckets: Record<number, Temporal.PlainDate[]> = {};
       let cur = monthStart;
@@ -3005,10 +3042,10 @@ export class RRuleTemporal {
         cur = cur.add({days: 1});
       }
       for (const tok of byDay) {
-        const m = tok.match(/^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/);
-        if (!m) continue;
-        const ord = m[1] ? parseInt(m[1], 10) : 0;
-        const wd = dayMap[m[2] as keyof typeof dayMap]!;
+        const parsed = parseByDayToken(tok);
+        if (!parsed) continue;
+        const ord = parsed.ord;
+        const wd = dayMap[parsed.weekday]!;
         const list = buckets[wd] || [];
         if (list.length === 0) continue;
         if (ord === 0) {
@@ -3054,7 +3091,7 @@ export class RRuleTemporal {
         const monthsTokens = this.opts.byMonth as Array<number | string> | undefined;
         const months = this.monthsOfYear(calId, tgtYear);
 
-        const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+        const dayMap = weekdayToIsoDay;
         const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
 
         // BYWEEKNO handling
@@ -3062,7 +3099,9 @@ export class RRuleTemporal {
           const firstStart = this.rscaleFirstWeekStart(calId, tgtYear, wkst);
           const lastWeek = this.rscaleLastWeekCount(calId, tgtYear, wkst);
           const tokens = this.opts.byDay?.length
-            ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+            ? this.opts.byDay
+                .map((tok) => extractWeekdayToken(tok))
+                .filter((day): day is Weekday => day !== null)
             : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
           for (const wn of this.opts.byWeekNo) {
             let idx = wn > 0 ? wn - 1 : lastWeek + wn;
@@ -3144,10 +3183,12 @@ export class RRuleTemporal {
 
     // WEEKLY frequency in RSCALE
     if (this.opts.freq === 'WEEKLY') {
-      const dayMap: Record<string, number> = {MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 7};
+      const dayMap = weekdayToIsoDay;
       const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
       const tokens = this.opts.byDay?.length
-        ? this.opts.byDay.map((tok) => tok.match(/(MO|TU|WE|TH|FR|SA|SU)$/)?.[1]!)
+        ? this.opts.byDay
+            .map((tok) => extractWeekdayToken(tok))
+            .filter((day): day is Weekday => day !== null)
         : [Object.entries(dayMap).find(([, d]) => d === this.originalDtstart.dayOfWeek)![0]];
 
       // Align to week start at or before seed (use PlainDate)
