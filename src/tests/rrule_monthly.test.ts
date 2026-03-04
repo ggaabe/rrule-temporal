@@ -51,6 +51,24 @@ describe('Monthly frequency tests', () => {
     assertDates({rule}, ['1997-09-03T09:00:00.000Z', '1997-10-01T09:00:00.000Z', '1997-10-03T09:00:00.000Z']);
   });
 
+  it('testMonthlyByMonthDayIncludesRemainingDaysInDtstartMonth', () => {
+    const rule = new RRuleTemporal({
+      rruleString:
+        'DTSTART;TZID=Europe/Lisbon:20260224T095000\nRRULE:FREQ=MONTHLY;UNTIL=20260522T225959Z;BYMONTHDAY=24,28,10',
+    });
+    assertDates({rule}, [
+      '2026-02-24T09:50:00.000Z',
+      '2026-02-28T09:50:00.000Z',
+      '2026-03-10T09:50:00.000Z',
+      '2026-03-24T09:50:00.000Z',
+      '2026-03-28T09:50:00.000Z',
+      '2026-04-10T08:50:00.000Z',
+      '2026-04-24T08:50:00.000Z',
+      '2026-04-28T08:50:00.000Z',
+      '2026-05-10T08:50:00.000Z',
+    ]);
+  });
+
   it('testMonthlyByMonthAndMonthDay', () => {
     const rule = new RRuleTemporal({
       freq: 'MONTHLY',

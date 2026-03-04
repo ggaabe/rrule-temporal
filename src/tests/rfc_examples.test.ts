@@ -875,6 +875,7 @@ describe('iCalendar.org RFC 5545 Examples', () => {
     });
     const rrule = 'DTSTART;TZID=America/New_York:19970930T090000\nRRULE:FREQ=MONTHLY;COUNT=10;BYMONTHDAY=1,-1';
     const dates = [
+      'Tue, 30 Sep 1997 13:00:00 GMT',
       'Wed, 01 Oct 1997 13:00:00 GMT',
       'Fri, 31 Oct 1997 14:00:00 GMT',
       'Sat, 01 Nov 1997 14:00:00 GMT',
@@ -884,7 +885,6 @@ describe('iCalendar.org RFC 5545 Examples', () => {
       'Thu, 01 Jan 1998 14:00:00 GMT',
       'Sat, 31 Jan 1998 14:00:00 GMT',
       'Sun, 01 Feb 1998 14:00:00 GMT',
-      'Sat, 28 Feb 1998 14:00:00 GMT',
     ];
     assertRules({rule, rrule, dates});
   });
