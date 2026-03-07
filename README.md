@@ -37,30 +37,6 @@ rule.all().forEach(dt => console.log(dt.toString()));
 const firstTen = rule.all((_, i) => i < 10);
 ```
 
-## Benchmarks
-
-Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max.
-The full three-library comparison, including `rrule-rust`, lives in `benchmarks/README.md`.
-
-| Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
-| --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 29,275 | 16,762 | 1.75x |
-| 30 daily occurrences | America/Chicago | 2,067 | 364 | 5.68x |
-| Daily weekdays across many cycles | UTC | 1,894 | 766 | 2.47x |
-| Daily weekdays across many cycles | America/Chicago | 64.9 | 18.9 | 3.43x |
-| 720 hourly occurrences | UTC | 1,499 | 701 | 2.14x |
-| 720 hourly occurrences | America/Chicago | 104 | 14.1 | 7.38x |
-| 1,440 minutely occurrences | UTC | 751 | 325 | 2.31x |
-| 1,440 minutely occurrences | America/Chicago | 145 | 7.1 | 20.42x |
-| Weekly MO/WE/FR across many cycles | UTC | 1,179 | 1,053 | 1.12x |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 64.4 | 14.6 | 4.41x |
-| Monthly last weekday across 20 years | UTC | 1,953 | 948 | 2.06x |
-| Monthly last weekday across 20 years | America/Chicago | 45.5 | 39.4 | 1.15x |
-| Monthly first and last weekday across 20 years | UTC | 1,378 | 1,202 | 1.15x |
-| Monthly first and last weekday across 20 years | America/Chicago | 40.0 | 24.2 | 1.65x |
-
-The current pattern is straightforward: `rrule-temporal` is faster than `rrule` across all of the scenarios above, with especially large gains on timezone-heavy daily, hourly, and minutely rules. The biggest recent jump came from the UTC monthly `BYDAY` + `BYSETPOS` path, which is now ahead as well.
-
 ## Separating DTSTART and RRULE
 
 Per RFC 5545, DTSTART and RRULE are separate properties. You can provide them separately:
@@ -325,6 +301,30 @@ Notes
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
 | `toText(rule, locale?, options?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). Options: `{ includeDtstart?: boolean }`. |
 | `options()` | Return the normalized options object. |
+
+## Benchmarks
+
+Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max.
+The full three-library comparison, including `rrule-rust`, lives in `benchmarks/README.md`.
+
+| Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
+| --- | --- | ---: | ---: | ---: |
+| 30 daily occurrences | UTC | 29,275 | 16,762 | 1.75x |
+| 30 daily occurrences | America/Chicago | 2,067 | 364 | 5.68x |
+| Daily weekdays across many cycles | UTC | 1,894 | 766 | 2.47x |
+| Daily weekdays across many cycles | America/Chicago | 64.9 | 18.9 | 3.43x |
+| 720 hourly occurrences | UTC | 1,499 | 701 | 2.14x |
+| 720 hourly occurrences | America/Chicago | 104 | 14.1 | 7.38x |
+| 1,440 minutely occurrences | UTC | 751 | 325 | 2.31x |
+| 1,440 minutely occurrences | America/Chicago | 145 | 7.1 | 20.42x |
+| Weekly MO/WE/FR across many cycles | UTC | 1,179 | 1,053 | 1.12x |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 64.4 | 14.6 | 4.41x |
+| Monthly last weekday across 20 years | UTC | 1,953 | 948 | 2.06x |
+| Monthly last weekday across 20 years | America/Chicago | 45.5 | 39.4 | 1.15x |
+| Monthly first and last weekday across 20 years | UTC | 1,378 | 1,202 | 1.15x |
+| Monthly first and last weekday across 20 years | America/Chicago | 40.0 | 24.2 | 1.65x |
+
+The current pattern is straightforward: `rrule-temporal` is faster than `rrule` across all of the scenarios above, with especially large gains on timezone-heavy daily, hourly, and minutely rules. The biggest recent jump came from the UTC monthly `BYDAY` + `BYSETPOS` path, which is now ahead as well.
 
 ## Further examples
 
