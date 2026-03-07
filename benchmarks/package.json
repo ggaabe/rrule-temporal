@@ -1,0 +1,17 @@
+{
+  "name": "rrule-temporal-benchmarks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebenchmark": "npm --prefix .. run build",
+    "prebenchmark:quick": "npm --prefix .. run build",
+    "benchmark": "node run.mjs",
+    "benchmark:quick": "node run.mjs --warmup-ms=100 --sample-ms=150 --samples=3",
+    "preprofile:temporal": "npm --prefix .. run build",
+    "profile:temporal": "node profile-temporal.mjs"
+  },
+  "dependencies": {
+    "rrule": "^2.8.1",
+    "rrule-rust": "^3.1.1"
+  }
+}
