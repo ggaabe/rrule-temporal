@@ -1606,6 +1606,113 @@ export class RRuleTemporal {
     }
   }
 
+  private hasSingleExpandedTimeSlot(): boolean {
+    const hours = this.opts.byHour ?? [this.originalDtstart.hour];
+    const minutes = this.opts.byMinute ?? [this.originalDtstart.minute];
+    const seconds = this.opts.bySecond ?? [this.originalDtstart.second];
+    return hours.length === 1 && minutes.length === 1 && seconds.length === 1;
+  }
+
+  private buildMonthlyOccurrenceOnDay(monthStart: Temporal.ZonedDateTime, day: number): Temporal.ZonedDateTime {
+    const base = monthStart.day === day ? monthStart : monthStart.with({day});
+    return this.applyTimeOverride(base);
+  }
+
+  private applyBySetPosToSortedList<T>(list: T[]): T[] {
+    const {bySetPos} = this.opts;
+    if (!bySetPos || !bySetPos.length || list.length === 0) return list;
+
+    const out: T[] = [];
+    const len = list.length;
+    for (const pos of bySetPos) {
+      const idx = pos > 0 ? pos - 1 : len + pos;
+      if (idx >= 0 && idx < len) out.push(list[idx]!);
+    }
+    return out;
+  }
+
+  private generateMonthlyOccurrenceDays(sample: Temporal.ZonedDateTime): number[] {
+    const {byDay, byMonth, byMonthDay} = this.opts;
+    const monthStart = sample.day === 1 ? sample : sample.with({day: 1});
+
+    if (byMonth && !byMonth.includes(sample.month)) return [];
+
+    const lastDay = monthStart.add({months: 1}).subtract({days: 1}).day;
+
+    let byMonthDayHits: number[] = [];
+    if (byMonthDay && byMonthDay.length > 0) {
+      byMonthDayHits = byMonthDay.map((d) => (d > 0 ? d : lastDay + d + 1)).filter((d) => d >= 1 && d <= lastDay);
+      byMonthDayHits = [...new Set(byMonthDayHits)].sort((a, b) => a - b);
+    }
+
+    if (!byDay && byMonthDay && byMonthDay.length > 0) {
+      return byMonthDayHits;
+    }
+
+    if (!byDay) {
+      return [sample.day];
+    }
+
+    const tokens = this.parsedByDayTokens;
+    if (!tokens?.length) return [];
+
+    const firstDayOfWeek = monthStart.dayOfWeek;
+    const lastDayOfWeek = ((firstDayOfWeek - 1 + lastDay - 1) % 7) + 1;
+
+    const byDayHits = new Set<number>();
+    for (const {ord, isoDay} of tokens) {
+      if (ord === 0) {
+        let day = 1 + ((isoDay - firstDayOfWeek + 7) % 7);
+        while (day <= lastDay) {
+          byDayHits.add(day);
+          day += 7;
+        }
+      } else {
+        let day: number;
+        if (ord > 0) {
+          day = 1 + ((isoDay - firstDayOfWeek + 7) % 7) + 7 * (ord - 1);
+        } else {
+          const lastMatch = lastDay - ((lastDayOfWeek - isoDay + 7) % 7);
+          day = lastMatch + 7 * (ord + 1);
+        }
+
+        if (day >= 1 && day <= lastDay) {
+          byDayHits.add(day);
+        }
+      }
+    }
+
+    let finalDays = [...byDayHits].sort((a, b) => a - b);
+    if (byMonthDay && byMonthDay.length > 0) {
+      if (byMonthDayHits.length === 0) {
+        return [];
+      }
+      const byMonthDayHitSet = new Set(byMonthDayHits);
+      finalDays = finalDays.filter((d) => byMonthDayHitSet.has(d));
+    }
+
+    return finalDays;
+  }
+
+  private generateMonthlyOccurrencesOptimizedBySetPos(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] | null {
+    if (!this.opts.bySetPos || !this.hasSingleExpandedTimeSlot()) {
+      return null;
+    }
+
+    const monthStart = sample.day === 1 ? sample : sample.with({day: 1});
+    const days = this.generateMonthlyOccurrenceDays(monthStart);
+    if (days.length === 0) {
+      return [];
+    }
+
+    const selectedDays = this.applyBySetPosToSortedList(days);
+    if (selectedDays.length === 0) {
+      return [];
+    }
+
+    return selectedDays.map((day) => this.buildMonthlyOccurrenceOnDay(monthStart, day));
+  }
+
   private processOccurrences(
     occs: Temporal.ZonedDateTime[],
     dates: Temporal.ZonedDateTime[],
@@ -1662,8 +1769,11 @@ export class RRuleTemporal {
         throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
       }
 
-      let occs = this.generateMonthlyOccurrences(monthCursor);
-      occs = this.applyBySetPos(occs);
+      let occs = this.generateMonthlyOccurrencesOptimizedBySetPos(monthCursor);
+      if (!occs) {
+        occs = this.generateMonthlyOccurrences(monthCursor);
+        occs = this.applyBySetPos(occs);
+      }
 
       const {shouldBreak} = this.processOccurrences(occs, dates, start, iterator);
       if (shouldBreak) {
@@ -2765,74 +2875,12 @@ export class RRuleTemporal {
    * matching your opts.byDay and opts.byMonth (or the single "same day" if no BYDAY).
    */
   private generateMonthlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
-    const {byDay, byMonth, byMonthDay} = this.opts;
     const monthStart = sample.day === 1 ? sample : sample.with({day: 1});
-
-    // 1) Skip whole month if BYMONTH says so
-    if (byMonth && !byMonth.includes(sample.month)) return [];
-
-    const lastDay = monthStart.add({months: 1}).subtract({days: 1}).day;
-
-    // days matched by BYMONTHDAY tokens
-    let byMonthDayHits: number[] = [];
-    if (byMonthDay && byMonthDay.length > 0) {
-      byMonthDayHits = byMonthDay.map((d) => (d > 0 ? d : lastDay + d + 1)).filter((d) => d >= 1 && d <= lastDay);
-      byMonthDayHits = [...new Set(byMonthDayHits)].sort((a, b) => a - b);
-    }
-
-    if (!byDay && byMonthDay && byMonthDay.length > 0) {
-      if (byMonthDayHits.length === 0) {
-        // No valid days found for this month, return empty array
-        return [];
-      }
-      const dates = byMonthDayHits.map((d) => monthStart.with({day: d}));
-      return dates.flatMap((z) => this.expandByTime(z));
-    }
-
-    if (!byDay) {
+    if (!this.opts.byDay && !this.opts.byMonthDay) {
       return this.expandByTime(sample);
     }
 
-    const tokens = this.parsedByDayTokens;
-    if (!tokens?.length) return [];
-
-    const firstDayOfWeek = monthStart.dayOfWeek;
-    const lastDayOfWeek = ((firstDayOfWeek - 1 + lastDay - 1) % 7) + 1;
-
-    // Resolve tokens → concrete days from BYDAY
-    const byDayHits = new Set<number>();
-    for (const {ord, isoDay} of tokens) {
-      if (ord === 0) {
-        let day = 1 + ((isoDay - firstDayOfWeek + 7) % 7);
-        while (day <= lastDay) {
-          byDayHits.add(day);
-          day += 7;
-        }
-      } else {
-        let day: number;
-        if (ord > 0) {
-          day = 1 + ((isoDay - firstDayOfWeek + 7) % 7) + 7 * (ord - 1);
-        } else {
-          const lastMatch = lastDay - ((lastDayOfWeek - isoDay + 7) % 7);
-          day = lastMatch + 7 * (ord + 1);
-        }
-
-        if (day >= 1 && day <= lastDay) {
-          byDayHits.add(day);
-        }
-      }
-    }
-    // Combine with BYMONTHDAY if present
-    let finalDays = [...byDayHits].sort((a, b) => a - b);
-    if (byMonthDay && byMonthDay.length > 0) {
-      if (byMonthDayHits.length === 0) {
-        // No valid days found for BYMONTHDAY, return empty array
-        return [];
-      }
-      const byMonthDayHitSet = new Set(byMonthDayHits);
-      finalDays = finalDays.filter((d) => byMonthDayHitSet.has(d));
-    }
-
+    const finalDays = this.generateMonthlyOccurrenceDays(monthStart);
     if (finalDays.length === 0) return [];
 
     const hits = finalDays.map((d) => monthStart.with({day: d}));
@@ -3133,12 +3181,7 @@ export class RRuleTemporal {
     const {bySetPos} = this.opts;
     if (!bySetPos || !bySetPos.length) return list;
     const sorted = [...list].sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
-    const out: Temporal.ZonedDateTime[] = [];
-    const len = sorted.length;
-    for (const pos of bySetPos) {
-      const idx = pos > 0 ? pos - 1 : len + pos;
-      if (idx >= 0 && idx < len) out.push(sorted[idx]!);
-    }
+    const out = this.applyBySetPosToSortedList(sorted);
     return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 

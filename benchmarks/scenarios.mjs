@@ -1,6 +1,6 @@
 export const TIMEZONES = [
   { id: 'UTC', label: 'UTC' },
-  { id: 'Pacific/Kiritimati', label: 'Pacific/Kiritimati' },
+  { id: 'America/Chicago', label: 'America/Chicago' },
 ];
 
 export const SCENARIOS = [
@@ -26,7 +26,7 @@ export const SCENARIOS = [
     description: 'Simple hourly frequency across 30 days.',
     expectedCount: 720,
     buildIcs: (tzid) =>
-      `DTSTART;TZID=${tzid}:20230221T235900\nRRULE:FREQ=HOURLY;COUNT=720;INTERVAL=1`,
+      `DTSTART;TZID=${tzid}:20230121T235900\nRRULE:FREQ=HOURLY;COUNT=720;INTERVAL=1`,
   },
   {
     id: 'minutely_1440',
