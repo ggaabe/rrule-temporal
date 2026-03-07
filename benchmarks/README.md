@@ -47,19 +47,19 @@ npm run profile:temporal -- --scenario monthly_last_weekday_240 --tzid UTC --ite
 
 Uncached median ops/s from the latest run on a MacBook Pro M2 Max:
 
-| Scenario | TZ | rrule-temporal | rrule | rrule-rust |
+| Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | rrule-rust median ops/s |
 | --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 24,322 | 16,783 | 179,506 |
-| 30 daily occurrences | America/Chicago | 2,081 | 363 | 170,777 |
-| Daily weekdays across many cycles | UTC | 1,903 | 736 | 10,622 |
-| Daily weekdays across many cycles | America/Chicago | 67.1 | 19.3 | 10,021 |
-| 720 hourly occurrences | UTC | 1,366 | 677 | 7,305 |
-| 720 hourly occurrences | America/Chicago | 108 | 13.7 | 6,963 |
-| 1,440 minutely occurrences | UTC | 751 | 317 | 4,212 |
-| 1,440 minutely occurrences | America/Chicago | 134 | 7.1 | 4,096 |
-| Weekly MO/WE/FR across many cycles | UTC | 1,275 | 1,045 | 9,282 |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 62.4 | 14.3 | 8,472 |
-| Monthly last weekday across 20 years | UTC | 67.8 | 1,087 | 11,181 |
-| Monthly last weekday across 20 years | America/Chicago | 39.4 | 39.6 | 10,043 |
-| Monthly first and last weekday across 20 years | UTC | 44.0 | 1,271 | 8,700 |
-| Monthly first and last weekday across 20 years | America/Chicago | 34.6 | 25.3 | 7,797 |
+| 30 daily occurrences | UTC | 29,275 | 16,762 | 183,628 |
+| 30 daily occurrences | America/Chicago | 2,067 | 364 | 174,182 |
+| Daily weekdays across many cycles | UTC | 1,894 | 766 | 10,652 |
+| Daily weekdays across many cycles | America/Chicago | 64.9 | 18.9 | 9,992 |
+| 720 hourly occurrences | UTC | 1,499 | 701 | 7,304 |
+| 720 hourly occurrences | America/Chicago | 104 | 14.1 | 6,958 |
+| 1,440 minutely occurrences | UTC | 751 | 325 | 4,175 |
+| 1,440 minutely occurrences | America/Chicago | 145 | 7.1 | 4,037 |
+| Weekly MO/WE/FR across many cycles | UTC | 1,179 | 1,053 | 9,432 |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 64.4 | 14.6 | 8,560 |
+| Monthly last weekday across 20 years | UTC | 1,953 | 948 | 10,493 |
+| Monthly last weekday across 20 years | America/Chicago | 45.5 | 39.4 | 10,147 |
+| Monthly first and last weekday across 20 years | UTC | 1,378 | 1,202 | 8,628 |
+| Monthly first and last weekday across 20 years | America/Chicago | 40.0 | 24.2 | 7,612 |

@@ -25,6 +25,8 @@ const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 const MS_PER_WEEK = 7 * MS_PER_DAY;
+const GREGORIAN_MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
+const GREGORIAN_WEEKDAY_OFFSETS = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4] as const;
 const NS_PER_MILLISECOND = BigInt(1_000_000);
 const NS_PER_SECOND = BigInt(1_000_000_000);
 const NS_PER_MINUTE = BigInt(60) * NS_PER_SECOND;
@@ -419,6 +421,9 @@ export class RRuleTemporal {
   private readonly simpleByDayIsoDays?: number[];
   private readonly allByDayIsoDays?: number[];
   private readonly hasOrdinalByDay: boolean;
+  private readonly canUseEpochMillisecondsPrecisionFlag: boolean;
+  private readonly timeSlotOffsetsMs?: number[];
+  private readonly numericByMonths?: number[];
   private static readonly rscaleCalendarSupport: Record<string, boolean> = {};
 
   /**
@@ -483,6 +488,12 @@ export class RRuleTemporal {
     this.simpleByDayIsoDays = this.buildByDayIsoDays(this.parsedByDayTokens, false);
     this.allByDayIsoDays = this.buildByDayIsoDays(this.parsedByDayTokens, true);
     this.hasOrdinalByDay = this.parsedByDayTokens?.some((token) => token.ord !== 0) ?? false;
+    this.canUseEpochMillisecondsPrecisionFlag =
+      this.originalDtstart.microsecond === 0 &&
+      this.originalDtstart.nanosecond === 0 &&
+      (!this.opts.until || (this.opts.until.microsecond === 0 && this.opts.until.nanosecond === 0));
+    this.timeSlotOffsetsMs = this.buildTimeSlotOffsetsMs();
+    this.numericByMonths = this.opts.byMonth?.filter((value): value is number => typeof value === 'number');
   }
 
   private buildParsedByDayTokens(byDay?: string[]) {
@@ -1350,6 +1361,21 @@ export class RRuleTemporal {
     );
   }
 
+  private canUseUtcMonthlyFastPath(iterator?: RRuleTemporalIterator): boolean {
+    return (
+      !iterator &&
+      this.tzid === 'UTC' &&
+      this.opts.freq === 'MONTHLY' &&
+      !this.opts.rscale &&
+      !this.opts.rDate &&
+      !this.opts.exDate &&
+      !this.opts.byYearDay &&
+      !this.opts.byWeekNo &&
+      this.canUseEpochMillisecondsPrecisionFlag &&
+      !!(this.opts.byDay || this.opts.byMonthDay)
+    );
+  }
+
   private utcZdtFromEpochNanoseconds(epochNanoseconds: bigint): Temporal.ZonedDateTime {
     return Temporal.Instant.fromEpochNanoseconds(epochNanoseconds).toZonedDateTimeISO('UTC');
   }
@@ -1359,11 +1385,27 @@ export class RRuleTemporal {
   }
 
   private canUseUtcEpochMillisecondsPrecision(): boolean {
-    return (
-      this.originalDtstart.microsecond === 0 &&
-      this.originalDtstart.nanosecond === 0 &&
-      (!this.opts.until || (this.opts.until.microsecond === 0 && this.opts.until.nanosecond === 0))
-    );
+    return this.canUseEpochMillisecondsPrecisionFlag;
+  }
+
+  private buildTimeSlotOffsetsMs(): number[] | undefined {
+    if (!this.canUseEpochMillisecondsPrecisionFlag) return undefined;
+
+    const hours = this.opts.byHour ?? [this.originalDtstart.hour];
+    const minutes = this.opts.byMinute ?? [this.originalDtstart.minute];
+    const seconds = this.opts.bySecond ?? [this.originalDtstart.second];
+    const baseMilliseconds = this.originalDtstart.millisecond;
+    const offsets: number[] = [];
+
+    for (const hour of hours) {
+      for (const minute of minutes) {
+        for (const second of seconds) {
+          offsets.push((((hour * 60) + minute) * 60 + second) * MS_PER_SECOND + baseMilliseconds);
+        }
+      }
+    }
+
+    return offsets;
   }
 
   private findFirstMatchingDailyStep(startDayOfWeek: number, stepDays: number, allowedDays: number[]): number | null {
@@ -1387,6 +1429,10 @@ export class RRuleTemporal {
         case 'MINUTELY':
           return this._allUtcFixedStepSimple(NS_PER_MINUTE * BigInt(this.opts.interval!));
       }
+    }
+
+    if (this.canUseUtcMonthlyFastPath(iterator)) {
+      return this._allUtcMonthlyByDayOrMonthDay();
     }
 
     if (this.canUseUtcWeeklyFastPath(iterator)) {
@@ -1607,6 +1653,9 @@ export class RRuleTemporal {
   }
 
   private hasSingleExpandedTimeSlot(): boolean {
+    if (this.timeSlotOffsetsMs) {
+      return this.timeSlotOffsetsMs.length === 1;
+    }
     const hours = this.opts.byHour ?? [this.originalDtstart.hour];
     const minutes = this.opts.byMinute ?? [this.originalDtstart.minute];
     const seconds = this.opts.bySecond ?? [this.originalDtstart.second];
@@ -1710,7 +1759,176 @@ export class RRuleTemporal {
       return [];
     }
 
-    return selectedDays.map((day) => this.buildMonthlyOccurrenceOnDay(monthStart, day));
+    return selectedDays.sort((a, b) => a - b).map((day) => this.buildMonthlyOccurrenceOnDay(monthStart, day));
+  }
+
+  private isGregorianLeapYear(year: number): boolean {
+    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  }
+
+  private daysInGregorianMonth(year: number, month: number): number {
+    if (month === 2 && this.isGregorianLeapYear(year)) {
+      return 29;
+    }
+    return GREGORIAN_MONTH_LENGTHS[month - 1]!;
+  }
+
+  private gregorianIsoDayOfWeek(year: number, month: number, day: number): number {
+    let adjustedYear = year;
+    if (month < 3) adjustedYear -= 1;
+    const sundayZero =
+      (adjustedYear +
+        Math.floor(adjustedYear / 4) -
+        Math.floor(adjustedYear / 100) +
+        Math.floor(adjustedYear / 400) +
+        GREGORIAN_WEEKDAY_OFFSETS[month - 1]! +
+        day) %
+      7;
+    return sundayZero === 0 ? 7 : sundayZero;
+  }
+
+  private monthIndexToYearMonth(monthIndex: number): {year: number; month: number} {
+    const year = Math.floor(monthIndex / 12);
+    return {
+      year,
+      month: monthIndex - year * 12 + 1,
+    };
+  }
+
+  private generateMonthlyOccurrenceDaysUtc(year: number, month: number): number[] {
+    if (this.numericByMonths && this.numericByMonths.length > 0 && !this.numericByMonths.includes(month)) {
+      return [];
+    }
+
+    const byMonthDay = this.opts.byMonthDay;
+    const byDay = this.opts.byDay;
+    const lastDay = this.daysInGregorianMonth(year, month);
+
+    let byMonthDayHits: number[] = [];
+    if (byMonthDay && byMonthDay.length > 0) {
+      byMonthDayHits = byMonthDay
+        .map((day) => (day > 0 ? day : lastDay + day + 1))
+        .filter((day) => day >= 1 && day <= lastDay);
+      byMonthDayHits = [...new Set(byMonthDayHits)].sort((a, b) => a - b);
+    }
+
+    if (!byDay && byMonthDay && byMonthDay.length > 0) {
+      return byMonthDayHits;
+    }
+
+    if (!byDay) {
+      const day = this.originalDtstart.day;
+      return day >= 1 && day <= lastDay ? [day] : [];
+    }
+
+    const tokens = this.parsedByDayTokens;
+    if (!tokens?.length) return [];
+
+    const firstDayOfWeek = this.gregorianIsoDayOfWeek(year, month, 1);
+    const lastDayOfWeek = addIsoDays(firstDayOfWeek, lastDay - 1);
+    const byDayHits = new Set<number>();
+
+    for (const {ord, isoDay} of tokens) {
+      if (ord === 0) {
+        let day = 1 + ((isoDay - firstDayOfWeek + 7) % 7);
+        while (day <= lastDay) {
+          byDayHits.add(day);
+          day += 7;
+        }
+      } else {
+        let day: number;
+        if (ord > 0) {
+          day = 1 + ((isoDay - firstDayOfWeek + 7) % 7) + 7 * (ord - 1);
+        } else {
+          const lastMatch = lastDay - ((lastDayOfWeek - isoDay + 7) % 7);
+          day = lastMatch + 7 * (ord + 1);
+        }
+
+        if (day >= 1 && day <= lastDay) {
+          byDayHits.add(day);
+        }
+      }
+    }
+
+    let finalDays = [...byDayHits].sort((a, b) => a - b);
+    if (byMonthDay && byMonthDay.length > 0) {
+      if (byMonthDayHits.length === 0) return [];
+      const byMonthDayHitSet = new Set(byMonthDayHits);
+      finalDays = finalDays.filter((day) => byMonthDayHitSet.has(day));
+    }
+
+    return finalDays;
+  }
+
+  private generateMonthlyOccurrenceEpochsUtc(year: number, month: number): number[] {
+    const days = this.generateMonthlyOccurrenceDaysUtc(year, month);
+    if (days.length === 0) return [];
+
+    const monthStartMs = Date.UTC(year, month - 1, 1, 0, 0, 0, 0);
+    const timeSlotOffsets = this.timeSlotOffsetsMs ?? [0];
+
+    if (this.opts.bySetPos && this.opts.bySetPos.length > 0) {
+      if (timeSlotOffsets.length === 1) {
+        const selectedDays = this.applyBySetPosToSortedList(days).sort((a, b) => a - b);
+        const offset = timeSlotOffsets[0]!;
+        return selectedDays.map((day) => monthStartMs + (day - 1) * MS_PER_DAY + offset);
+      }
+
+      const timestamps: number[] = [];
+      for (const day of days) {
+        const dayBase = monthStartMs + (day - 1) * MS_PER_DAY;
+        for (const offset of timeSlotOffsets) {
+          timestamps.push(dayBase + offset);
+        }
+      }
+      return this.applyBySetPosToSortedList(timestamps).sort((a, b) => a - b);
+    }
+
+    const timestamps: number[] = [];
+    for (const day of days) {
+      const dayBase = monthStartMs + (day - 1) * MS_PER_DAY;
+      for (const offset of timeSlotOffsets) {
+        timestamps.push(dayBase + offset);
+      }
+    }
+    return timestamps;
+  }
+
+  private _allUtcMonthlyByDayOrMonthDay(): Temporal.ZonedDateTime[] {
+    const dates: Temporal.ZonedDateTime[] = [];
+    const startMilliseconds = this.originalDtstart.epochMilliseconds;
+    const untilMilliseconds = this.opts.until?.epochMilliseconds;
+    let iterationCount = 0;
+
+    if (!this.addDtstartIfNeeded(dates)) {
+      return dates;
+    }
+
+    let monthIndex = this.originalDtstart.year * 12 + (this.originalDtstart.month - 1);
+    while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+
+      const {year, month} = this.monthIndexToYearMonth(monthIndex);
+      const occurrenceEpochs = this.generateMonthlyOccurrenceEpochsUtc(year, month);
+
+      for (const epochMilliseconds of occurrenceEpochs) {
+        if (epochMilliseconds < startMilliseconds) {
+          continue;
+        }
+        if (untilMilliseconds !== undefined && epochMilliseconds > untilMilliseconds) {
+          return dates;
+        }
+
+        dates.push(this.utcZdtFromEpochMilliseconds(epochMilliseconds));
+        if (this.shouldBreakForCountLimit(dates.length)) {
+          return dates;
+        }
+      }
+
+      monthIndex += this.opts.interval!;
+    }
   }
 
   private processOccurrences(
