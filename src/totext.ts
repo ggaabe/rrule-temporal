@@ -638,16 +638,16 @@ function formatByDayToken(tok: string | number, locale: LocaleData): string {
   return `${ordinal(ord, locale)} ${name}`;
 }
 
-function formatTime(dtz: Temporal.ZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
+function formatTime(zdt: Temporal.ZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
   const options: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
-    timeZone: dtz.timeZoneId,
+    timeZone: zdt.timeZoneId,
   };
 
-  if (second) options.second = '2-digit'
+  if (second) options.second = '2-digit';
   if (second || minute) options.minute = '2-digit';
 
-  const jsDate = new Date(dtz.with({ hour, minute, second }).epochMilliseconds);
+  const jsDate = new Date(zdt.with({hour, minute, second}).epochMilliseconds);
 
   const formatter = getDateTimeFormatterWithFallback(locale, options);
   return formatter.format(jsDate);
