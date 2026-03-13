@@ -170,4 +170,15 @@ describe('RRuleTemporal.toText', () => {
     });
     expect(toText(rule)).toBe('every week on Thursday at 10:30 AM UTC');
   });
+
+  test('should display the requested wall-clock time for DST spring-forward (nonexistent local time)', () => {
+    const rule = new RRuleTemporal({
+      dtstart: Temporal.ZonedDateTime.from('2025-03-09T02:30:00[America/New_York]'),
+      freq: 'YEARLY',
+      byHour: [2],
+      byMinute: [30],
+    });
+    const text = toText(rule, 'en');
+    expect(text).toContain('2:30'); // Should not display 3:30
+  });
 });
