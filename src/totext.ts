@@ -647,10 +647,8 @@ function formatTime(zdt: Temporal.ZonedDateTime, locale: string, hour: number, m
   if (second) options.second = '2-digit';
   if (second || minute) options.minute = '2-digit';
 
-  const jsDate = new Date(zdt.with({hour, minute, second}).epochMilliseconds);
-
-  const formatter = getDateTimeFormatterWithFallback(locale, options);
-  return formatter.format(jsDate);
+  const ruleTime = Temporal.PlainTime.from({hour, minute, second});
+  return ruleTime.toLocaleString(locale, options)
 }
 
 function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
