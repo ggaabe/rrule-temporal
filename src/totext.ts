@@ -638,30 +638,33 @@ function formatByDayToken(tok: string | number, locale: LocaleData): string {
   return `${ordinal(ord, locale)} ${name}`;
 }
 
-function formatTime(hour: number, minute = 0, second = 0): string {
-  const hr12 = ((hour + 11) % 12) + 1;
-  const ampm = hour < 12 ? 'AM' : 'PM';
-  const mm = String(minute).padStart(2, '0');
-  const ss = String(second).padStart(2, '0');
-  if (second) {
-    return `${hr12}:${mm}:${ss} ${ampm}`;
-  }
-  if (minute) {
-    return `${hr12}:${mm} ${ampm}`;
-  }
-  return `${hr12} ${ampm}`;
+function formatTime(dtz: Temporal.ZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
+  const options: Intl.DateTimeFormatOptions = {
+    hour: 'numeric',
+    timeZone: dtz.timeZoneId,
+  };
+
+  if (second) options.second = '2-digit'
+  if (second || minute) options.minute = '2-digit';
+
+  const jsDate = new Date(dtz.with({ hour, minute, second }).epochMilliseconds);
+
+  const formatter = getDateTimeFormatterWithFallback(locale, options);
+  return formatter.format(jsDate);
 }
 
 function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
   return allowedWeekdays[zdt.dayOfWeek - 1]!;
 }
 
-function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
+function tzAbbreviation(zdt: Temporal.ZonedDateTime, locale: string): string {
+  const options: Intl.DateTimeFormatOptions = {
     timeZone: zdt.timeZoneId,
     timeZoneName: 'short',
     hour: 'numeric',
-  }).formatToParts(new Date(zdt.epochMilliseconds));
+  };
+  const formatter = getDateTimeFormatterWithFallback(locale, options);
+  const parts = formatter.formatToParts(new Date(zdt.epochMilliseconds));
   const tzPart = parts.find((p) => p.type === 'timeZoneName');
   return tzPart?.value || zdt.timeZoneId;
 }
@@ -671,6 +674,14 @@ function formatLocalizedDate(zdt: Temporal.ZonedDateTime, locale: string): strin
     return zdt.toLocaleString(locale, {dateStyle: 'long'});
   } catch {
     return zdt.toLocaleString('en', {dateStyle: 'long'});
+  }
+}
+
+function getDateTimeFormatterWithFallback(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  try {
+    return new Intl.DateTimeFormat(locale, options);
+  } catch {
+    return new Intl.DateTimeFormat('en-US', options);
   }
 }
 
@@ -795,9 +806,11 @@ export function toText(input: RRuleTemporal | string, locale?: string, options: 
   if (textByHour) {
     const minutes = textByMinute ?? [0];
     const seconds = textBySecond ?? [0];
-    const times = textByHour.flatMap((h) => minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s))));
+    const times = textByHour.flatMap((h) =>
+      minutes.flatMap((m) => seconds.map((s) => formatTime(opts.dtstart, dateLocale, h, m, s))),
+    );
     parts.push(data.words.at, list(times, undefined, data.words.and));
-    if (!options.excludeTzAbbreviation) parts.push(tzAbbreviation(opts.dtstart));
+    if (!options.excludeTzAbbreviation) parts.push(tzAbbreviation(opts.dtstart, dateLocale));
   }
 
   if (!textByHour && textByMinute) {
