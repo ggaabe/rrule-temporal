@@ -638,30 +638,62 @@ function formatByDayToken(tok: string | number, locale: LocaleData): string {
   return `${ordinal(ord, locale)} ${name}`;
 }
 
-function formatTime(hour: number, minute = 0, second = 0): string {
-  const hr12 = ((hour + 11) % 12) + 1;
-  const ampm = hour < 12 ? 'AM' : 'PM';
-  const mm = String(minute).padStart(2, '0');
-  const ss = String(second).padStart(2, '0');
-  if (second) {
-    return `${hr12}:${mm}:${ss} ${ampm}`;
+function formatTime(dtz: Temporal.ZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
+  console.log(formatTime, dtz, {hour, minute, second});
+  const options: Intl.DateTimeFormatOptions = {
+    hour: 'numeric',
+    timeZone: dtz.timeZoneId,
+  };
+
+  if (second) options.second = '2-digit'
+  if (second || minute) options.minute = '2-digit';
+
+  console.log(dtz.hour, dtz.toLocaleString());
+
+  const toto = dtz.with({hour, minute, second});
+
+  console.log(toto.hour, toto.toLocaleString());
+  const jsDate = new Date(toto.epochMilliseconds);
+  /*
+  if (h) jsDate.setHours(h)
+  if (m) jsDate.setMinutes(m)
+  if (s) jsDate.setSeconds(s)
+
+   */
+  console.log(jsDate.toUTCString());
+  console.log('====>', new Intl.DateTimeFormat('en-US', options).format(jsDate));
+
+  console.log({jsDate});
+  console.log(new Intl.DateTimeFormat(locale, options).format(jsDate));
+  try {
+    return new Intl.DateTimeFormat(locale, options).format(jsDate);
+  } catch {
+    return new Intl.DateTimeFormat('en-US', options).format(jsDate);
   }
-  if (minute) {
-    return `${hr12}:${mm} ${ampm}`;
-  }
-  return `${hr12} ${ampm}`;
 }
 
 function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
   return allowedWeekdays[zdt.dayOfWeek - 1]!;
 }
 
-function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: zdt.timeZoneId,
-    timeZoneName: 'short',
-    hour: 'numeric',
-  }).formatToParts(new Date(zdt.epochMilliseconds));
+function tzAbbreviation(zdt: Temporal.ZonedDateTime, locale: string): string {
+  let formatter
+
+  try {
+    formatter = new Intl.DateTimeFormat(locale, {
+      timeZone: zdt.timeZoneId,
+      timeZoneName: 'short',
+      hour: 'numeric',
+    });
+  } catch {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: zdt.timeZoneId,
+      timeZoneName: 'short',
+      hour: 'numeric',
+    });
+  }
+
+  const parts = formatter.formatToParts(new Date(zdt.epochMilliseconds))
   const tzPart = parts.find((p) => p.type === 'timeZoneName');
   return tzPart?.value || zdt.timeZoneId;
 }
@@ -791,12 +823,15 @@ export function toText(input: RRuleTemporal | string, locale?: string, options: 
     );
   }
 
+  console.log({textByHour });
   if (textByHour) {
     const minutes = textByMinute ?? [0];
     const seconds = textBySecond ?? [0];
-    const times = textByHour.flatMap((h) => minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s))));
+    const times = textByHour.flatMap((h) =>
+      minutes.flatMap((m) => seconds.map((s) => formatTime(opts.dtstart, dateLocale, h, m, s))),
+    );
     parts.push(data.words.at, list(times, undefined, data.words.and));
-    parts.push(tzAbbreviation(opts.dtstart));
+    parts.push(tzAbbreviation(opts.dtstart, dateLocale));
   }
 
   if (!textByHour && textByMinute) {
