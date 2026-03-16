@@ -648,7 +648,15 @@ function formatTime(zdt: Temporal.ZonedDateTime, locale: string, hour: number, m
   if (second || minute) options.minute = '2-digit';
 
   const ruleTime = Temporal.PlainTime.from({hour, minute, second});
-  return ruleTime.toLocaleString(locale, options)
+
+  let result;
+  try {
+    result = ruleTime.toLocaleString(locale, options);
+  } catch {
+    result = ruleTime.toLocaleString('en', options);
+  }
+
+  return result;
 }
 
 function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
@@ -661,7 +669,14 @@ function tzAbbreviation(zdt: Temporal.ZonedDateTime, locale: string): string {
     timeZoneName: 'short',
     hour: 'numeric',
   };
-  const formatter = getDateTimeFormatterWithFallback(locale, options);
+
+  let formatter
+  try {
+    formatter = new Intl.DateTimeFormat(locale, options);
+  } catch {
+    formatter = Intl.DateTimeFormat('en', options);
+  }
+
   const parts = formatter.formatToParts(new Date(zdt.epochMilliseconds));
   const tzPart = parts.find((p) => p.type === 'timeZoneName');
   return tzPart?.value || zdt.timeZoneId;
@@ -672,14 +687,6 @@ function formatLocalizedDate(zdt: Temporal.ZonedDateTime, locale: string): strin
     return zdt.toLocaleString(locale, {dateStyle: 'long'});
   } catch {
     return zdt.toLocaleString('en', {dateStyle: 'long'});
-  }
-}
-
-function getDateTimeFormatterWithFallback(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
-  try {
-    return new Intl.DateTimeFormat(locale, options);
-  } catch {
-    return new Intl.DateTimeFormat('en-US', options);
   }
 }
 
