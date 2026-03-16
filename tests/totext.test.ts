@@ -30,6 +30,14 @@ describe('RRuleTemporal.toText', () => {
     expect(toText(rule, 'en', {includeDtstart: true})).toBe('every day starting from January 1, 2025');
   });
 
+  test('can exclude timezone abbreviation in text output', () => {
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      dtstart: zdt(2025, 1, 1, 8),
+    });
+    expect(toText(rule, 'en', {excludeTzAbbreviation: true})).toBe('every week on Wednesday at 8 AM');
+  });
+
   test('daily with hours', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
