@@ -47,12 +47,12 @@
     "dist"
   ],
   "devDependencies": {
-    "@types/node": "^24.9.1",
-    "@vitest/coverage-v8": "^3.2.4",
-    "prettier": "^3.6.2",
-    "tsup": "^8.5.0",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "prettier": "^3.8.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.0"
   },
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1"
