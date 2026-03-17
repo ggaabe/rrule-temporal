@@ -18,7 +18,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsup",
+    "build": "tsdown",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "format": "./node_modules/.bin/prettier --write 'src/**/*.ts'",
@@ -50,7 +50,7 @@
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^4.1.0",
     "prettier": "^3.8.1",
-    "tsup": "^8.5.1",
+    "tsdown": "^0.21.4",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   },
