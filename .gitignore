@@ -127,3 +127,4 @@ yarn.lock
 .claude
 .coverage
 .DS_Store
+tests/_tmp.test.ts
