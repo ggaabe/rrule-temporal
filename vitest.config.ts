@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import {defineConfig} from 'vitest/config';
 
 export default defineConfig({
   test: {
@@ -6,7 +6,7 @@ export default defineConfig({
     testTimeout: 15000, // 15 seconds for slow tests
     coverage: {
       provider: 'v8',
-      include: ['src/index.ts', 'src/totext.ts'],
+      include: ['src/RRuleTemporal.ts', 'src/totext.ts'],
       reporter: ['html', 'text-summary'],
       reportsDirectory: '.coverage',
     },
