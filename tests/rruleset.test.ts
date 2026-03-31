@@ -67,4 +67,92 @@ describe('RRuleSetTemporal skeleton', () => {
     expect(dates[0]).not.toBe(original);
     expect(dates[0]?.toString()).toBe(original.toString());
   });
+
+  it('returns included rule occurrences and explicit dates within a window', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 3,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const includeDate = Temporal.ZonedDateTime.from('2026-01-04T09:00:00[UTC]');
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [includeDate],
+    });
+
+    const results = set.between(new Date('2025-12-31T00:00:00.000Z'), new Date('2026-01-05T00:00:00.000Z'), true);
+
+    expect(results.map((date) => date.toString())).toEqual([
+      '2026-01-01T09:00:00+00:00[UTC]',
+      '2026-01-02T09:00:00+00:00[UTC]',
+      '2026-01-03T09:00:00+00:00[UTC]',
+      '2026-01-04T09:00:00+00:00[UTC]',
+    ]);
+  });
+
+  it('removes occurrences excluded by explicit dates', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 4,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const excludeDate = Temporal.ZonedDateTime.from('2026-01-02T09:00:00[UTC]');
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      excludeDates: [excludeDate],
+    });
+
+    const results = set.between(new Date('2025-12-31T00:00:00.000Z'), new Date('2026-01-05T00:00:00.000Z'), true);
+
+    expect(results.map((date) => date.toString())).toEqual([
+      '2026-01-01T09:00:00+00:00[UTC]',
+      '2026-01-03T09:00:00+00:00[UTC]',
+      '2026-01-04T09:00:00+00:00[UTC]',
+    ]);
+  });
+
+  it('deduplicates explicit dates already produced by an included rule', () => {
+    const duplicateDate = Temporal.ZonedDateTime.from('2026-01-02T09:00:00[UTC]');
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 3,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [duplicateDate],
+    });
+
+    const results = set.between(new Date('2025-12-31T00:00:00.000Z'), new Date('2026-01-05T00:00:00.000Z'), true);
+
+    expect(results.map((date) => date.toString())).toEqual([
+      '2026-01-01T09:00:00+00:00[UTC]',
+      '2026-01-02T09:00:00+00:00[UTC]',
+      '2026-01-03T09:00:00+00:00[UTC]',
+    ]);
+  });
+
+  it('lets exclusion rules override inclusion rules', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 4,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const excludeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 2,
+      dtstart: zdt(2026, 1, 2, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      excludeRules: [excludeRule],
+    });
+
+    const results = set.between(new Date('2025-12-31T00:00:00.000Z'), new Date('2026-01-05T00:00:00.000Z'), true);
+
+    expect(results.map((date) => date.toString())).toEqual([
+      '2026-01-01T09:00:00+00:00[UTC]',
+      '2026-01-04T09:00:00+00:00[UTC]',
+    ]);
+  });
 });

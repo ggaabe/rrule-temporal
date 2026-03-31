@@ -23,6 +23,10 @@ function compareByInstant(a: Temporal.ZonedDateTime, b: Temporal.ZonedDateTime):
   return Temporal.Instant.compare(a.toInstant(), b.toInstant());
 }
 
+function normalizeDateFilter(date: DateFilter): Temporal.Instant {
+  return date instanceof Date ? Temporal.Instant.from(date.toISOString()) : date.toInstant();
+}
+
 function dedupeDates(dates: Temporal.ZonedDateTime[]): Temporal.ZonedDateTime[] {
   const byInstant = new Map<string, Temporal.ZonedDateTime>();
   for (const date of dates) {
@@ -104,5 +108,41 @@ export class RRuleSetTemporal {
       excludeDates: this.exdates(),
       maxIterations: this.maxIterations,
     };
+  }
+
+  between(after: DateFilter, before: DateFilter, inc = false): Temporal.ZonedDateTime[] {
+    const afterInstant = normalizeDateFilter(after);
+    const beforeInstant = normalizeDateFilter(before);
+
+    const included = dedupeDates([
+      ...this.includeRules.flatMap((rule) => rule.between(after, before, inc)),
+      ...this.includeDates.filter((date) => this.isWithinWindow(date, afterInstant, beforeInstant, inc)),
+    ]);
+
+    const excluded = new Set(
+      dedupeDates([
+        ...this.excludeRules.flatMap((rule) => rule.between(after, before, inc)),
+        ...this.excludeDates.filter((date) => this.isWithinWindow(date, afterInstant, beforeInstant, inc)),
+      ]).map(instantKey),
+    );
+
+    return included.filter((date) => !excluded.has(instantKey(date)));
+  }
+
+  private isWithinWindow(
+    date: Temporal.ZonedDateTime,
+    afterInstant: Temporal.Instant,
+    beforeInstant: Temporal.Instant,
+    inc: boolean,
+  ): boolean {
+    const instant = date.toInstant();
+    const afterComparison = Temporal.Instant.compare(instant, afterInstant);
+    const beforeComparison = Temporal.Instant.compare(instant, beforeInstant);
+
+    if (inc) {
+      return afterComparison >= 0 && beforeComparison <= 0;
+    }
+
+    return afterComparison > 0 && beforeComparison < 0;
   }
 }
