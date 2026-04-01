@@ -129,6 +129,39 @@ export class RRuleSetTemporal {
     return included.filter((date) => !excluded.has(instantKey(date)));
   }
 
+  all(iterator?: (d: Temporal.ZonedDateTime, len: number) => boolean): Temporal.ZonedDateTime[] {
+    const included = dedupeDates([
+      ...this.includeRules.flatMap((rule) => rule.all()),
+      ...this.includeDates,
+    ]);
+
+    const excluded = new Set(
+      dedupeDates([
+        ...this.excludeRules.flatMap((rule) => rule.all()),
+        ...this.excludeDates,
+      ]).map(instantKey),
+    );
+
+    const results = included.filter((date) => !excluded.has(instantKey(date)));
+    if (!iterator) {
+      return results;
+    }
+
+    const accepted: Temporal.ZonedDateTime[] = [];
+    for (let index = 0; index < results.length; index++) {
+      const date = results[index]!;
+      if (!iterator(date, index)) {
+        break;
+      }
+      accepted.push(date);
+    }
+    return accepted;
+  }
+
+  count(): number {
+    return this.all().length;
+  }
+
   private isWithinWindow(
     date: Temporal.ZonedDateTime,
     afterInstant: Temporal.Instant,

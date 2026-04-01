@@ -155,4 +155,51 @@ describe('RRuleSetTemporal skeleton', () => {
       '2026-01-04T09:00:00+00:00[UTC]',
     ]);
   });
+
+  it('returns the merged finite recurrence set from all()', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 3,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [Temporal.ZonedDateTime.from('2026-01-04T09:00:00[UTC]')],
+      excludeDates: [Temporal.ZonedDateTime.from('2026-01-02T09:00:00[UTC]')],
+    });
+
+    expect(set.all().map((date) => date.toString())).toEqual([
+      '2026-01-01T09:00:00+00:00[UTC]',
+      '2026-01-03T09:00:00+00:00[UTC]',
+      '2026-01-04T09:00:00+00:00[UTC]',
+    ]);
+  });
+
+  it('supports the same early-stop iterator contract in all()', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 4,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({includeRules: [includeRule]});
+
+    expect(set.all((_, index) => index < 2).map((date) => date.toString())).toEqual([
+      '2026-01-01T09:00:00+00:00[UTC]',
+      '2026-01-02T09:00:00+00:00[UTC]',
+    ]);
+  });
+
+  it('counts the merged finite recurrence set', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 4,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      excludeDates: [Temporal.ZonedDateTime.from('2026-01-03T09:00:00[UTC]')],
+    });
+
+    expect(set.count()).toBe(3);
+  });
 });
