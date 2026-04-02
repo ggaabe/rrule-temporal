@@ -202,4 +202,53 @@ describe('RRuleSetTemporal skeleton', () => {
 
     expect(set.count()).toBe(3);
   });
+
+  it('returns the next occurrence from the merged set', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 3,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [Temporal.ZonedDateTime.from('2026-01-04T09:00:00[UTC]')],
+      excludeDates: [Temporal.ZonedDateTime.from('2026-01-02T09:00:00[UTC]')],
+    });
+
+    expect(set.next(new Date('2026-01-01T09:00:00.000Z'))?.toString()).toBe('2026-01-03T09:00:00+00:00[UTC]');
+    expect(set.next(new Date('2026-01-01T09:00:00.000Z'), true)?.toString()).toBe('2026-01-01T09:00:00+00:00[UTC]');
+  });
+
+  it('returns the previous occurrence from the merged set', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 3,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [Temporal.ZonedDateTime.from('2026-01-04T09:00:00[UTC]')],
+      excludeDates: [Temporal.ZonedDateTime.from('2026-01-02T09:00:00[UTC]')],
+    });
+
+    expect(set.previous(new Date('2026-01-04T09:00:00.000Z'))?.toString()).toBe('2026-01-03T09:00:00+00:00[UTC]');
+    expect(set.previous(new Date('2026-01-04T09:00:00.000Z'), true)?.toString()).toBe('2026-01-04T09:00:00+00:00[UTC]');
+  });
+
+  it('surfaces explicit dates through next() and previous()', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      count: 2,
+      byDay: ['MO'],
+      dtstart: zdt(2026, 1, 5, 9, 'UTC'),
+    });
+    const explicitDate = Temporal.ZonedDateTime.from('2026-01-07T09:00:00[UTC]');
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [explicitDate],
+    });
+
+    expect(set.next(new Date('2026-01-05T09:00:00.000Z'))?.toString()).toBe('2026-01-07T09:00:00+00:00[UTC]');
+    expect(set.previous(new Date('2026-01-12T09:00:00.000Z'))?.toString()).toBe('2026-01-07T09:00:00+00:00[UTC]');
+  });
 });

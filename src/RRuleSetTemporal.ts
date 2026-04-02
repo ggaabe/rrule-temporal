@@ -162,6 +162,48 @@ export class RRuleSetTemporal {
     return this.all().length;
   }
 
+  next(after: DateFilter = new Date(), inc = false): Temporal.ZonedDateTime | null {
+    const afterInstant = normalizeDateFilter(after);
+
+    let result: Temporal.ZonedDateTime | null = null;
+    this.all((occurrence) => {
+      const instant = occurrence.toInstant();
+      const matches = inc
+        ? Temporal.Instant.compare(instant, afterInstant) >= 0
+        : Temporal.Instant.compare(instant, afterInstant) > 0;
+
+      if (matches) {
+        result = occurrence;
+        return false;
+      }
+
+      return true;
+    });
+
+    return result;
+  }
+
+  previous(before: DateFilter = new Date(), inc = false): Temporal.ZonedDateTime | null {
+    const beforeInstant = normalizeDateFilter(before);
+
+    let result: Temporal.ZonedDateTime | null = null;
+    this.all((occurrence) => {
+      const instant = occurrence.toInstant();
+      const beyond = inc
+        ? Temporal.Instant.compare(instant, beforeInstant) > 0
+        : Temporal.Instant.compare(instant, beforeInstant) >= 0;
+
+      if (beyond) {
+        return false;
+      }
+
+      result = occurrence;
+      return true;
+    });
+
+    return result;
+  }
+
   private isWithinWindow(
     date: Temporal.ZonedDateTime,
     afterInstant: Temporal.Instant,
