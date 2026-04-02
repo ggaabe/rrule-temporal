@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - '**'
+  workflow_dispatch:
 
 jobs:
   build-test:
@@ -26,4 +27,3 @@ jobs:
 
       - name: Run unit tests
         run: npm test
-
