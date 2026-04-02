@@ -676,6 +676,7 @@ function formatLocalizedDate(zdt: Temporal.ZonedDateTime, locale: string): strin
 
 export interface ToTextOptions {
   includeDtstart?: boolean;
+  excludeTzAbbreviation?: boolean;
 }
 
 export function toText(input: RRuleTemporal | string, locale?: string, options: ToTextOptions = {}): string {
@@ -796,7 +797,7 @@ export function toText(input: RRuleTemporal | string, locale?: string, options: 
     const seconds = textBySecond ?? [0];
     const times = textByHour.flatMap((h) => minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s))));
     parts.push(data.words.at, list(times, undefined, data.words.and));
-    parts.push(tzAbbreviation(opts.dtstart));
+    if (!options.excludeTzAbbreviation) parts.push(tzAbbreviation(opts.dtstart));
   }
 
   if (!textByHour && textByMinute) {

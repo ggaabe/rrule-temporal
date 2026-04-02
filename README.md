@@ -166,6 +166,7 @@ rule.toString();
 toText(rule);             // uses the runtime locale, defaults to English
 toText(rule, "es");      // Spanish description
 toText(rule, "en", { includeDtstart: true }); // include "starting from <DTSTART date>"
+toText(rule, "en", { excludeTzAbbreviation: true }); // omit timezone abbreviation in the output
 toText(rule);
 // "every day for 3 times"
 
@@ -299,7 +300,7 @@ Notes
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(rule, locale?, options?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). Options: `{ includeDtstart?: boolean }`. |
+| `toText(rule, locale?, options?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). Options: `{ includeDtstart?: boolean, excludeTzAbbreviation?: boolean }`. |
 | `options()` | Return the normalized options object. |
 
 ## Benchmarks
