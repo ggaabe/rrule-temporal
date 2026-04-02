@@ -21,7 +21,7 @@
     "build": "tsdown",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
-    "format": "./node_modules/.bin/prettier --write 'src/**/*.ts'",
+    "format": "prettier --write 'src/**/*.ts'",
     "prepare": "npm run build"
   },
   "repository": {
