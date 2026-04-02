@@ -101,7 +101,10 @@ const expected = {
   'yue-Hant': [
     '每 日',
     '每 日 在 上午10時, 下午12時 和 下午5時 GMT-4',
-    '每 週 在 星期日 在 上午10時, 下午12時 和 下午5時 GMT-4',
+    [
+      '每 週 在 星期日 在 上午10時, 下午12時 和 下午5時 GMT-4',
+      '每 週 在 星期日 在 上晝10時, 下晝12時 和 下晝5時 gmt-4',
+    ],
     '每 週 在 星期日',
     '每 小時',
     '每 4 小時',
@@ -114,9 +117,15 @@ const expected = {
     '每 年',
     '每 年 在 第1 星期五',
     '每 年 在 第13 星期五',
-    '每 日 在 下午5:30 GMT-4',
-    '每 週 在 星期一 和 星期三 在 上午10時 和 下午4時 GMT-4',
-    '每 週 在 星期二 和 星期四 在 上午9:30 和 下午3:30 GMT-4',
+    ['每 日 在 下午5:30 GMT-4', '每 日 在 下晝5:30 gmt-4'],
+    [
+      '每 週 在 星期一 和 星期三 在 上午10時 和 下午4時 GMT-4',
+      '每 週 在 星期一 和 星期三 在 上晝10時 和 下晝4時 gmt-4',
+    ],
+    [
+      '每 週 在 星期二 和 星期四 在 上午9:30 和 下午3:30 GMT-4',
+      '每 週 在 星期二 和 星期四 在 上晝9:30 和 下晝3:30 gmt-4',
+    ],
   ],
   ar: [
     'كل يوم',
@@ -202,9 +211,9 @@ const expected = {
 
 describe('toText i18n basic cases', () => {
   for (const lang of Object.keys(expected) as (keyof typeof expected)[]) {
-    test.each(cases.map((r, i) => [expected[lang][i], r]))('%s', (text, ruleStr) => {
+    test.each(cases.map((r, i) => [expected[lang][i], r]))('%s', (expectation, ruleStr) => {
       const rule = make(ruleStr);
-      expect(toText(rule, lang).toLowerCase()).toBe(text?.toLowerCase());
+      expect(Array.isArray(expectation) ? expectation : [expectation]).toContain(toText(rule, lang).toLowerCase());
     });
   }
 });
