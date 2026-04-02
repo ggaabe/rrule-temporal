@@ -189,4 +189,15 @@ describe('RRuleTemporal.toText', () => {
     const text = toText(rule, 'en');
     expect(text).toContain('2:30'); // Should not display 3:30
   });
+
+  test('yue-Hant and zh-Hant intentionally use different day-period wording', () => {
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      byHour: [10],
+      dtstart: zdt(2025, 1, 1, 0),
+    });
+
+    expect(toText(rule, 'yue-Hant', {excludeTzAbbreviation: true})).toContain('上晝10時');
+    expect(toText(rule, 'zh-Hant', {excludeTzAbbreviation: true})).toContain('上午10時');
+  });
 });
