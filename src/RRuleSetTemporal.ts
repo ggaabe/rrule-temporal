@@ -204,6 +204,31 @@ export class RRuleSetTemporal {
     return result;
   }
 
+  toJSON(): RRuleSetOpts {
+    return this.options();
+  }
+
+  toString(): string {
+    if (this.excludeRules.length > 0 || this.includeRules.length > 1) {
+      throw new Error('toString() only supports sets with a single include rule and no exclude rules');
+    }
+
+    if (this.includeRules.length === 0) {
+      throw new Error('toString() requires exactly one include rule');
+    }
+
+    const [rule] = this.includeRules;
+    const baseOptions = rule!.options();
+
+    const serializedRule = new RRuleTemporal({
+      ...baseOptions,
+      rDate: dedupeDates([...(baseOptions.rDate ?? []), ...this.includeDates]),
+      exDate: dedupeDates([...(baseOptions.exDate ?? []), ...this.excludeDates]),
+    });
+
+    return serializedRule.toString();
+  }
+
   private isWithinWindow(
     date: Temporal.ZonedDateTime,
     afterInstant: Temporal.Instant,

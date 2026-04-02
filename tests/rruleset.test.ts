@@ -2,7 +2,7 @@ import {Temporal} from '@js-temporal/polyfill';
 import {RRuleSetTemporal, RRuleTemporal} from '../src';
 import {zdt} from './helpers';
 
-describe('RRuleSetTemporal skeleton', () => {
+describe('RRuleSetTemporal', () => {
   it('stores constructor-provided rules and dates', () => {
     const includeRule = new RRuleTemporal({
       freq: 'DAILY',
@@ -250,5 +250,90 @@ describe('RRuleSetTemporal skeleton', () => {
 
     expect(set.next(new Date('2026-01-05T09:00:00.000Z'))?.toString()).toBe('2026-01-07T09:00:00+00:00[UTC]');
     expect(set.previous(new Date('2026-01-12T09:00:00.000Z'))?.toString()).toBe('2026-01-07T09:00:00+00:00[UTC]');
+  });
+
+  it('serializes to JSON using constructor-shaped data', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 2,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const includeDate = Temporal.ZonedDateTime.from('2026-01-05T09:00:00[UTC]');
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [includeDate],
+      maxIterations: 12,
+    });
+
+    const json = set.toJSON();
+
+    expect(json.includeRules).toEqual([includeRule]);
+    expect(json.includeDates?.map((date) => date.toString())).toEqual([includeDate.toString()]);
+    expect(json.maxIterations).toBe(12);
+  });
+
+  it('serializes the single-rule shape through toString()', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 2,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const includeDate = Temporal.ZonedDateTime.from('2026-01-05T09:00:00[UTC]');
+    const excludeDate = Temporal.ZonedDateTime.from('2026-01-06T09:00:00[UTC]');
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      includeDates: [includeDate],
+      excludeDates: [excludeDate],
+    });
+
+    expect(set.toString()).toBe(
+      [
+        'DTSTART;TZID=UTC:20260101T090000',
+        'RRULE:FREQ=DAILY;COUNT=2',
+        'RDATE:20260105T090000Z',
+        'EXDATE:20260106T090000Z',
+      ].join('\n'),
+    );
+  });
+
+  it('rejects toString() for multiple include rules', () => {
+    const firstRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 1,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const secondRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 1,
+      dtstart: zdt(2026, 1, 2, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [firstRule, secondRule],
+    });
+
+    expect(() => set.toString()).toThrow(
+      'toString() only supports sets with a single include rule and no exclude rules',
+    );
+  });
+
+  it('rejects toString() for exclusion rules', () => {
+    const includeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 1,
+      dtstart: zdt(2026, 1, 1, 9, 'UTC'),
+    });
+    const excludeRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 1,
+      dtstart: zdt(2026, 1, 2, 9, 'UTC'),
+    });
+    const set = new RRuleSetTemporal({
+      includeRules: [includeRule],
+      excludeRules: [excludeRule],
+    });
+
+    expect(() => set.toString()).toThrow(
+      'toString() only supports sets with a single include rule and no exclude rules',
+    );
   });
 });
