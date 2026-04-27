@@ -120,12 +120,24 @@ interface IcsOpts extends BaseOpts {
   count?: number;
   /** UNTIL: last possible occurrence, used when missing from rruleString */
   until?: Temporal.ZonedDateTime;
+  /** RDATE: additional dates to include */
+  rDate?: Temporal.ZonedDateTime[];
+  /** EXDATE: exception dates to exclude */
+  exDate?: Temporal.ZonedDateTime[];
 }
 
 export type RRuleOptions = ManualOpts | IcsOpts;
 
 function isIcsOpts(opts: RRuleOptions): opts is IcsOpts {
   return typeof (opts as IcsOpts).rruleString === 'string';
+}
+
+function mergeDateLists(
+  parsedDates?: Temporal.ZonedDateTime[],
+  suppliedDates?: Temporal.ZonedDateTime[],
+): Temporal.ZonedDateTime[] | undefined {
+  const merged = [...(parsedDates ?? []), ...(suppliedDates ?? [])];
+  return merged.length > 0 ? merged : undefined;
 }
 
 /**
@@ -453,6 +465,8 @@ export class RRuleTemporal {
       // the temporary dtstart/until alignment, leading to excessive iteration.
       manual = {
         ...parsed,
+        rDate: mergeDateLists(parsed.rDate, params.rDate),
+        exDate: mergeDateLists(parsed.exDate, params.exDate),
         // Allow explicit COUNT/UNTIL overrides when omitted from the RRULE string
         count: params.count ?? parsed.count,
         until: params.until ?? parsed.until,
