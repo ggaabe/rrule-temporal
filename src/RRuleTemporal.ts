@@ -2853,7 +2853,7 @@ export class RRuleTemporal {
    * Returns all occurrences of the rule within a specified time window.
    * @param after - The start date or Temporal.ZonedDateTime object.
    * @param before - The end date or Temporal.ZonedDateTime object.
-   * @param inc - Optional boolean flag to include the end date in the results.
+   * @param inc - Optional boolean flag to include the start and end dates in the results.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule within the specified time window.
    */
   between(after: DateFilter, before: DateFilter, inc = false): Temporal.ZonedDateTime[] {
