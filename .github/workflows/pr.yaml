@@ -9,6 +9,13 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 and 24 run on the bundled temporal-polyfill backend; 26 ships
+        # native Temporal, so it exercises the native binding end to end.
+        node-version: ['20', '24', '26']
+    name: build-test (Node ${{ matrix.node-version }})
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies
