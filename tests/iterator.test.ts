@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 import {formatISO, parse} from './helpers';
 
 describe('all() iterator', function () {

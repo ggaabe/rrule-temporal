@@ -1,4 +1,6 @@
-import {Temporal} from '@js-temporal/polyfill';
+// RSCALE calendar math is pinned to the polyfill implementation (see
+// temporal-impl.ts), so expectations must be computed with the same data.
+import {PolyfillTemporal as Temporal} from '../src/temporal-impl';
 import {RRuleTemporal} from '../src';
 
 function weekIndexHebrew(pd: Temporal.PlainDate, wkst: number) {
@@ -50,7 +52,7 @@ describe('RSCALE sub-daily intersections (BYYEARDAY/BYWEEKNO)', () => {
     expect(out.length).toBe(2);
     for (const occ of out) {
       expect(occ.dayOfWeek).toBe(1);
-      const pd = occ.toPlainDate().withCalendar('hebrew');
+      const pd = Temporal.PlainDate.from(occ.toPlainDate().toString()).withCalendar('hebrew');
       const idx = weekIndexHebrew(pd, 1);
       expect(idx).toBe(1);
     }

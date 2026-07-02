@@ -1,6 +1,6 @@
 import {describe, test, expect} from 'vitest';
 import {RRuleTemporal} from '../src';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 
 /**
  * Tests for compatibility with native Temporal API implementations

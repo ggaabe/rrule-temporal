@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../src';
 import {assertDates, zdt} from './helpers';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 
 describe('Secondly frequency tests', () => {
   it('testSecondly', () => {

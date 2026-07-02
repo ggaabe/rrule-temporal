@@ -1,5 +1,5 @@
 import {RRuleTemporal} from '../src';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 import {assertDates, format, limit, parse, zdt} from './helpers';
 
 const INVALID_DATE = '2020-01-01-01-01T:00:00:00Z';

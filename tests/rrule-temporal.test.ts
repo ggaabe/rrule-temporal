@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../src';
 import {toText} from '../src/totext';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 import {zdt} from './helpers';
 
 describe('RRuleTemporal - ICS snippet parsing', () => {

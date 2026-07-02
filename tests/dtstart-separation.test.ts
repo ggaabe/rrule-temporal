@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 import {RRuleTemporal} from '../src';
 
 describe('DTSTART separation (RFC 5545 compliance)', () => {

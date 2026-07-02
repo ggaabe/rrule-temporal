@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from './temporal-impl';
 import {RRuleTemporal, allowedWeekdays, type TemporalZonedDateTime, type Weekday} from './index';
 
 interface UnitStrings {
@@ -598,9 +598,10 @@ for (const l of active) {
 }
 const workweekWeekdays = allowedWeekdays.slice(0, 5);
 const byDayTokenRegex = new RegExp(`^([+-]?\\d+)?(${allowedWeekdays.join('|')})$`);
-const weekdayIndexByToken = Object.fromEntries(
-  allowedWeekdays.map((weekday, idx) => [weekday, idx]),
-) as Record<Weekday, number>;
+const weekdayIndexByToken = Object.fromEntries(allowedWeekdays.map((weekday, idx) => [weekday, idx])) as Record<
+  Weekday,
+  number
+>;
 
 function defaultOrdinal(n: number): string {
   const abs = Math.abs(n);
@@ -638,25 +639,25 @@ function formatByDayToken(tok: string | number, locale: LocaleData): string {
   return `${ordinal(ord, locale)} ${name}`;
 }
 
-function formatTime(zdt: TemporalZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
+function formatTime(_zdt: TemporalZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
+  // Format via Intl directly (not Temporal's toLocaleString, whose option
+  // handling differs between implementations) so output is identical
+  // whether the native Temporal or the polyfill is active.
   const options: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
-    timeZone: zdt.timeZoneId,
+    timeZone: 'UTC',
   };
 
   if (second) options.second = '2-digit';
   if (second || minute) options.minute = '2-digit';
 
-  const ruleTime = Temporal.PlainTime.from({hour, minute, second});
+  const sample = new Date(Date.UTC(2000, 0, 1, hour, minute, second));
 
-  let result;
   try {
-    result = ruleTime.toLocaleString(locale, options);
+    return new Intl.DateTimeFormat(locale, options).format(sample);
   } catch {
-    result = ruleTime.toLocaleString('en', options);
+    return new Intl.DateTimeFormat('en', options).format(sample);
   }
-
-  return result;
 }
 
 function weekdayTokenFromZdt(zdt: TemporalZonedDateTime): string {
@@ -670,7 +671,7 @@ function tzAbbreviation(zdt: TemporalZonedDateTime, locale: string): string {
     hour: 'numeric',
   };
 
-  let formatter
+  let formatter;
   try {
     formatter = new Intl.DateTimeFormat(locale, options);
   } catch {
@@ -683,10 +684,14 @@ function tzAbbreviation(zdt: TemporalZonedDateTime, locale: string): string {
 }
 
 function formatLocalizedDate(zdt: TemporalZonedDateTime, locale: string): string {
+  // Format via Intl directly (not Temporal's toLocaleString) so output is
+  // identical whether the native Temporal or the polyfill is active.
+  const options: Intl.DateTimeFormatOptions = {dateStyle: 'long', timeZone: zdt.timeZoneId};
+  const sample = new Date(zdt.epochMilliseconds);
   try {
-    return zdt.toLocaleString(locale, {dateStyle: 'long'});
+    return new Intl.DateTimeFormat(locale, options).format(sample);
   } catch {
-    return zdt.toLocaleString('en', {dateStyle: 'long'});
+    return new Intl.DateTimeFormat('en', options).format(sample);
   }
 }
 
@@ -728,8 +733,8 @@ export function toText(input: RRuleTemporal | string, locale?: string, options: 
 
   const textByDay = byDay ?? (freq === 'WEEKLY' ? [weekdayTokenFromZdt(opts.dtstart)] : undefined);
   const textByHour = byHour ?? (shouldDefaultTime ? [opts.dtstart.hour] : undefined);
-  const textByMinute = textByHour ? byMinute ?? [opts.dtstart.minute] : byMinute;
-  const textBySecond = textByHour ? bySecond ?? [opts.dtstart.second] : bySecond;
+  const textByMinute = textByHour ? (byMinute ?? [opts.dtstart.minute]) : byMinute;
+  const textBySecond = textByHour ? (bySecond ?? [opts.dtstart.second]) : bySecond;
 
   const parts: string[] = [data.words.every];
 

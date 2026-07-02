@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 import {RRuleOptions, RRuleTemporal} from '../src';
 
 export function zdt(y: number, m: number, d: number, h: number = 0, tz = 'America/New_York') {

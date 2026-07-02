@@ -1,6 +1,6 @@
 import {RRuleTemporal} from '../src';
 import {toText} from '../src/totext';
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 
 function zdt(y: number, m: number, d: number, h: number, tz = 'UTC') {
   return Temporal.ZonedDateTime.from({year: y, month: m, day: d, hour: h, minute: 0, timeZone: tz});

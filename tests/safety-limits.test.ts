@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from '../src/temporal-impl';
 import {RRuleTemporal} from '../src';
 
 describe('RRuleTemporal - Safety Limits', () => {
@@ -95,18 +95,38 @@ describe('RRuleTemporal - Safety Limits', () => {
     expect((rule as any).maxIterations).toBe(10000);
   });
 
-  test('next() and previous() should be protected by all() safety limits', () => {
+  test('next() answers far-future queries without exhausting iteration limits', () => {
     const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
 
-    // Create a rule with complex constraints that would require many iterations
     const rule = new RRuleTemporal({
       freq: 'DAILY',
       dtstart,
-      byDay: ['MO'], // Only Mondays - requires many iterations to find one
+      byDay: ['MO'],
       maxIterations: 3, // Very low limit
     });
 
     const after = Temporal.ZonedDateTime.from('2030-01-01T10:00:00[UTC]'); // Far in future
+
+    // next() starts its scan at a phase-aligned point near `after`, so it no
+    // longer needs to iterate through five years of daily candidates.
+    const next = rule.next(after.toPlainDate().toZonedDateTime('UTC'));
+    expect(next?.toString()).toBe('2030-01-07T10:00:00+00:00[UTC]');
+  });
+
+  test('next() and previous() should be protected by all() safety limits', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
+
+    // A rule that can never match: February 31st does not exist, so every
+    // candidate is filtered and the iteration cap is the only way out.
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      dtstart,
+      byMonth: [2],
+      byMonthDay: [31],
+      maxIterations: 3, // Very low limit
+    });
+
+    const after = Temporal.ZonedDateTime.from('2030-01-01T10:00:00[UTC]');
 
     expect(() => {
       rule.next(after.toPlainDate().toZonedDateTime('UTC'));
