@@ -48,6 +48,7 @@
     "dist"
   ],
   "devDependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^4.1.0",
     "prettier": "^3.8.1",
@@ -57,7 +58,6 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1",
     "temporal-spec": "^1.0.0"
   },
   "packageManager": "pnpm@10.6.0+sha1.c53a73dd9336949b37f63d82c45beb5b161924b6"
