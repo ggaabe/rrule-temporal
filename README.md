@@ -40,7 +40,7 @@ const firstTen = rule.all((_, i) => i < 10);
 Per RFC 5545, DTSTART and RRULE are separate properties. You can provide them separately:
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const rule = new RRuleTemporal({
   rruleString: 'FREQ=DAILY;COUNT=5',
@@ -68,7 +68,7 @@ zone (converted to UTC when required). Set `strict: true` to reject it.
 Instead of a full ICS string you can supply the recurrence parameters directly:
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const rule = new RRuleTemporal({
   freq: "DAILY",
@@ -151,7 +151,7 @@ The `toText` helper converts a rule into a human readable description.
 `UNTIL` (and optional `DTSTART`) dates are locale-aware via `toLocaleString`.
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 import { RRuleTemporal } from "rrule-temporal";
 import { toText } from "rrule-temporal/totext";
 
@@ -303,27 +303,37 @@ Notes
 
 ## Benchmarks
 
-Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max.
-The full three-library comparison, including `rrule-rust`, lives in `benchmarks/README.md`.
+Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max
+(Node 25, polyfill backend). The full three-library comparison, including
+`rrule-rust` and cached-mode results, lives in `benchmarks/README.md`.
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
 | --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 29,275 | 16,762 | 1.75x |
-| 30 daily occurrences | America/Chicago | 2,067 | 364 | 5.68x |
-| Daily weekdays across many cycles | UTC | 1,894 | 766 | 2.47x |
-| Daily weekdays across many cycles | America/Chicago | 64.9 | 18.9 | 3.43x |
-| 720 hourly occurrences | UTC | 1,499 | 701 | 2.14x |
-| 720 hourly occurrences | America/Chicago | 104 | 14.1 | 7.38x |
-| 1,440 minutely occurrences | UTC | 751 | 325 | 2.31x |
-| 1,440 minutely occurrences | America/Chicago | 145 | 7.1 | 20.42x |
-| Weekly MO/WE/FR across many cycles | UTC | 1,179 | 1,053 | 1.12x |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 64.4 | 14.6 | 4.41x |
-| Monthly last weekday across 20 years | UTC | 1,953 | 948 | 2.06x |
-| Monthly last weekday across 20 years | America/Chicago | 45.5 | 39.4 | 1.15x |
-| Monthly first and last weekday across 20 years | UTC | 1,378 | 1,202 | 1.15x |
-| Monthly first and last weekday across 20 years | America/Chicago | 40.0 | 24.2 | 1.65x |
+| 30 daily occurrences | UTC | 19,443 | 15,825 | 1.23x |
+| 30 daily occurrences | America/Chicago | 13,525 | 347 | 38.98x |
+| Daily weekdays across many cycles | UTC | 997 | 759 | 1.31x |
+| Daily weekdays across many cycles | America/Chicago | 751 | 17.9 | 41.96x |
+| 720 hourly occurrences | UTC | 713 | 653 | 1.09x |
+| 720 hourly occurrences | America/Chicago | 502 | 14.1 | 35.60x |
+| 1,440 minutely occurrences | UTC | 343 | 333 | 1.03x |
+| 1,440 minutely occurrences | America/Chicago | 259 | 6.6 | 39.24x |
+| Weekly MO/WE/FR across many cycles | UTC | 632 | 1,068 | 0.59x |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 471 | 13.1 | 35.95x |
+| Monthly last weekday across 20 years | UTC | 1,120 | 1,010 | 1.11x |
+| Monthly last weekday across 20 years | America/Chicago | 980 | 36.7 | 26.70x |
+| Monthly first and last weekday across 20 years | UTC | 723 | 1,277 | 0.57x |
+| Monthly first and last weekday across 20 years | America/Chicago | 562 | 22.2 | 25.32x |
 
-The current pattern is straightforward: `rrule-temporal` is faster than `rrule` across all of the scenarios above, with especially large gains on timezone-heavy daily, hourly, and minutely rules. The biggest recent jump came from the UTC monthly `BYDAY` + `BYSETPOS` path, which is now ahead as well.
+Time-zone-aware rules iterate through an epoch-integer engine with a cached
+per-zone offset table, so named-zone scenarios now run 25–42x faster than
+`rrule` and within a small factor of their UTC equivalents. On UTC the two
+libraries are comparable on Node 25 (`rrule` stays ahead on two weekly/monthly
+scenarios where occurrence materialization dominates); on runtimes with native
+Temporal (Node 26+, Chrome 144+, Firefox 139+) materialization is much cheaper
+and `rrule-temporal` leads every scenario — e.g. monthly last weekday in
+Chicago reaches ~2,200 ops/s and daily weekdays ~2,800 ops/s. Repeated
+`all()` calls on the same rule are served from an internal cache (opt out per
+rule with `cache: false`).
 
 ## Further examples
 
@@ -356,7 +366,7 @@ ruleB.all().forEach(dt => console.log(dt.toString()));
 ### Working with extra and excluded dates
 
 ```typescript
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "temporal-polyfill";
 
 const start = Temporal.ZonedDateTime.from({
   year: 2025, month: 1, day: 1, hour: 12, timeZone: "UTC"
@@ -380,15 +390,24 @@ const hits = ruleC.between(
 );
 ```
 
-### Converting between **@js-temporal/polyfill** and **temporal-polyfill**
+### Temporal implementations and interoperability
 
-`rrule-temporal` ships with **`@js-temporal/polyfill`** and therefore returns `Temporal` objects that are from that implementation. If the rest of your codebase (or a third-party package) relies on the lighter **`temporal-polyfill`** package or a native Temporal implementation, those objects will **not** satisfy `instanceof` checks in your app.
-This snippet shows how to re-hydrate each recurrence result into the polyfill your project expects.
+`rrule-temporal` uses the runtime's **native `Temporal`** when it exists
+(Node 26+, Chrome 144+, Firefox 139+) and otherwise falls back to a bundled
+copy of **`temporal-polyfill`** — no polyfill setup is required either way.
+Inputs are accepted from **any** Temporal implementation: `dtstart`, `until`,
+`rDate`, `exDate` and date filters are normalized internally, so you can pass
+objects from `@js-temporal/polyfill`, `temporal-polyfill`, or native Temporal
+interchangeably.
+
+Returned occurrences come from the library's active implementation (native
+when available, the bundled polyfill otherwise). They are fully spec-shaped,
+but they will not satisfy `instanceof` checks against a *different*
+implementation's classes. If your app needs instances of its own Temporal
+implementation, re-hydrate them:
 
 ```ts
-// rrule-temporal (and its internals) use @js-temporal/polyfill
-import { Temporal as RRTTemporal } from "@js-temporal/polyfill";
-// your application using temporal-polyfill or native Temporal
+// your application's Temporal implementation
 import { Temporal as AppTemporal } from "temporal-polyfill";
 
 import { RRuleTemporal } from "rrule-temporal";
@@ -397,25 +416,24 @@ import { RRuleTemporal } from "rrule-temporal";
 const rule = new RRuleTemporal({
   freq: "WEEKLY",
   count: 4,
-  dtstart: RRTTemporal.ZonedDateTime.from(
+  dtstart: AppTemporal.ZonedDateTime.from(
     "2025-05-05T10:00[America/Chicago]"
   ),
 });
 
-// Occurrences are ZonedDateTime instances from @js-temporal/polyfill
 const rawOccurrences = rule.all();
 
-/** Convert each ZonedDateTime to temporal-polyfill ZonedDateTime. */
+/** Convert each ZonedDateTime into your app's implementation. */
 const appOccurrences = rawOccurrences.map((zdt) =>
   AppTemporal.ZonedDateTime.from(zdt.toString())
 );
-
-// …now `appOccurrences` can be passed anywhere that expects temporal-polyfill in your app
 ```
 
 #### Why `.toString()`?
 
-`Temporal.*.from()` accepts ISO 8601 strings (including bracketed time-zone annotations), so calling `toString()` sidesteps the internal-slot branding that makes polyfill objects incompatible.
+`Temporal.*.from()` accepts ISO 8601 strings (including bracketed time-zone
+annotations), so calling `toString()` sidesteps the internal-slot branding
+that makes objects from different implementations incompatible.
 
 #### Nanosecond precision variant
 
@@ -426,6 +444,14 @@ const appOccurrences = rawOccurrences.map((zdt) =>
 ```
 
 Both approaches preserve the original calendar, time-zone and nanosecond accuracy.
+
+#### Non-Gregorian RSCALE rules
+
+RFC 7529 `RSCALE` rules (Chinese, Hebrew, Indian) always compute calendar
+math with the bundled polyfill, even when native Temporal is active:
+implementations disagree on non-ISO calendar details (for example V8 numbers
+Chinese calendar years in a continuous era), and recurrence results must not
+change with the runtime.
 
 ## Sponsor
 

@@ -89,7 +89,9 @@ function measure(fn, config) {
 }
 
 function buildBenchmarks(ics, expectedCount) {
-  const temporal = new RRuleTemporal({ rruleString: ics });
+  const temporalNoCache = new RRuleTemporal({ rruleString: ics, cache: false });
+  const temporalCached = new RRuleTemporal({ rruleString: ics });
+  temporalCached.all();
 
   const nodeNoCache = rrulestr(ics, { forceset: true, cache: false });
   const nodeCached = rrulestr(ics, { forceset: true, cache: true });
@@ -104,8 +106,13 @@ function buildBenchmarks(ics, expectedCount) {
   return [
     {
       library: 'rrule-temporal',
-      cache: 'n/a',
-      fn: () => assertCount('rrule-temporal', temporal.all().length, expectedCount),
+      cache: 'off',
+      fn: () => assertCount('rrule-temporal', temporalNoCache.all().length, expectedCount),
+    },
+    {
+      library: 'rrule-temporal',
+      cache: 'on',
+      fn: () => assertCount('rrule-temporal (cache)', temporalCached.all().length, expectedCount),
     },
     {
       library: 'rrule',
