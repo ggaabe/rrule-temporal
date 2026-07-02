@@ -1,5 +1,5 @@
 import {Temporal} from '@js-temporal/polyfill';
-import {RRuleTemporal, allowedWeekdays, type Weekday} from './index';
+import {RRuleTemporal, allowedWeekdays, type TemporalZonedDateTime, type Weekday} from './index';
 
 interface UnitStrings {
   singular: string;
@@ -638,7 +638,7 @@ function formatByDayToken(tok: string | number, locale: LocaleData): string {
   return `${ordinal(ord, locale)} ${name}`;
 }
 
-function formatTime(zdt: Temporal.ZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
+function formatTime(zdt: TemporalZonedDateTime, locale: string, hour: number, minute: number, second: number): string {
   const options: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
     timeZone: zdt.timeZoneId,
@@ -659,11 +659,11 @@ function formatTime(zdt: Temporal.ZonedDateTime, locale: string, hour: number, m
   return result;
 }
 
-function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
+function weekdayTokenFromZdt(zdt: TemporalZonedDateTime): string {
   return allowedWeekdays[zdt.dayOfWeek - 1]!;
 }
 
-function tzAbbreviation(zdt: Temporal.ZonedDateTime, locale: string): string {
+function tzAbbreviation(zdt: TemporalZonedDateTime, locale: string): string {
   const options: Intl.DateTimeFormatOptions = {
     timeZone: zdt.timeZoneId,
     timeZoneName: 'short',
@@ -682,7 +682,7 @@ function tzAbbreviation(zdt: Temporal.ZonedDateTime, locale: string): string {
   return tzPart?.value || zdt.timeZoneId;
 }
 
-function formatLocalizedDate(zdt: Temporal.ZonedDateTime, locale: string): string {
+function formatLocalizedDate(zdt: TemporalZonedDateTime, locale: string): string {
   try {
     return zdt.toLocaleString(locale, {dateStyle: 'long'});
   } catch {

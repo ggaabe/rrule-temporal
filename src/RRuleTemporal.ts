@@ -1,4 +1,5 @@
 import {Temporal} from '@js-temporal/polyfill';
+import type {Temporal as TemporalSpec} from 'temporal-spec';
 
 export const allowedFreq = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'] as const;
 export type Freq = (typeof allowedFreq)[number];
@@ -72,11 +73,56 @@ interface BaseOpts {
   skip?: 'OMIT' | 'BACKWARD' | 'FORWARD';
 }
 
+export type TemporalZonedDateTime = TemporalSpec.ZonedDateTime;
+export type TemporalPlainDate = TemporalSpec.PlainDate;
+
+export interface TemporalZonedDateTimeInput {
+  readonly timeZoneId: string;
+  toString(): string;
+}
+
+export interface TemporalPlainDateInput {
+  toString(): string;
+}
+
+type PolyfillZonedDateTime = Temporal.ZonedDateTime;
+export type RRuleTemporalIterator = (date: TemporalZonedDateTime, i: number) => boolean;
+type InternalRRuleTemporalIterator = (date: PolyfillZonedDateTime, i: number) => boolean;
+export type DateFilter = Date | TemporalZonedDateTimeInput;
+
+function isTemporalZonedDateTimeInput(value: unknown): value is TemporalZonedDateTimeInput {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as {timeZoneId?: unknown}).timeZoneId === 'string' &&
+    typeof (value as {toString?: unknown}).toString === 'function'
+  );
+}
+
+function normalizeZonedDateTime(value: TemporalZonedDateTimeInput, label: string): PolyfillZonedDateTime {
+  if (!isTemporalZonedDateTimeInput(value)) {
+    throw new Error(`${label} must be a ZonedDateTime`);
+  }
+
+  try {
+    return Temporal.ZonedDateTime.from(value.toString());
+  } catch {
+    throw new Error(`${label} must be a ZonedDateTime`);
+  }
+}
+
+function normalizeZonedDateTimeList(
+  values: TemporalZonedDateTimeInput[] | undefined,
+  label: string,
+): PolyfillZonedDateTime[] | undefined {
+  return values?.map((value) => normalizeZonedDateTime(value, label));
+}
+
 /**
  * Manual rule definition following the recurrence rule parts defined in
  * RFC 5545 §3.3.10.
  */
-interface ManualOpts extends BaseOpts {
+interface ManualOptions extends BaseOpts {
   /** FREQ: recurrence frequency */
   freq: Freq;
   /** INTERVAL between each occurrence of {@link freq} */
@@ -84,7 +130,7 @@ interface ManualOpts extends BaseOpts {
   /** COUNT: total number of occurrences */
   count?: number;
   /** UNTIL: last possible occurrence */
-  until?: Temporal.ZonedDateTime;
+  until?: TemporalZonedDateTimeInput;
   /** BYHOUR: hours to include (0-23) */
   byHour?: number[];
   /** BYMINUTE: minutes to include (0-59) */
@@ -106,37 +152,50 @@ interface ManualOpts extends BaseOpts {
   /** WKST: weekday on which the week starts ("MO".."SU") */
   wkst?: string;
   /** RDATE: additional dates to include */
-  rDate?: Temporal.ZonedDateTime[];
+  rDate?: TemporalZonedDateTimeInput[];
   /** EXDATE: exception dates to exclude */
-  exDate?: Temporal.ZonedDateTime[];
+  exDate?: TemporalZonedDateTimeInput[];
   /** DTSTART: first occurrence */
-  dtstart: Temporal.ZonedDateTime;
+  dtstart: TemporalZonedDateTimeInput;
 }
 
-interface IcsOpts extends BaseOpts {
+interface IcsOptions extends BaseOpts {
   rruleString: string; // full "DTSTART...\nRRULE..." snippet or bare RRULE/FREQ pattern
-  dtstart?: Temporal.ZonedDateTime; // optional separate DTSTART when rruleString lacks one
+  dtstart?: TemporalZonedDateTimeInput; // optional separate DTSTART when rruleString lacks one
   /** COUNT: total number of occurrences, used when missing from rruleString */
   count?: number;
   /** UNTIL: last possible occurrence, used when missing from rruleString */
-  until?: Temporal.ZonedDateTime;
+  until?: TemporalZonedDateTimeInput;
   /** RDATE: additional dates to include */
-  rDate?: Temporal.ZonedDateTime[];
+  rDate?: TemporalZonedDateTimeInput[];
   /** EXDATE: exception dates to exclude */
-  exDate?: Temporal.ZonedDateTime[];
+  exDate?: TemporalZonedDateTimeInput[];
 }
 
-export type RRuleOptions = ManualOpts | IcsOpts;
+type ManualOpts = Omit<ManualOptions, 'dtstart' | 'until' | 'rDate' | 'exDate'> & {
+  dtstart: PolyfillZonedDateTime;
+  until?: PolyfillZonedDateTime;
+  rDate?: PolyfillZonedDateTime[];
+  exDate?: PolyfillZonedDateTime[];
+};
 
-function isIcsOpts(opts: RRuleOptions): opts is IcsOpts {
-  return typeof (opts as IcsOpts).rruleString === 'string';
+export type RRuleOptions = ManualOptions | IcsOptions;
+export type RRuleResolvedOptions = Omit<ManualOptions, 'dtstart' | 'until' | 'rDate' | 'exDate'> & {
+  dtstart: TemporalZonedDateTime;
+  until?: TemporalZonedDateTime;
+  rDate?: TemporalZonedDateTime[];
+  exDate?: TemporalZonedDateTime[];
+};
+
+function isIcsOpts(opts: RRuleOptions): opts is IcsOptions {
+  return typeof (opts as IcsOptions).rruleString === 'string';
 }
 
 function mergeDateLists(
-  parsedDates?: Temporal.ZonedDateTime[],
-  suppliedDates?: Temporal.ZonedDateTime[],
-): Temporal.ZonedDateTime[] | undefined {
-  const merged = [...(parsedDates ?? []), ...(suppliedDates ?? [])];
+  parsedDates?: PolyfillZonedDateTime[],
+  suppliedDates?: TemporalZonedDateTimeInput[],
+): PolyfillZonedDateTime[] | undefined {
+  const merged = [...(parsedDates ?? []), ...(normalizeZonedDateTimeList(suppliedDates, 'Manual date') ?? [])];
   return merged.length > 0 ? merged : undefined;
 }
 
@@ -175,22 +234,58 @@ function parseIcsDateTime(dateStr: string, tzid: string, valueType?: string): Te
  */
 function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', defaultTzid: string) {
   const dates: Temporal.ZonedDateTime[] = [];
-  const regex = new RegExp(`^${linePrefix}(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)`, 'i');
 
   for (const line of lines) {
-    const match = line.match(regex);
-    if (match) {
-      const [, valueType, tzid, dateValuesStr] = match;
-      const timezone = tzid || defaultTzid;
-      const dateValues = dateValuesStr!.split(',');
-      dates.push(...dateValues.map((dateValue) => parseIcsDateTime(dateValue, timezone, valueType)));
-    }
+    const parsed = parseIcsDatePropertyLine(line, linePrefix);
+    if (!parsed) continue;
+
+    const timezone = parsed.tzid || defaultTzid;
+    const dateValues = parsed.value.split(',');
+    dates.push(...dateValues.map((dateValue) => parseIcsDateTime(dateValue, timezone, parsed.valueType)));
   }
   return dates;
 }
 
-function parseNumberArray(val: string, sort = false): number[] {
-  const arr = val.split(',').map((n) => parseInt(n, 10));
+function parseIcsDatePropertyLine(
+  line: string,
+  propertyName: 'DTSTART' | 'EXDATE' | 'RDATE',
+): {valueType?: string; tzid?: string; value: string} | null {
+  const colonIndex = line.indexOf(':');
+  if (colonIndex === -1) return null;
+
+  const head = line.slice(0, colonIndex);
+  const value = line.slice(colonIndex + 1);
+  const [name, ...params] = head.split(';');
+  if (name?.toUpperCase() !== propertyName) return null;
+
+  let valueType: string | undefined;
+  let tzid: string | undefined;
+  for (const param of params) {
+    const equalsIndex = param.indexOf('=');
+    if (equalsIndex === -1) continue;
+
+    const paramName = param.slice(0, equalsIndex).toUpperCase();
+    const paramValue = param.slice(equalsIndex + 1);
+    if (paramName === 'VALUE') {
+      valueType = paramValue.toUpperCase();
+    } else if (paramName === 'TZID') {
+      tzid = paramValue;
+    }
+  }
+
+  return {valueType, tzid, value};
+}
+
+function parseIntegerToken(token: string, label: string, strict: boolean): number {
+  const trimmed = token.trim();
+  if (strict && !/^[+-]?\d+$/.test(trimmed)) {
+    throw new Error(`Invalid ${label} value: ${token}`);
+  }
+  return parseInt(trimmed, 10);
+}
+
+function parseNumberArray(val: string, sort = false, strict = false, label = 'number'): number[] {
+  const arr = val.split(',').map((n) => parseIntegerToken(n, label, strict));
   if (sort) {
     return arr.sort((a, b) => a - b);
   }
@@ -201,11 +296,11 @@ function parseNumberArray(val: string, sort = false): number[] {
  * Parse BYMONTH values, supporting RFC 7529 leap-month tokens with an "L" suffix (e.g., "5L").
  * Returns a heterogeneous array keeping original tokens for serialization.
  */
-function parseByMonthArray(val: string): Array<number | string> {
+function parseByMonthArray(val: string, strict = false): Array<number | string> {
   return val.split(',').map((tok) => {
     const t = tok.trim();
     if (/^\d+L$/i.test(t)) return t.toUpperCase();
-    const n = parseInt(t, 10);
+    const n = parseIntegerToken(t, 'BYMONTH', strict);
     return Number.isFinite(n) ? n : t;
   });
 }
@@ -246,7 +341,7 @@ function parseByMonthArray(val: string): Array<number | string> {
 function parseRRuleString(
   input: string,
   targetTimezone?: string,
-  dtstart?: Temporal.ZonedDateTime,
+  dtstart?: TemporalZonedDateTimeInput,
   strict = false,
 ): ManualOpts {
   // Unfold the input according to RFC 5545 specification
@@ -269,16 +364,16 @@ function parseRRuleString(
     const exLines = lines.filter((line) => line.match(/^EXDATE/i));
     const rLines = lines.filter((line) => line.match(/^RDATE/i));
 
-    const dtMatch = dtLine.match(/DTSTART(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)/i);
-    if (!dtMatch) throw new Error('Invalid DTSTART in ICS snippet');
+    const parsedDtLine = parseIcsDatePropertyLine(dtLine, 'DTSTART');
+    if (!parsedDtLine) throw new Error('Invalid DTSTART in ICS snippet');
 
-    const [, valueType, dtTzid, dtValue] = dtMatch;
+    const {valueType, tzid: dtTzid, value: dtValue} = parsedDtLine;
     const normalizedValueType = (valueType || (dtValue?.includes('T') ? 'DATE-TIME' : 'DATE')).toUpperCase();
     dtstartValueType = normalizedValueType === 'DATE' ? 'DATE' : 'DATE-TIME';
     dtstartHasTzid = Boolean(dtTzid);
     dtstartIsUtc = Boolean(dtValue?.endsWith('Z'));
     const effectiveTzid = dtTzid ?? targetTimezone ?? tzid ?? 'UTC';
-    parsedDtstart = parseIcsDateTime(dtValue!, effectiveTzid, dtstartValueType);
+    parsedDtstart = parseIcsDateTime(dtValue, effectiveTzid, dtstartValueType);
     tzid = dtTzid ?? parsedDtstart.timeZoneId ?? targetTimezone ?? tzid ?? 'UTC';
 
     rruleLine = rrLine!;
@@ -287,7 +382,7 @@ function parseRRuleString(
     rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC');
   } else {
     // Just RRULE or FREQ pattern - use provided dtstart
-    parsedDtstart = dtstart;
+    parsedDtstart = dtstart ? normalizeZonedDateTime(dtstart, 'dtstart') : undefined;
     rruleLine = unfoldedInput;
     if (parsedDtstart) {
       tzid = parsedDtstart.timeZoneId;
@@ -335,10 +430,10 @@ function parseRRuleString(
         opts.freq = val!.toUpperCase() as Freq;
         break;
       case 'INTERVAL':
-        opts.interval = parseInt(val!, 10);
+        opts.interval = parseIntegerToken(val!, 'INTERVAL', strict);
         break;
       case 'COUNT':
-        opts.count = parseInt(val!, 10);
+        opts.count = parseIntegerToken(val!, 'COUNT', strict);
         break;
       case 'UNTIL': {
         const untilHasTime = val!.includes('T');
@@ -378,31 +473,31 @@ function parseRRuleString(
         break;
       }
       case 'BYHOUR':
-        opts.byHour = parseNumberArray(val!, true);
+        opts.byHour = parseNumberArray(val!, true, strict, 'BYHOUR');
         break;
       case 'BYMINUTE':
-        opts.byMinute = parseNumberArray(val!, true);
+        opts.byMinute = parseNumberArray(val!, true, strict, 'BYMINUTE');
         break;
       case 'BYSECOND':
-        opts.bySecond = parseNumberArray(val!, true);
+        opts.bySecond = parseNumberArray(val!, true, strict, 'BYSECOND');
         break;
       case 'BYDAY':
         opts.byDay = val!.split(',').map((token) => token.toUpperCase()); // e.g. ["MO","2FR","-1SU"]
         break;
       case 'BYMONTH':
-        opts.byMonth = parseByMonthArray(val!);
+        opts.byMonth = parseByMonthArray(val!, strict);
         break;
       case 'BYMONTHDAY':
-        opts.byMonthDay = parseNumberArray(val!);
+        opts.byMonthDay = parseNumberArray(val!, false, strict, 'BYMONTHDAY');
         break;
       case 'BYYEARDAY':
-        opts.byYearDay = parseNumberArray(val!);
+        opts.byYearDay = parseNumberArray(val!, false, strict, 'BYYEARDAY');
         break;
       case 'BYWEEKNO':
-        opts.byWeekNo = parseNumberArray(val!);
+        opts.byWeekNo = parseNumberArray(val!, false, strict, 'BYWEEKNO');
         break;
       case 'BYSETPOS':
-        opts.bySetPos = parseNumberArray(val!);
+        opts.bySetPos = parseNumberArray(val!, false, strict, 'BYSETPOS');
         break;
       case 'WKST':
         opts.wkst = val?.toUpperCase();
@@ -419,9 +514,6 @@ function parseRRuleString(
 
   return opts;
 }
-
-type RRuleTemporalIterator = (date: Temporal.ZonedDateTime, i: number) => boolean;
-type DateFilter = Date | Temporal.ZonedDateTime;
 
 export class RRuleTemporal {
   private readonly tzid: string;
@@ -442,8 +534,20 @@ export class RRuleTemporal {
    * Normalize a ZonedDateTime to the polyfill implementation.
    * This prevents type mismatches when mixing native and polyfill Temporal objects.
    */
-  private static normalizeToPolyfill(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    return Temporal.ZonedDateTime.from(zdt.toString());
+  private static normalizeToPolyfill(zdt: TemporalZonedDateTimeInput): Temporal.ZonedDateTime {
+    return normalizeZonedDateTime(zdt, 'Date');
+  }
+
+  private static toInternalIterator(iterator?: RRuleTemporalIterator): InternalRRuleTemporalIterator | undefined {
+    return iterator as unknown as InternalRRuleTemporalIterator | undefined;
+  }
+
+  private static toPublicDate(date: PolyfillZonedDateTime | null): TemporalZonedDateTime | null {
+    return date as unknown as TemporalZonedDateTime | null;
+  }
+
+  private static toPublicDates(dates: PolyfillZonedDateTime[]): TemporalZonedDateTime[] {
+    return dates as unknown as TemporalZonedDateTime[];
   }
 
   constructor(params: RRuleOptions) {
@@ -457,43 +561,43 @@ export class RRuleTemporal {
         throw new Error('dtstart is required - provide it either in rruleString or as a separate parameter');
       }
 
+      const dtstart = RRuleTemporal.normalizeToPolyfill(parsed.dtstart);
       this.tzid = parsed.tzid ?? params.tzid ?? 'UTC';
-      this.originalDtstart = RRuleTemporal.normalizeToPolyfill(parsed.dtstart as Temporal.ZonedDateTime);
+      this.originalDtstart = dtstart;
       // Important: do NOT carry `rruleString` into internal opts. If present,
       // `between()` spreads opts and constructs a new RRuleTemporal; leaking
       // `rruleString` would trigger the ICS parsing branch again and override
       // the temporary dtstart/until alignment, leading to excessive iteration.
       manual = {
         ...parsed,
+        dtstart,
         rDate: mergeDateLists(parsed.rDate, params.rDate),
         exDate: mergeDateLists(parsed.exDate, params.exDate),
         // Allow explicit COUNT/UNTIL overrides when omitted from the RRULE string
         count: params.count ?? parsed.count,
-        until: params.until ?? parsed.until,
+        until: params.until ? RRuleTemporal.normalizeToPolyfill(params.until) : parsed.until,
         strict: params.strict,
         maxIterations: params.maxIterations,
         includeDtstart: params.includeDtstart,
         tzid: this.tzid,
       } as ManualOpts;
     } else {
-      manual = {...params};
-      if (typeof manual.dtstart === 'string') {
-        throw new Error('Manual dtstart must be a ZonedDateTime');
-      }
-      manual.tzid = manual.tzid || manual.dtstart.timeZoneId;
+      const dtstart = normalizeZonedDateTime(params.dtstart, 'Manual dtstart');
+      manual = {
+        ...params,
+        dtstart,
+        until: params.until ? normalizeZonedDateTime(params.until, 'Manual until') : undefined,
+        rDate: normalizeZonedDateTimeList(params.rDate, 'Manual rDate'),
+        exDate: normalizeZonedDateTimeList(params.exDate, 'Manual exDate'),
+      };
+      manual.tzid = manual.tzid || dtstart.timeZoneId;
       this.tzid = manual.tzid;
-      this.originalDtstart = RRuleTemporal.normalizeToPolyfill(manual.dtstart as Temporal.ZonedDateTime);
+      this.originalDtstart = dtstart;
     }
     if (!manual.freq) throw new Error('RRULE must include FREQ');
     manual.interval = manual.interval ?? 1;
     if (manual.interval <= 0) {
       throw new Error('Cannot create RRule: interval must be greater than 0');
-    }
-    if (manual.until && !(manual.until instanceof Temporal.ZonedDateTime)) {
-      throw new Error('Manual until must be a ZonedDateTime');
-    }
-    if (manual.until) {
-      manual.until = RRuleTemporal.normalizeToPolyfill(manual.until);
     }
     this.opts = this.sanitizeOpts(manual);
     this.maxIterations = manual.maxIterations ?? 10000;
@@ -1219,8 +1323,8 @@ export class RRuleTemporal {
     });
   }
 
-  options() {
-    return this.opts;
+  options(): RRuleResolvedOptions {
+    return this.cloneOptions() as unknown as RRuleResolvedOptions;
   }
 
   private cloneOptions(): ManualOpts {
@@ -1255,8 +1359,8 @@ export class RRuleTemporal {
     } as ManualOpts;
   }
 
-  private cloneUpdateOptions(updates: Partial<ManualOpts>): Partial<ManualOpts> {
-    const cloned: Partial<ManualOpts> = {};
+  private cloneUpdateOptions(updates: Partial<ManualOptions>): Partial<ManualOptions> {
+    const cloned: Partial<ManualOptions> = {};
     if (Object.prototype.hasOwnProperty.call(updates, 'byHour')) {
       cloned.byHour = Array.isArray(updates.byHour) ? [...updates.byHour] : updates.byHour;
     }
@@ -1301,19 +1405,19 @@ export class RRuleTemporal {
    * const updated = rule.with({byMonthDay: [3]});
    * ```
    */
-  with(updates: Partial<ManualOpts>): RRuleTemporal {
+  with(updates: Partial<ManualOptions>): RRuleTemporal {
     const merged = {
       ...this.cloneOptions(),
       ...updates,
       ...this.cloneUpdateOptions(updates),
       tzid: updates.tzid ?? this.opts.tzid,
       dtstart: updates.dtstart ?? this.opts.dtstart,
-    } as ManualOpts;
+    } as RRuleOptions;
 
     return new RRuleTemporal(merged);
   }
 
-  private addDtstartIfNeeded(dates: Temporal.ZonedDateTime[], iterator?: RRuleTemporalIterator): boolean {
+  private addDtstartIfNeeded(dates: Temporal.ZonedDateTime[], iterator?: InternalRRuleTemporalIterator): boolean {
     if (this.includeDtstart && !this.matchesAll(this.originalDtstart)) {
       // Skip if dtstart is excluded and we have an iterator
       if (iterator && this.isExcluded(this.originalDtstart)) {
@@ -1330,7 +1434,7 @@ export class RRuleTemporal {
     return true; // continue
   }
 
-  private canUseUtcLinearFastPath(iterator?: RRuleTemporalIterator): boolean {
+  private canUseUtcLinearFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
     if (iterator || this.tzid !== 'UTC' || this.opts.rscale || this.opts.rDate || this.opts.exDate) {
       return false;
     }
@@ -1355,7 +1459,7 @@ export class RRuleTemporal {
     }
   }
 
-  private canUseUtcWeeklyFastPath(iterator?: RRuleTemporalIterator): boolean {
+  private canUseUtcWeeklyFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
     return (
       !iterator &&
       this.tzid === 'UTC' &&
@@ -1375,7 +1479,7 @@ export class RRuleTemporal {
     );
   }
 
-  private canUseUtcMonthlyFastPath(iterator?: RRuleTemporalIterator): boolean {
+  private canUseUtcMonthlyFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
     return (
       !iterator &&
       this.tzid === 'UTC' &&
@@ -1433,7 +1537,7 @@ export class RRuleTemporal {
     return null;
   }
 
-  private allUtcFastPath(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] | null {
+  private allUtcFastPath(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] | null {
     if (this.canUseUtcLinearFastPath(iterator)) {
       switch (this.opts.freq) {
         case 'DAILY':
@@ -1949,7 +2053,7 @@ export class RRuleTemporal {
     occs: Temporal.ZonedDateTime[],
     dates: Temporal.ZonedDateTime[],
     start: Temporal.ZonedDateTime,
-    iterator?: RRuleTemporalIterator,
+    iterator?: InternalRRuleTemporalIterator,
     extraFilters?: (occ: Temporal.ZonedDateTime) => boolean,
   ): {
     shouldBreak: boolean;
@@ -1986,7 +2090,7 @@ export class RRuleTemporal {
    * @param iterator - An optional callback iterator function that can be used to filter or modify the occurrences.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
-  private _allMonthlyByDayOrMonthDay(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allMonthlyByDayOrMonthDay(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2017,7 +2121,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allWeekly(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allWeekly(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2083,7 +2187,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allMonthlyByMonth(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allMonthlyByMonth(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2142,7 +2246,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allYearlyByMonth(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allYearlyByMonth(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2187,7 +2291,7 @@ export class RRuleTemporal {
     }
   }
 
-  private _allYearlyComplex(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allYearlyComplex(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2229,7 +2333,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allMinutelySecondlyComplex(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allMinutelySecondlyComplex(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     if (!this.addDtstartIfNeeded(dates, iterator)) {
@@ -2270,7 +2374,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allMonthlyByWeekNo(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allMonthlyByWeekNo(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2331,7 +2435,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allMonthlyByYearDay(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allMonthlyByYearDay(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2406,7 +2510,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allDailyMinutelyHourlyWithBySetPos(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allDailyMinutelyHourlyWithBySetPos(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2458,7 +2562,7 @@ export class RRuleTemporal {
     return this.applyCountLimitAndMergeRDates(dates, iterator);
   }
 
-  private _allFallback(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allFallback(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     let current = this.computeFirst();
@@ -2512,7 +2616,11 @@ export class RRuleTemporal {
    * @param iterator - An optional callback iterator function that can be used to filter or modify the occurrences.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
-  all(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  all(iterator?: RRuleTemporalIterator): TemporalZonedDateTime[] {
+    return RRuleTemporal.toPublicDates(this.allInternal(RRuleTemporal.toInternalIterator(iterator)));
+  }
+
+  private allInternal(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     // RSCALE non-Gregorian engines (Chinese, Hebrew, Indian) for YEARLY/MONTHLY/WEEKLY
     if (this.opts.rscale && ['CHINESE', 'HEBREW', 'INDIAN'].includes(this.opts.rscale)) {
       if (
@@ -2656,7 +2764,7 @@ export class RRuleTemporal {
    * Handles month-to-month stepping from DTSTART's year/month aiming for DTSTART's day-of-month.
    * Applies SKIP=OMIT (skip invalid months), BACKWARD (clamp to last day), FORWARD (first day of next month).
    */
-  private _allMonthlyRscaleSimple(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allMonthlyRscaleSimple(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     let iterationCount = 0;
     const start = this.originalDtstart;
@@ -2773,7 +2881,7 @@ export class RRuleTemporal {
    */
   private applyCountLimitAndMergeRDates(
     dates: Temporal.ZonedDateTime[],
-    iterator?: RRuleTemporalIterator,
+    iterator?: InternalRRuleTemporalIterator,
   ): Temporal.ZonedDateTime[] {
     const merged = this.mergeAndDeduplicateRDates(dates);
     const excluded = this.excludeExDates(merged);
@@ -2856,9 +2964,15 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include the start and end dates in the results.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule within the specified time window.
    */
-  between(after: DateFilter, before: DateFilter, inc = false): Temporal.ZonedDateTime[] {
-    const startInst = after instanceof Date ? Temporal.Instant.from(after.toISOString()) : after.toInstant();
-    const endInst = before instanceof Date ? Temporal.Instant.from(before.toISOString()) : before.toInstant();
+  between(after: DateFilter, before: DateFilter, inc = false): TemporalZonedDateTime[] {
+    const startInst =
+      after instanceof Date
+        ? Temporal.Instant.from(after.toISOString())
+        : normalizeZonedDateTime(after, 'after').toInstant();
+    const endInst =
+      before instanceof Date
+        ? Temporal.Instant.from(before.toISOString())
+        : normalizeZonedDateTime(before, 'before').toInstant();
 
     const startZdt = Temporal.Instant.from(startInst).toZonedDateTimeISO(this.tzid);
     const beforeZdt = Temporal.Instant.from(endInst).toZonedDateTimeISO(this.tzid);
@@ -2956,20 +3070,22 @@ export class RRuleTemporal {
     }
 
     const tempRule = new RRuleTemporal(tempOpts);
-    const allDates = tempRule.all();
+    const allDates = tempRule.allInternal();
 
-    return allDates.filter((date) => {
-      const inst = date.toInstant();
-      const afterStart = inc
-        ? Temporal.Instant.compare(inst, startInst) >= 0
-        : Temporal.Instant.compare(inst, startInst) > 0;
+    return RRuleTemporal.toPublicDates(
+      allDates.filter((date) => {
+        const inst = date.toInstant();
+        const afterStart = inc
+          ? Temporal.Instant.compare(inst, startInst) >= 0
+          : Temporal.Instant.compare(inst, startInst) > 0;
 
-      const beforeEnd = inc
-        ? Temporal.Instant.compare(inst, endInst) <= 0
-        : Temporal.Instant.compare(inst, endInst) < 0;
+        const beforeEnd = inc
+          ? Temporal.Instant.compare(inst, endInst) <= 0
+          : Temporal.Instant.compare(inst, endInst) < 0;
 
-      return afterStart && beforeEnd;
-    });
+        return afterStart && beforeEnd;
+      }),
+    );
   }
 
   /**
@@ -2984,8 +3100,9 @@ export class RRuleTemporal {
    * Convenience helper: true if any occurrence falls on the given calendar day
    * in the rule's time zone. This ignores time-of-day granularity.
    */
-  occursOn(date: Temporal.PlainDate): boolean {
-    const startOfDay = date.toZonedDateTime({
+  occursOn(date: TemporalPlainDateInput): boolean {
+    const plainDate = Temporal.PlainDate.from(date.toString());
+    const startOfDay = plainDate.toZonedDateTime({
       timeZone: this.tzid,
       plainTime: Temporal.PlainTime.from('00:00'),
     });
@@ -2999,11 +3116,14 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the start date.
    * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
    */
-  next(after: DateFilter = new Date(), inc = false): Temporal.ZonedDateTime | null {
-    const afterInst = after instanceof Date ? Temporal.Instant.from(after.toISOString()) : after.toInstant();
+  next(after: DateFilter = new Date(), inc = false): TemporalZonedDateTime | null {
+    const afterInst =
+      after instanceof Date
+        ? Temporal.Instant.from(after.toISOString())
+        : normalizeZonedDateTime(after, 'after').toInstant();
 
     let result: Temporal.ZonedDateTime | null = null;
-    this.all((occ) => {
+    this.allInternal((occ) => {
       const inst = occ.toInstant();
       const ok = inc ? Temporal.Instant.compare(inst, afterInst) >= 0 : Temporal.Instant.compare(inst, afterInst) > 0;
       if (ok) {
@@ -3015,7 +3135,7 @@ export class RRuleTemporal {
       return true;
     });
 
-    return result;
+    return RRuleTemporal.toPublicDate(result);
   }
 
   /**
@@ -3024,11 +3144,14 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the end date.
    * @returns The previous occurrence of the rule before the specified date or null if no occurrences are found.
    */
-  previous(before: DateFilter = new Date(), inc = false): Temporal.ZonedDateTime | null {
-    const beforeInst = before instanceof Date ? Temporal.Instant.from(before.toISOString()) : before.toInstant();
+  previous(before: DateFilter = new Date(), inc = false): TemporalZonedDateTime | null {
+    const beforeInst =
+      before instanceof Date
+        ? Temporal.Instant.from(before.toISOString())
+        : normalizeZonedDateTime(before, 'before').toInstant();
 
     let prev: Temporal.ZonedDateTime | null = null;
-    this.all((occ) => {
+    this.allInternal((occ) => {
       const inst = occ.toInstant();
       const beyond = inc
         ? Temporal.Instant.compare(inst, beforeInst) > 0
@@ -3038,7 +3161,7 @@ export class RRuleTemporal {
       return true;
     });
 
-    return prev;
+    return RRuleTemporal.toPublicDate(prev);
   }
 
   toString(): string {
@@ -3268,16 +3391,16 @@ export class RRuleTemporal {
       if (numericMonths.length && !numericMonths.includes(current.month)) {
         const months = [...numericMonths].sort((a, b) => a - b);
         const nextMonth = this.findNextValidValue(current.month, months, (a, b) => a - b);
-      if (nextMonth) {
-        current = current.with({month: nextMonth, day: 1, hour: 0, minute: 0, second: 0});
-      } else {
-        // Move to next year and use first valid month
+        if (nextMonth) {
+          current = current.with({month: nextMonth, day: 1, hour: 0, minute: 0, second: 0});
+        } else {
+          // Move to next year and use first valid month
         current = current
           .add({years: 1})
           .with({month: months[0], day: 1, hour: 0, minute: 0, second: 0});
-      }
-      current = this.applyTimeOverride(current);
-      return current;
+        }
+        current = this.applyTimeOverride(current);
+        return current;
       }
     }
 
@@ -3698,7 +3821,7 @@ export class RRuleTemporal {
     return this.applyBySetPos(occs).sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
   }
 
-  private _allRscaleNonGregorian(iterator?: RRuleTemporalIterator): Temporal.ZonedDateTime[] {
+  private _allRscaleNonGregorian(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
     const calId = this.getRscaleCalendarId();
     if (!calId) return this._allFallback(iterator);
     this.assertRscaleCalendarSupported(calId);

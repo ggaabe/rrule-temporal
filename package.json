@@ -20,6 +20,7 @@
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
+    "test:types": "npm run build && tsc -p tests/type-compat/tsconfig.json --noEmit",
     "coverage": "vitest run --coverage",
     "format": "prettier --write 'src/**/*.ts'",
     "prepare": "npm run build"
@@ -50,11 +51,14 @@
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^4.1.0",
     "prettier": "^3.8.1",
+    "temporal-polyfill": "^1.0.1",
     "tsdown": "^0.21.4",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1"
-  }
+    "@js-temporal/polyfill": "^0.5.1",
+    "temporal-spec": "^1.0.0"
+  },
+  "packageManager": "pnpm@10.6.0+sha1.c53a73dd9336949b37f63d82c45beb5b161924b6"
 }
