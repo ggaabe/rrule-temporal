@@ -47,9 +47,6 @@
   "files": [
     "dist"
   ],
-  "engines": {
-    "node": ">=20"
-  },
   "devDependencies": {
     "@js-temporal/polyfill": "^0.5.1",
     "@types/node": "^25.5.0",

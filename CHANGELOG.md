@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1 (2026-07-21)
+
+- Removed the `engines.node >=20` declaration. It reflected the oldest Node
+  version in the project's CI matrix, not a runtime requirement of the
+  published package, and unnecessarily warned consumers using older Node
+  versions.
+
 ## 2.0.0 (2026-07-02)
 
 The recurrence engine was rebuilt around integer epoch math and a pluggable
