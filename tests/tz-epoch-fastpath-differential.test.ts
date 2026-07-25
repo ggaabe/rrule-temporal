@@ -36,6 +36,28 @@ const SCENARIOS: Scenario[] = [
     opts: (dtstart) => ({freq: 'DAILY', count: 300, byDay: ['MO', 'TU', 'WE', 'TH', 'FR'], dtstart}),
   },
   {
+    label: 'DAILY weekday time expansion',
+    opts: (dtstart) => ({
+      freq: 'DAILY',
+      interval: 2,
+      count: 180,
+      byDay: ['MO', 'WE', 'FR'],
+      byHour: [9, 17],
+      byMinute: [0, 30],
+      dtstart,
+    }),
+  },
+  {
+    label: 'DAILY time expansion with included DTSTART',
+    opts: (dtstart) => ({
+      freq: 'DAILY',
+      count: 60,
+      byHour: [9, 17],
+      includeDtstart: true,
+      dtstart,
+    }),
+  },
+  {
     label: 'HOURLY across DST transitions',
     opts: (dtstart) => ({freq: 'HOURLY', count: 400, dtstart}),
   },
@@ -44,12 +66,27 @@ const SCENARIOS: Scenario[] = [
     opts: (dtstart) => ({freq: 'MINUTELY', interval: 90, count: 400, dtstart}),
   },
   {
+    label: 'SECONDLY INTERVAL=17',
+    opts: (dtstart) => ({freq: 'SECONDLY', interval: 17, count: 400, dtstart}),
+  },
+  {
     label: 'WEEKLY MO/WE/FR INTERVAL=2',
     opts: (dtstart) => ({freq: 'WEEKLY', interval: 2, count: 150, byDay: ['MO', 'WE', 'FR'], dtstart}),
   },
   {
     label: 'WEEKLY default weekday, WKST=SU',
     opts: (dtstart) => ({freq: 'WEEKLY', count: 110, wkst: 'SU', dtstart}),
+  },
+  {
+    label: 'WEEKLY day and time expansion',
+    opts: (dtstart) => ({
+      freq: 'WEEKLY',
+      interval: 2,
+      count: 180,
+      byDay: ['MO', 'WE', 'FR'],
+      byHour: [9, 17],
+      dtstart,
+    }),
   },
   {
     label: 'MONTHLY last weekday (BYSETPOS=-1)',

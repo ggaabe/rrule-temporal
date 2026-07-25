@@ -14,9 +14,12 @@ Included scenarios:
 
 - `30 daily occurrences`
 - `Daily weekdays across many cycles`
+- `Daily time-slot expansion`
 - `720 hourly occurrences`
 - `1,440 minutely occurrences`
+- `3,600 secondly occurrences`
 - `Weekly MO/WE/FR across many cycles`
+- `Weekly day and time-slot expansion`
 - `Monthly last weekday across 20 years`
 - `Monthly first and last weekday across 20 years`
 
@@ -50,27 +53,34 @@ Uncached median ops/s from the latest run on a MacBook Pro M2 Max (Node 25,
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | rrule-rust median ops/s |
 | --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 19,443 | 15,825 | 172,889 |
-| 30 daily occurrences | America/Chicago | 13,525 | 347 | 169,396 |
-| Daily weekdays across many cycles | UTC | 997 | 759 | 10,749 |
-| Daily weekdays across many cycles | America/Chicago | 751 | 17.9 | 9,638 |
-| 720 hourly occurrences | UTC | 713 | 653 | 6,796 |
-| 720 hourly occurrences | America/Chicago | 502 | 14.1 | 6,444 |
-| 1,440 minutely occurrences | UTC | 343 | 333 | 4,005 |
-| 1,440 minutely occurrences | America/Chicago | 259 | 6.6 | 3,880 |
-| Weekly MO/WE/FR across many cycles | UTC | 632 | 1,068 | 8,975 |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 471 | 13.1 | 8,252 |
-| Monthly last weekday across 20 years | UTC | 1,120 | 1,010 | 11,003 |
-| Monthly last weekday across 20 years | America/Chicago | 980 | 36.7 | 9,877 |
-| Monthly first and last weekday across 20 years | UTC | 723 | 1,277 | 8,581 |
-| Monthly first and last weekday across 20 years | America/Chicago | 562 | 22.2 | 7,735 |
+| 30 daily occurrences | UTC | 22,308 | 17,932 | 196,403 |
+| 30 daily occurrences | America/Chicago | 15,358 | 384 | 181,821 |
+| Daily weekdays across many cycles | UTC | 1,192 | 830 | 11,449 |
+| Daily weekdays across many cycles | America/Chicago | 873 | 20.9 | 10,629 |
+| Daily time-slot expansion | UTC | 611 | 1,199 | 11,060 |
+| Daily time-slot expansion | America/Chicago | 448 | 11.7 | 10,059 |
+| 720 hourly occurrences | UTC | 817 | 757 | 7,311 |
+| 720 hourly occurrences | America/Chicago | 588 | 13.9 | 6,842 |
+| 1,440 minutely occurrences | UTC | 392 | 364 | 4,200 |
+| 1,440 minutely occurrences | America/Chicago | 287 | 7.4 | 4,045 |
+| 3,600 secondly occurrences | UTC | 152 | 144 | 1,773 |
+| 3,600 secondly occurrences | America/Chicago | 113 | 2.9 | 1,734 |
+| Weekly MO/WE/FR across many cycles | UTC | 662 | 1,137 | 9,579 |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 493 | 14.7 | 8,653 |
+| Weekly day and time-slot expansion | UTC | 502 | 1,207 | 9,382 |
+| Weekly day and time-slot expansion | America/Chicago | 394 | 12.2 | 8,744 |
+| Monthly last weekday across 20 years | UTC | 1,314 | 1,119 | 11,539 |
+| Monthly last weekday across 20 years | America/Chicago | 1,043 | 41.7 | 10,322 |
+| Monthly first and last weekday across 20 years | UTC | 804 | 1,326 | 9,015 |
+| Monthly first and last weekday across 20 years | America/Chicago | 622 | 24.9 | 8,162 |
 
 Time-zone-aware iteration now runs through an epoch-integer engine with a
 cached per-zone offset table, so the historical UTC-vs-named-zone gap is gone
-(e.g. monthly last weekday in Chicago went from 45.5 to 980 ops/s).
+(e.g. monthly last weekday in Chicago went from 45.5 to 1,043 ops/s).
 
 On runtimes with native Temporal (Node 26+), occurrence materialization is
-much cheaper. rrule-temporal alone, same scenarios (ops/s = 1000 / ms-per-call):
+much cheaper. rrule-temporal alone, the earlier core scenarios
+(ops/s = 1000 / ms-per-call):
 
 | Scenario | TZ | rrule-temporal on Node 26 (native Temporal) |
 | --- | --- | ---: |

@@ -309,31 +309,37 @@ Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
 | --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 19,443 | 15,825 | 1.23x |
-| 30 daily occurrences | America/Chicago | 13,525 | 347 | 38.98x |
-| Daily weekdays across many cycles | UTC | 997 | 759 | 1.31x |
-| Daily weekdays across many cycles | America/Chicago | 751 | 17.9 | 41.96x |
-| 720 hourly occurrences | UTC | 713 | 653 | 1.09x |
-| 720 hourly occurrences | America/Chicago | 502 | 14.1 | 35.60x |
-| 1,440 minutely occurrences | UTC | 343 | 333 | 1.03x |
-| 1,440 minutely occurrences | America/Chicago | 259 | 6.6 | 39.24x |
-| Weekly MO/WE/FR across many cycles | UTC | 632 | 1,068 | 0.59x |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 471 | 13.1 | 35.95x |
-| Monthly last weekday across 20 years | UTC | 1,120 | 1,010 | 1.11x |
-| Monthly last weekday across 20 years | America/Chicago | 980 | 36.7 | 26.70x |
-| Monthly first and last weekday across 20 years | UTC | 723 | 1,277 | 0.57x |
-| Monthly first and last weekday across 20 years | America/Chicago | 562 | 22.2 | 25.32x |
+| 30 daily occurrences | UTC | 22,308 | 17,932 | 1.24x |
+| 30 daily occurrences | America/Chicago | 15,358 | 384 | 40.00x |
+| Daily weekdays across many cycles | UTC | 1,192 | 830 | 1.44x |
+| Daily weekdays across many cycles | America/Chicago | 873 | 20.9 | 41.77x |
+| Daily time-slot expansion | UTC | 611 | 1,199 | 0.51x |
+| Daily time-slot expansion | America/Chicago | 448 | 11.7 | 38.29x |
+| 720 hourly occurrences | UTC | 817 | 757 | 1.08x |
+| 720 hourly occurrences | America/Chicago | 588 | 13.9 | 42.30x |
+| 1,440 minutely occurrences | UTC | 392 | 364 | 1.08x |
+| 1,440 minutely occurrences | America/Chicago | 287 | 7.4 | 38.78x |
+| 3,600 secondly occurrences | UTC | 152 | 144 | 1.06x |
+| 3,600 secondly occurrences | America/Chicago | 113 | 2.9 | 38.97x |
+| Weekly MO/WE/FR across many cycles | UTC | 662 | 1,137 | 0.58x |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 493 | 14.7 | 33.54x |
+| Weekly day and time-slot expansion | UTC | 502 | 1,207 | 0.42x |
+| Weekly day and time-slot expansion | America/Chicago | 394 | 12.2 | 32.30x |
+| Monthly last weekday across 20 years | UTC | 1,314 | 1,119 | 1.17x |
+| Monthly last weekday across 20 years | America/Chicago | 1,043 | 41.7 | 25.01x |
+| Monthly first and last weekday across 20 years | UTC | 804 | 1,326 | 0.61x |
+| Monthly first and last weekday across 20 years | America/Chicago | 622 | 24.9 | 24.98x |
 
 Time-zone-aware rules iterate through an epoch-integer engine with a cached
 per-zone offset table, so named-zone scenarios now run 25–42x faster than
 `rrule` and within a small factor of their UTC equivalents. On UTC the two
-libraries are comparable on Node 25 (`rrule` stays ahead on two weekly/monthly
-scenarios where occurrence materialization dominates); on runtimes with native
-Temporal (Node 26+, Chrome 144+, Firefox 139+) materialization is much cheaper
-and `rrule-temporal` leads every scenario — e.g. monthly last weekday in
-Chicago reaches ~2,200 ops/s and daily weekdays ~2,800 ops/s. Repeated
-`all()` calls on the same rule are served from an internal cache (opt out per
-rule with `cache: false`).
+libraries are comparable on Node 25 (`rrule` stays ahead in several expanded
+and weekly/monthly scenarios where occurrence materialization dominates); on
+runtimes with native Temporal (Node 26+, Chrome 144+, Firefox 139+)
+materialization is much cheaper, and `rrule-temporal` led every measured core
+scenario — e.g. monthly last weekday in Chicago reaches ~2,200 ops/s and daily
+weekdays ~2,800 ops/s. Repeated `all()` calls on the same rule are served from
+an internal cache (opt out per rule with `cache: false`).
 
 ## Further examples
 

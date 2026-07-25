@@ -535,6 +535,7 @@ export class RRuleTemporal {
   private readonly hasOrdinalByDay: boolean;
   private readonly canUseEpochMillisecondsPrecisionFlag: boolean;
   private readonly timeSlotOffsetsMs?: number[];
+  private readonly hasUniqueTimeSlotOffsets: boolean;
   private readonly numericByMonths?: number[];
   private exDateEpochNs?: Set<bigint>;
   private allResultCache?: Temporal.ZonedDateTime[];
@@ -624,6 +625,8 @@ export class RRuleTemporal {
       this.originalDtstart.nanosecond === 0 &&
       (!this.opts.until || (this.opts.until.microsecond === 0 && this.opts.until.nanosecond === 0));
     this.timeSlotOffsetsMs = this.buildTimeSlotOffsetsMs();
+    this.hasUniqueTimeSlotOffsets =
+      this.timeSlotOffsetsMs === undefined || new Set(this.timeSlotOffsetsMs).size === this.timeSlotOffsetsMs.length;
     this.numericByMonths = this.opts.byMonth?.filter((value): value is number => typeof value === 'number');
   }
 
@@ -1451,9 +1454,15 @@ export class RRuleTemporal {
 
     switch (this.opts.freq) {
       case 'DAILY':
-        return !this.opts.byHour && !this.opts.byMinute && !this.opts.bySecond && !this.hasOrdinalByDay;
+        return (
+          !this.hasOrdinalByDay &&
+          (!this.opts.byHour || this.canUseEpochMillisecondsPrecisionFlag) &&
+          (!this.opts.byMinute || this.canUseEpochMillisecondsPrecisionFlag) &&
+          (!this.opts.bySecond || this.canUseEpochMillisecondsPrecisionFlag)
+        );
       case 'HOURLY':
       case 'MINUTELY':
+      case 'SECONDLY':
         return !this.opts.byDay && !this.opts.byHour && !this.opts.byMinute && !this.opts.bySecond;
       default:
         return false;
@@ -1473,9 +1482,9 @@ export class RRuleTemporal {
       !this.opts.byYearDay &&
       !this.opts.byWeekNo &&
       !this.opts.bySetPos &&
-      !this.opts.byHour &&
-      !this.opts.byMinute &&
-      !this.opts.bySecond &&
+      (!this.opts.byHour || this.canUseEpochMillisecondsPrecisionFlag) &&
+      (!this.opts.byMinute || this.canUseEpochMillisecondsPrecisionFlag) &&
+      (!this.opts.bySecond || this.canUseEpochMillisecondsPrecisionFlag) &&
       !this.hasOrdinalByDay
     );
   }
@@ -1542,11 +1551,17 @@ export class RRuleTemporal {
     if (this.canUseUtcLinearFastPath(iterator)) {
       switch (this.opts.freq) {
         case 'DAILY':
-          return this._allUtcDailySimple();
+          return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
+            ? this.hasUniqueTimeSlotOffsets
+              ? this._allUtcDailyExpanded()
+              : null
+            : this._allUtcDailySimple();
         case 'HOURLY':
           return this._allUtcFixedStepSimple(NS_PER_HOUR * BigInt(this.opts.interval!));
         case 'MINUTELY':
           return this._allUtcFixedStepSimple(NS_PER_MINUTE * BigInt(this.opts.interval!));
+        case 'SECONDLY':
+          return this._allUtcFixedStepSimple(NS_PER_SECOND * BigInt(this.opts.interval!));
       }
     }
 
@@ -1555,7 +1570,11 @@ export class RRuleTemporal {
     }
 
     if (this.canUseUtcWeeklyFastPath(iterator)) {
-      return this._allUtcWeeklySimple();
+      return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
+        ? this.hasUniqueTimeSlotOffsets
+          ? this._allUtcWeeklyExpanded()
+          : null
+        : this._allUtcWeeklySimple();
     }
 
     return null;
@@ -1696,6 +1715,57 @@ export class RRuleTemporal {
     return dates;
   }
 
+  private _allUtcDailyExpanded(): Temporal.ZonedDateTime[] {
+    const dates: Temporal.ZonedDateTime[] = [];
+    if (!this.addDtstartIfNeeded(dates)) {
+      return dates;
+    }
+
+    const timeSlotOffsets = this.timeSlotOffsetsMs!;
+    const startMilliseconds = this.originalDtstart.epochMilliseconds;
+    const untilMilliseconds = this.opts.until?.epochMilliseconds;
+    const stepDays = this.opts.interval!;
+    const allowedDays = this.simpleByDayIsoDays;
+    let epochDay = Math.floor(startMilliseconds / MS_PER_DAY);
+    let dayOfWeek = this.originalDtstart.dayOfWeek;
+
+    if (allowedDays?.length) {
+      const firstMatchingDayOffset = this.findFirstMatchingDailyStep(dayOfWeek, 1, allowedDays);
+      if (firstMatchingDayOffset === null) {
+        return dates;
+      }
+      epochDay += firstMatchingDayOffset;
+      dayOfWeek = addIsoDays(dayOfWeek, firstMatchingDayOffset);
+    }
+
+    let iterationCount = 0;
+    while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+
+      if (!allowedDays || allowedDays.includes(dayOfWeek)) {
+        const dayStartMilliseconds = epochDay * MS_PER_DAY;
+        for (const timeSlotOffset of timeSlotOffsets) {
+          const occurrenceMilliseconds = dayStartMilliseconds + timeSlotOffset;
+          if (occurrenceMilliseconds < startMilliseconds) {
+            continue;
+          }
+          if (untilMilliseconds !== undefined && occurrenceMilliseconds > untilMilliseconds) {
+            return dates;
+          }
+          dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
+          if (this.shouldBreakForCountLimit(dates.length)) {
+            return dates;
+          }
+        }
+      }
+
+      epochDay += stepDays;
+      dayOfWeek = addIsoDays(dayOfWeek, stepDays);
+    }
+  }
+
   private _allUtcWeeklySimple(): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     if (!this.addDtstartIfNeeded(dates)) {
@@ -1768,6 +1838,50 @@ export class RRuleTemporal {
       }
 
       weekStartNanoseconds += weekStepNanoseconds;
+    }
+  }
+
+  private _allUtcWeeklyExpanded(): Temporal.ZonedDateTime[] {
+    const dates: Temporal.ZonedDateTime[] = [];
+    if (!this.addDtstartIfNeeded(dates)) {
+      return dates;
+    }
+
+    const start = this.originalDtstart;
+    const startMilliseconds = start.epochMilliseconds;
+    const startEpochDay = Math.floor(startMilliseconds / MS_PER_DAY);
+    const untilMilliseconds = this.opts.until?.epochMilliseconds;
+    const timeSlotOffsets = this.timeSlotOffsetsMs!;
+    const wkstToken = extractWeekdayToken(this.opts.wkst || 'MO') ?? 'MO';
+    const wkstDay = weekdayToIsoDay[wkstToken] ?? 1;
+    const targetDays = this.opts.byDay ? [...(this.allByDayIsoDays ?? [])] : [start.dayOfWeek];
+    const dayOffsets = targetDays.map((day) => (day - wkstDay + 7) % 7).sort((a, b) => a - b);
+    const weekStartOffset = (start.dayOfWeek - wkstDay + 7) % 7;
+    const stepDaysPerWeek = this.opts.interval! * 7;
+
+    let weekStartDay = startEpochDay - weekStartOffset;
+    let iterationCount = 0;
+    while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+      for (const dayOffset of dayOffsets) {
+        const dayStartMilliseconds = (weekStartDay + dayOffset) * MS_PER_DAY;
+        for (const timeSlotOffset of timeSlotOffsets) {
+          const occurrenceMilliseconds = dayStartMilliseconds + timeSlotOffset;
+          if (occurrenceMilliseconds < startMilliseconds) {
+            continue;
+          }
+          if (untilMilliseconds !== undefined && occurrenceMilliseconds > untilMilliseconds) {
+            return dates;
+          }
+          dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
+          if (this.shouldBreakForCountLimit(dates.length)) {
+            return dates;
+          }
+        }
+      }
+      weekStartDay += stepDaysPerWeek;
     }
   }
 
@@ -2146,14 +2260,20 @@ export class RRuleTemporal {
     if (linearEligible) {
       switch (this.opts.freq) {
         case 'DAILY':
-          if (!this.opts.byHour && !this.opts.byMinute && !this.opts.bySecond && !this.hasOrdinalByDay) {
-            return this._allTzDailySimple();
+          if (!this.hasOrdinalByDay) {
+            return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
+              ? this.hasUniqueTimeSlotOffsets
+                ? this._allTzDailyExpanded()
+                : null
+              : this._allTzDailySimple();
           }
           break;
         case 'HOURLY':
         case 'MINUTELY':
+        case 'SECONDLY':
           if (!this.opts.byDay && !this.opts.byHour && !this.opts.byMinute && !this.opts.bySecond) {
-            const stepMs = this.opts.freq === 'HOURLY' ? MS_PER_HOUR : MS_PER_MINUTE;
+            const stepMs =
+              this.opts.freq === 'HOURLY' ? MS_PER_HOUR : this.opts.freq === 'MINUTELY' ? MS_PER_MINUTE : MS_PER_SECOND;
             return this._allTzFixedStepSimple(stepMs * this.opts.interval!);
           }
           break;
@@ -2169,15 +2289,10 @@ export class RRuleTemporal {
       return this._allTzMonthlyByDayOrMonthDay();
     }
 
-    if (
-      this.opts.freq === 'WEEKLY' &&
-      linearEligible &&
-      !this.opts.byHour &&
-      !this.opts.byMinute &&
-      !this.opts.bySecond &&
-      !this.hasOrdinalByDay
-    ) {
-      return this._allTzWeeklySimple();
+    if (this.opts.freq === 'WEEKLY' && linearEligible && !this.hasOrdinalByDay && this.hasUniqueTimeSlotOffsets) {
+      return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
+        ? this._allTzWeeklyExpanded()
+        : this._allTzWeeklySimple();
     }
 
     return null;
@@ -2235,6 +2350,68 @@ export class RRuleTemporal {
     }
 
     return dates;
+  }
+
+  private _allTzDailyExpanded(): Temporal.ZonedDateTime[] | null {
+    const dates: Temporal.ZonedDateTime[] = [];
+    if (!this.addDtstartIfNeeded(dates)) {
+      return dates;
+    }
+
+    const resolver = this.getZoneResolver();
+    const startEpochMs = this.originalDtstart.epochMilliseconds;
+    const startWallMs = this.wallMsOf(this.originalDtstart);
+    const timeSlotOffsets = this.timeSlotOffsetsMs!;
+    for (const timeSlotOffset of timeSlotOffsets) {
+      if (this.tzFastPathGapHazard(timeSlotOffset)) {
+        return null;
+      }
+    }
+
+    const stepDays = this.opts.interval!;
+    const allowedDays = this.simpleByDayIsoDays;
+    const untilMs = this.opts.until?.epochMilliseconds;
+    let epochDay = Math.floor(startWallMs / MS_PER_DAY);
+    let dayOfWeek = isoDayOfWeekOfEpochDay(epochDay);
+
+    if (allowedDays?.length) {
+      const firstMatchingDayOffset = this.findFirstMatchingDailyStep(dayOfWeek, 1, allowedDays);
+      if (firstMatchingDayOffset === null) {
+        return dates;
+      }
+      epochDay += firstMatchingDayOffset;
+      dayOfWeek = addIsoDays(dayOfWeek, firstMatchingDayOffset);
+    }
+
+    let iterationCount = 0;
+    while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+
+      if (!allowedDays || allowedDays.includes(dayOfWeek)) {
+        const dayStartWallMs = epochDay * MS_PER_DAY;
+        for (const timeSlotOffset of timeSlotOffsets) {
+          const resolution = resolver.epochMsForWall(dayStartWallMs + timeSlotOffset);
+          if (resolution.pushed) {
+            return null;
+          }
+          if (resolution.epochMs < startEpochMs) {
+            continue;
+          }
+          if (untilMs !== undefined && resolution.epochMs > untilMs) {
+            return dates;
+          }
+          dates.push(this.zdtFromEpochMs(resolution.epochMs));
+          if (this.shouldBreakForCountLimit(dates.length)) {
+            return dates;
+          }
+        }
+      }
+
+      epochDay += stepDays;
+      dayOfWeek = addIsoDays(dayOfWeek, stepDays);
+    }
   }
 
   private _allTzFixedStepSimple(stepMs: number): Temporal.ZonedDateTime[] | null {
@@ -2323,6 +2500,62 @@ export class RRuleTemporal {
         dates.push(this.zdtFromEpochMs(resolution.epochMs));
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
+        }
+      }
+      weekStartDay += stepDaysPerWeek;
+    }
+  }
+
+  private _allTzWeeklyExpanded(): Temporal.ZonedDateTime[] | null {
+    const dates: Temporal.ZonedDateTime[] = [];
+    if (!this.addDtstartIfNeeded(dates)) {
+      return dates;
+    }
+
+    const resolver = this.getZoneResolver();
+    const start = this.originalDtstart;
+    const startEpochMs = start.epochMilliseconds;
+    const startWallMs = this.wallMsOf(start);
+    const startEpochDay = Math.floor(startWallMs / MS_PER_DAY);
+    const timeSlotOffsets = this.timeSlotOffsetsMs!;
+    for (const timeSlotOffset of timeSlotOffsets) {
+      if (this.tzFastPathGapHazard(timeSlotOffset)) {
+        return null;
+      }
+    }
+
+    const startDayOfWeek = isoDayOfWeekOfEpochDay(startEpochDay);
+    const wkstToken = extractWeekdayToken(this.opts.wkst || 'MO') ?? 'MO';
+    const wkstDay = weekdayToIsoDay[wkstToken] ?? 1;
+    const targetDays = this.opts.byDay ? [...(this.allByDayIsoDays ?? [])] : [startDayOfWeek];
+    const dayOffsets = targetDays.map((day) => (day - wkstDay + 7) % 7).sort((a, b) => a - b);
+    const weekStartOffset = (startDayOfWeek - wkstDay + 7) % 7;
+    const untilMs = this.opts.until?.epochMilliseconds;
+    const stepDaysPerWeek = this.opts.interval! * 7;
+
+    let weekStartDay = startEpochDay - weekStartOffset;
+    let iterationCount = 0;
+    while (true) {
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+      for (const dayOffset of dayOffsets) {
+        const dayStartWallMs = (weekStartDay + dayOffset) * MS_PER_DAY;
+        for (const timeSlotOffset of timeSlotOffsets) {
+          const resolution = resolver.epochMsForWall(dayStartWallMs + timeSlotOffset);
+          if (resolution.pushed) {
+            return null;
+          }
+          if (resolution.epochMs < startEpochMs) {
+            continue;
+          }
+          if (untilMs !== undefined && resolution.epochMs > untilMs) {
+            return dates;
+          }
+          dates.push(this.zdtFromEpochMs(resolution.epochMs));
+          if (this.shouldBreakForCountLimit(dates.length)) {
+            return dates;
+          }
         }
       }
       weekStartDay += stepDaysPerWeek;

@@ -44,7 +44,7 @@ function main() {
   }
 
   const ics = scenario.buildIcs(timezone.id);
-  const rule = new RRuleTemporal({ rruleString: ics });
+  const rule = new RRuleTemporal({ rruleString: ics, cache: false });
 
   const warm = rule.all();
   if (warm.length !== scenario.expectedCount) {

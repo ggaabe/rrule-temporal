@@ -21,6 +21,14 @@ export const SCENARIOS = [
       `DTSTART;TZID=${tzid}:20230221T235900\nRRULE:FREQ=DAILY;COUNT=520;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR`,
   },
   {
+    id: 'daily_time_slots_1000',
+    label: 'Daily time-slot expansion',
+    description: '1,000 occurrences using BYHOUR × BYMINUTE expansion.',
+    expectedCount: 1000,
+    buildIcs: (tzid) =>
+      `DTSTART;TZID=${tzid}:20230221T235900\nRRULE:FREQ=DAILY;COUNT=1000;BYHOUR=9,17;BYMINUTE=0,30`,
+  },
+  {
     id: 'hourly_720',
     label: '720 hourly occurrences',
     description: 'Simple hourly frequency across 30 days.',
@@ -37,12 +45,28 @@ export const SCENARIOS = [
       `DTSTART;TZID=${tzid}:20230221T235900\nRRULE:FREQ=MINUTELY;COUNT=1440;INTERVAL=1`,
   },
   {
+    id: 'secondly_3600',
+    label: '3,600 secondly occurrences',
+    description: 'Simple secondly frequency across one hour.',
+    expectedCount: 3600,
+    buildIcs: (tzid) =>
+      `DTSTART;TZID=${tzid}:20230221T235900\nRRULE:FREQ=SECONDLY;COUNT=3600;INTERVAL=1`,
+  },
+  {
     id: 'weekly_mwf_780',
     label: 'Weekly MO/WE/FR across many cycles',
     description: '780 occurrences over roughly 5 years.',
     expectedCount: 780,
     buildIcs: (tzid) =>
       `DTSTART;TZID=${tzid}:20230221T235900\nRRULE:FREQ=WEEKLY;COUNT=780;INTERVAL=1;BYDAY=MO,WE,FR`,
+  },
+  {
+    id: 'weekly_time_slots_1000',
+    label: 'Weekly day and time-slot expansion',
+    description: '1,000 occurrences using BYDAY × BYHOUR expansion.',
+    expectedCount: 1000,
+    buildIcs: (tzid) =>
+      `DTSTART;TZID=${tzid}:20230221T235900\nRRULE:FREQ=WEEKLY;COUNT=1000;BYDAY=MO,WE,FR;BYHOUR=9,17`,
   },
   {
     id: 'monthly_last_weekday_240',

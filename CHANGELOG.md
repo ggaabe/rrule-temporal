@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.2 (2026-07-25)
+
+- Added epoch-integer fast paths for simple `SECONDLY` rules and for
+  `BYHOUR`/`BYMINUTE`/`BYSECOND` expansion in `DAILY` and `WEEKLY` rules.
+  Named-zone paths retain the existing DST-gap fallback to the general
+  Temporal engine.
+- Expanded differential fast-path coverage and corrected the profiling
+  harness to measure uncached recurrence generation.
+- Focused before/after median generation times on a MacBook Pro M2 Max with
+  Node 25 improved by 34.2% for 3,600 UTC `SECONDLY` occurrences; 64.6% in UTC
+  and 62.2% in `America/Chicago` for 1,000 `DAILY` time-slot occurrences; and
+  71.9% in UTC and 72.2% in `America/Chicago` for 1,000 `WEEKLY` day/time-slot
+  occurrences. The named-zone `SECONDLY` case remained effectively flat
+  (+0.3%).
+
 ## 2.0.1 (2026-07-21)
 
 - Removed the `engines.node >=20` declaration. It reflected the oldest Node

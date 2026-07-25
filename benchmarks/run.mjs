@@ -180,7 +180,7 @@ function printSummary(results) {
   );
   console.log('');
   console.log(
-    `rrule-temporal has no internal occurrence cache, so its cache column is marked \`n/a\`. Cached variants for \`rrule\` and \`rrule-rust\` are pre-warmed before timing.`,
+    `Cached variants for all three libraries are pre-warmed before timing; uncached rows measure recurrence generation and occurrence materialization.`,
   );
 
   for (const suite of results.suites) {
