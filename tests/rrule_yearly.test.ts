@@ -48,7 +48,18 @@ describe('Yearly frequency tests', () => {
       byMonthDay: [1, 3],
       dtstart: zdt(1997, 9, 2, 9, 'UTC'),
     });
-    assertDates({rule}, ['1997-09-03T09:00:00.000Z', '1997-10-01T09:00:00.000Z', '1997-10-03T09:00:00.000Z']);
+    assertDates({rule}, ['1997-09-03T09:00:00.000Z', '1998-09-01T09:00:00.000Z', '1998-09-03T09:00:00.000Z']);
+  });
+
+  it('uses DTSTART month for yearly BYMONTHDAY without BYMONTH', () => {
+    const yearlyByMonthDayRule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 3,
+      byMonthDay: [7],
+      dtstart: zdt(2026, 7, 7, 0, 'UTC'),
+    });
+    assertDates({rule: yearlyByMonthDayRule}, ['2026-07-07T00:00:00.000Z',
+ '2027-07-07T00:00:00.000Z', '2028-07-07T00:00:00.000Z']);
   });
 
   it('testYearlyByMonthAndMonthDay', () => {

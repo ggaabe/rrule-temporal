@@ -3920,11 +3920,18 @@ export class RRuleTemporal {
    * if BYMONTH is not specified.
    */
   private generateYearlyOccurrences(sample: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
-    const months = this.opts.byMonth
-      ? this.opts.byMonth.filter((v): v is number => typeof v === 'number').sort((a, b) => a - b)
-      : this.opts.byMonthDay || this.opts.byDay
-        ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-        : [this.originalDtstart.month];
+    const expandsAcrossYear = Boolean(this.opts.byDay || (this.opts.byMonthDay && this.opts.bySetPos));
+    let months: number[];
+
+    if (this.opts.byMonth) {
+      months = this.opts.byMonth
+        .filter((value): value is number => typeof value === 'number')
+        .sort((a, b) => a - b);
+    } else if (expandsAcrossYear) {
+      months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    } else {
+      months = [this.originalDtstart.month];
+    }
 
     let occs: Temporal.ZonedDateTime[] = [];
 
