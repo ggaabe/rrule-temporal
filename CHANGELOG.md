@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.0.0-alpha.0 WASM candidate (unreleased)
+
+- Added a lazily instantiated, embedded WebAssembly recurrence kernel for
+  batched Gregorian fixed-step, daily, weekly, and monthly epoch generation.
+  The public `RRuleTemporal` constructor, methods, accepted Temporal inputs,
+  and returned `Temporal.ZonedDateTime` values are unchanged.
+- Added direct packed-epoch query plans for eligible COUNT-bounded
+  `between()`, `next()`, `previous()`, and `matches()` calls. These plans avoid
+  materializing occurrences that the query will discard.
+- Retained the 2.x JavaScript engine as an automatic fallback for unsupported
+  rules, sub-millisecond values, non-Gregorian RSCALE, iterator callbacks,
+  RDATE/EXDATE, DST-gap-sensitive wall times, unavailable WebAssembly, and
+  restrictive CSP environments.
+- Added forced-engine differential coverage, raw-kernel tests, ESM/CJS-safe
+  embedded loading, and a dedicated public-operation benchmark harness.
+- Corrected UTC monthly generation for proleptic-Gregorian years 0000–0099;
+  the previous `Date.UTC` helper remapped those years into 1900–1999.
+- On the development Node 24 host, eager `all()` improved by 1.2–1.3× for the
+  automatically selected monthly BYSETPOS cases. Distant COUNT=9000 range and
+  reverse queries improved by 196–1,477× because only the returned Temporal
+  values are materialized. See `docs/wasm-v3.md` for methodology and scope.
+
 ## 2.0.3 (2026-08-06)
 
 - Corrected RFC 5545 recurrence-set ordering so `COUNT` and `UNTIL` bound

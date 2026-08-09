@@ -1,6 +1,13 @@
 import {Temporal, isNativeTemporal, PolyfillTemporal} from './temporal-impl';
 import type {Temporal as TemporalSpec} from 'temporal-spec';
 import {getZoneOffsetResolver, type ZoneOffsetResolver} from './tz-offset';
+import {
+  generateDailyExpandedWasm,
+  generateDailyWasm,
+  generateFixedStepWasm,
+  generateMonthlyWasm,
+  generateWeeklyWasm,
+} from './wasm-engine';
 
 export const allowedFreq = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'] as const;
 export type Freq = (typeof allowedFreq)[number];
@@ -97,6 +104,11 @@ type PolyfillZonedDateTime = Temporal.ZonedDateTime;
 export type RRuleTemporalIterator = (date: TemporalZonedDateTime, i: number) => boolean;
 type InternalRRuleTemporalIterator = (date: PolyfillZonedDateTime, i: number) => boolean;
 export type DateFilter = Date | TemporalZonedDateTimeInput;
+
+interface WasmQuerySeries {
+  values: Float64Array;
+  wallClock: boolean;
+}
 
 function isTemporalZonedDateTimeInput(value: unknown): value is TemporalZonedDateTimeInput {
   return (
@@ -1547,6 +1559,316 @@ export class RRuleTemporal {
     return null;
   }
 
+  private weekdayMask(days: readonly number[] | undefined): number {
+    let mask = 0;
+    for (const day of days ?? []) {
+      mask |= 1 << (day - 1);
+    }
+    return mask;
+  }
+
+  private monthMask(): number {
+    let mask = 0;
+    for (const month of this.numericByMonths ?? []) {
+      mask |= 1 << (month - 1);
+    }
+    return mask;
+  }
+
+  private monthDayMasks(): {positive: number; negative: number} {
+    let positive = 0;
+    let negative = 0;
+    for (const day of this.opts.byMonthDay ?? []) {
+      if (day > 0) positive |= 1 << (day - 1);
+      else negative |= 1 << (-day - 1);
+    }
+    return {positive, negative};
+  }
+
+  private wasmMonthlyRangeSafe(): boolean {
+    const minimumMonthIndex = -271_820 * 12;
+    const maximumMonthIndex = 275_759 * 12 + 11;
+    const startMonthIndex = this.originalDtstart.year * 12 + this.originalDtstart.month - 1;
+    const periods = Math.min(this.maxIterations, this.opts.count ?? this.maxIterations);
+    const lastMonthIndex = startMonthIndex + this.opts.interval! * Math.max(periods - 1, 0);
+    return (
+      Number.isSafeInteger(lastMonthIndex) &&
+      startMonthIndex >= minimumMonthIndex &&
+      lastMonthIndex <= maximumMonthIndex
+    );
+  }
+
+  private materializeWasmEpochs(epochs: Float64Array): Temporal.ZonedDateTime[] {
+    const dates = new Array<Temporal.ZonedDateTime>(epochs.length);
+    if (this.tzid === 'UTC') {
+      for (let i = 0; i < epochs.length; i++) {
+        dates[i] = this.utcZdtFromEpochMilliseconds(epochs[i]!);
+      }
+      return dates;
+    }
+
+    for (let i = 0; i < epochs.length; i++) {
+      dates[i] = this.zdtFromEpochMs(epochs[i]!);
+    }
+    return dates;
+  }
+
+  private materializeWasmWallEpochs(wallEpochs: Float64Array): Temporal.ZonedDateTime[] | null {
+    const resolver = this.getZoneResolver();
+    const dates = new Array<Temporal.ZonedDateTime>(wallEpochs.length);
+    for (let i = 0; i < wallEpochs.length; i++) {
+      const resolution = resolver.epochMsForWall(wallEpochs[i]!);
+      if (resolution.pushed) return null;
+      dates[i] = this.zdtFromEpochMs(resolution.epochMs);
+    }
+    return dates;
+  }
+
+  /**
+   * Execute the already-proven Gregorian integer fast paths as one batched
+   * WebAssembly call. Unsupported rules fall through to the v2 JavaScript
+   * fast paths, which remain the semantic source of truth.
+   */
+  private allWasmFastPath(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] | null {
+    const forceWasm = Boolean((globalThis as {__RRULE_TEMPORAL_FORCE_WASM__?: boolean}).__RRULE_TEMPORAL_FORCE_WASM__);
+    const profitableDefaultPath =
+      this.tzid === 'UTC' &&
+      this.opts.freq === 'MONTHLY' &&
+      !!this.opts.bySetPos?.length &&
+      (this.opts.count ?? 0) >= 128;
+    if (!forceWasm && !profitableDefaultPath) return null;
+
+    if (
+      iterator ||
+      this.includeDtstart ||
+      this.opts.rscale ||
+      this.opts.rDate ||
+      this.opts.exDate ||
+      !this.canUseEpochMillisecondsPrecisionFlag ||
+      this.originalDtstart.timeZoneId !== this.tzid
+    ) {
+      return null;
+    }
+    if (
+      this.opts.bySetPos?.some(
+        (position) => !Number.isInteger(position) || position === 0 || position < -0x80000000 || position > 0x7fffffff,
+      )
+    ) {
+      return null;
+    }
+
+    const calendar = this.originalDtstart.calendarId;
+    if (calendar !== 'iso8601' && calendar !== 'gregory') return null;
+
+    const count = this.opts.count;
+    if (count !== undefined && (!Number.isInteger(count) || count <= 0 || count > 1_000_000)) return null;
+    if (!Number.isInteger(this.maxIterations) || this.maxIterations <= 0 || this.maxIterations > 0x7fffffff)
+      return null;
+    if (!Number.isInteger(this.opts.interval) || this.opts.interval! <= 0 || this.opts.interval! > 0x7fffffff) {
+      return null;
+    }
+
+    const startEpochMs = this.originalDtstart.epochMilliseconds;
+    const common = {
+      count,
+      untilMs: this.opts.until?.epochMilliseconds,
+      maxIterations: this.maxIterations,
+    };
+
+    if (this.tzid === 'UTC') {
+      if (this.canUseUtcLinearFastPath()) {
+        if (this.opts.freq === 'DAILY') {
+          const epochs =
+            this.opts.byHour || this.opts.byMinute || this.opts.bySecond
+              ? this.hasUniqueTimeSlotOffsets && this.timeSlotOffsetsMs
+                ? generateDailyExpandedWasm({
+                    ...common,
+                    startWallMs: startEpochMs,
+                    stepDays: this.opts.interval!,
+                    startDayOfWeek: this.originalDtstart.dayOfWeek,
+                    weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+                    timeSlotsMs: this.timeSlotOffsetsMs,
+                  })
+                : null
+              : generateDailyWasm({
+                  ...common,
+                  startMs: startEpochMs,
+                  stepDays: this.opts.interval!,
+                  startDayOfWeek: this.originalDtstart.dayOfWeek,
+                  weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+                });
+          return epochs ? this.materializeWasmEpochs(epochs) : null;
+        }
+
+        if (this.opts.freq === 'HOURLY' || this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY') {
+          const unitMs =
+            this.opts.freq === 'HOURLY' ? MS_PER_HOUR : this.opts.freq === 'MINUTELY' ? MS_PER_MINUTE : MS_PER_SECOND;
+          const epochs = generateFixedStepWasm({
+            ...common,
+            startMs: startEpochMs,
+            stepMs: unitMs * this.opts.interval!,
+          });
+          return epochs ? this.materializeWasmEpochs(epochs) : null;
+        }
+      }
+
+      if (
+        this.canUseUtcMonthlyFastPath() &&
+        this.wasmMonthlyRangeSafe() &&
+        !this.hasOrdinalByDay &&
+        this.timeSlotOffsetsMs &&
+        (!this.opts.byMonth || this.opts.byMonth.every((month) => typeof month === 'number'))
+      ) {
+        const {positive, negative} = this.monthDayMasks();
+        const epochs = generateMonthlyWasm({
+          ...common,
+          startWallMs: startEpochMs,
+          startYear: this.originalDtstart.year,
+          startMonth: this.originalDtstart.month,
+          intervalMonths: this.opts.interval!,
+          monthMask: this.monthMask(),
+          weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+          positiveMonthDayMask: positive,
+          negativeMonthDayMask: negative,
+          timeSlotsMs: this.timeSlotOffsetsMs,
+          bySetPos: this.opts.bySetPos ?? [],
+        });
+        return epochs ? this.materializeWasmEpochs(epochs) : null;
+      }
+
+      if (this.canUseUtcWeeklyFastPath() && this.hasUniqueTimeSlotOffsets && this.timeSlotOffsetsMs) {
+        const weekStartToken = extractWeekdayToken(this.opts.wkst || 'MO') ?? 'MO';
+        const targetDays = this.opts.byDay ? this.allByDayIsoDays : [this.originalDtstart.dayOfWeek];
+        const epochs = generateWeeklyWasm({
+          ...common,
+          startWallMs: startEpochMs,
+          startDayOfWeek: this.originalDtstart.dayOfWeek,
+          weekStartDay: weekdayToIsoDay[weekStartToken],
+          intervalWeeks: this.opts.interval!,
+          weekdayMask: this.weekdayMask(targetDays),
+          timeSlotsMs: this.timeSlotOffsetsMs,
+        });
+        return epochs ? this.materializeWasmEpochs(epochs) : null;
+      }
+
+      return null;
+    }
+
+    if (!this.canUseTzEpochFastPaths()) return null;
+    const linearEligible =
+      !this.opts.byMonth && !this.opts.byMonthDay && !this.opts.byYearDay && !this.opts.byWeekNo && !this.opts.bySetPos;
+
+    if (
+      linearEligible &&
+      (this.opts.freq === 'MINUTELY' ||
+        this.opts.freq === 'SECONDLY' ||
+        (this.opts.freq === 'HOURLY' && this.opts.interval !== 1)) &&
+      !this.opts.byDay &&
+      !this.opts.byHour &&
+      !this.opts.byMinute &&
+      !this.opts.bySecond
+    ) {
+      const unitMs =
+        this.opts.freq === 'HOURLY' ? MS_PER_HOUR : this.opts.freq === 'MINUTELY' ? MS_PER_MINUTE : MS_PER_SECOND;
+      const epochs = generateFixedStepWasm({...common, startMs: startEpochMs, stepMs: unitMs * this.opts.interval!});
+      return epochs ? this.materializeWasmEpochs(epochs) : null;
+    }
+
+    // Wall-clock kernels cannot compare an epoch-based UNTIL without a zone
+    // transition table. COUNT-bounded rules are safe; UNTIL rules retain the
+    // existing JS implementation until the v3 zone-table ABI is added.
+    if (this.opts.until || count === undefined) return null;
+    const startWallMs = this.wallMsOf(this.originalDtstart);
+
+    if (linearEligible && this.opts.freq === 'DAILY' && !this.hasOrdinalByDay) {
+      const timeSlots =
+        this.opts.byHour || this.opts.byMinute || this.opts.bySecond ? this.timeSlotOffsetsMs : undefined;
+      for (const timeOfDayMs of timeSlots ?? [startWallMs - Math.floor(startWallMs / MS_PER_DAY) * MS_PER_DAY]) {
+        if (this.tzFastPathGapHazard(timeOfDayMs)) return null;
+      }
+
+      const wallEpochs = timeSlots
+        ? this.hasUniqueTimeSlotOffsets
+          ? generateDailyExpandedWasm({
+              count,
+              maxIterations: this.maxIterations,
+              startWallMs,
+              stepDays: this.opts.interval!,
+              startDayOfWeek: this.originalDtstart.dayOfWeek,
+              weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+              timeSlotsMs: timeSlots,
+            })
+          : null
+        : generateDailyWasm({
+            count,
+            maxIterations: this.maxIterations,
+            startMs: startWallMs,
+            stepDays: this.opts.interval!,
+            startDayOfWeek: this.originalDtstart.dayOfWeek,
+            weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+          });
+      return wallEpochs ? this.materializeWasmWallEpochs(wallEpochs) : null;
+    }
+
+    if (
+      this.opts.freq === 'WEEKLY' &&
+      linearEligible &&
+      !this.hasOrdinalByDay &&
+      this.hasUniqueTimeSlotOffsets &&
+      this.timeSlotOffsetsMs
+    ) {
+      for (const timeOfDayMs of this.timeSlotOffsetsMs) {
+        if (this.tzFastPathGapHazard(timeOfDayMs)) return null;
+      }
+      const weekStartToken = extractWeekdayToken(this.opts.wkst || 'MO') ?? 'MO';
+      const targetDays = this.opts.byDay ? this.allByDayIsoDays : [this.originalDtstart.dayOfWeek];
+      const wallEpochs = generateWeeklyWasm({
+        count,
+        maxIterations: this.maxIterations,
+        startWallMs,
+        startDayOfWeek: this.originalDtstart.dayOfWeek,
+        weekStartDay: weekdayToIsoDay[weekStartToken],
+        intervalWeeks: this.opts.interval!,
+        weekdayMask: this.weekdayMask(targetDays),
+        timeSlotsMs: this.timeSlotOffsetsMs,
+      });
+      return wallEpochs ? this.materializeWasmWallEpochs(wallEpochs) : null;
+    }
+
+    if (
+      this.opts.freq === 'MONTHLY' &&
+      this.wasmMonthlyRangeSafe() &&
+      !this.opts.byYearDay &&
+      !this.opts.byWeekNo &&
+      !!(this.opts.byDay || this.opts.byMonthDay) &&
+      !this.hasOrdinalByDay &&
+      this.timeSlotOffsetsMs &&
+      (!this.opts.byMonth || this.opts.byMonth.every((month) => typeof month === 'number'))
+    ) {
+      for (const timeOfDayMs of this.timeSlotOffsetsMs) {
+        if (this.tzFastPathGapHazard(timeOfDayMs)) return null;
+      }
+      const {positive, negative} = this.monthDayMasks();
+      const wallEpochs = generateMonthlyWasm({
+        count,
+        maxIterations: this.maxIterations,
+        startWallMs,
+        startYear: this.originalDtstart.year,
+        startMonth: this.originalDtstart.month,
+        intervalMonths: this.opts.interval!,
+        monthMask: this.monthMask(),
+        weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+        positiveMonthDayMask: positive,
+        negativeMonthDayMask: negative,
+        timeSlotsMs: this.timeSlotOffsetsMs,
+        bySetPos: this.opts.bySetPos ?? [],
+      });
+      return wallEpochs ? this.materializeWasmWallEpochs(wallEpochs) : null;
+    }
+
+    return null;
+  }
+
   private allUtcFastPath(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] | null {
     if (this.canUseUtcLinearFastPath(iterator)) {
       switch (this.opts.freq) {
@@ -2097,7 +2419,12 @@ export class RRuleTemporal {
     const days = this.generateMonthlyOccurrenceDaysUtc(year, month);
     if (days.length === 0) return [];
 
-    const monthStartMs = Date.UTC(year, month - 1, 1, 0, 0, 0, 0);
+    // Date.UTC remaps years 0..99 to 1900..1999. setUTCFullYear preserves the
+    // proleptic-Gregorian year used by Temporal across its full Date range.
+    const monthStart = new Date(0);
+    monthStart.setUTCFullYear(year, month - 1, 1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const monthStartMs = monthStart.getTime();
     const timeSlotOffsets = this.timeSlotOffsetsMs ?? [0];
 
     if (this.opts.bySetPos && this.opts.bySetPos.length > 0) {
@@ -3230,6 +3557,11 @@ export class RRuleTemporal {
       return this.iterateRecurrenceSet(iterator);
     }
 
+    const wasmFastPathDates = this.allWasmFastPath(iterator);
+    if (wasmFastPathDates) {
+      return wasmFastPathDates;
+    }
+
     const utcFastPathDates = this.allUtcFastPath(iterator);
     if (utcFastPathDates) {
       return utcFastPathDates;
@@ -3605,6 +3937,330 @@ export class RRuleTemporal {
     return false;
   }
 
+  private wasmQuerySeries(): WasmQuerySeries | null {
+    const forceWasm = Boolean((globalThis as {__RRULE_TEMPORAL_FORCE_WASM__?: boolean}).__RRULE_TEMPORAL_FORCE_WASM__);
+    if (
+      this.includeDtstart ||
+      this.opts.rscale ||
+      this.opts.rDate ||
+      this.opts.exDate ||
+      this.opts.count === undefined ||
+      !Number.isInteger(this.opts.count) ||
+      this.opts.count <= 0 ||
+      (!forceWasm && this.opts.count < 128) ||
+      this.opts.count > 250_000 ||
+      !Number.isInteger(this.maxIterations) ||
+      this.maxIterations <= 0 ||
+      this.maxIterations > 0x7fffffff ||
+      !Number.isInteger(this.opts.interval) ||
+      this.opts.interval! <= 0 ||
+      this.opts.interval! > 0x7fffffff ||
+      !this.canUseEpochMillisecondsPrecisionFlag ||
+      this.originalDtstart.timeZoneId !== this.tzid
+    ) {
+      return null;
+    }
+
+    const calendar = this.originalDtstart.calendarId;
+    if (calendar !== 'iso8601' && calendar !== 'gregory') return null;
+
+    const linearEligible =
+      !this.opts.byMonth && !this.opts.byMonthDay && !this.opts.byYearDay && !this.opts.byWeekNo && !this.opts.bySetPos;
+    if (!linearEligible) return null;
+
+    const common = {
+      count: this.opts.count,
+      untilMs: this.opts.until?.epochMilliseconds,
+      maxIterations: this.maxIterations,
+    };
+    const startEpochMs = this.originalDtstart.epochMilliseconds;
+
+    try {
+      if (this.tzid === 'UTC' && this.canUseUtcLinearFastPath()) {
+        if (this.opts.freq === 'DAILY') {
+          const expanded = Boolean(this.opts.byHour || this.opts.byMinute || this.opts.bySecond);
+          const outputsPerMatchingDay = expanded ? (this.timeSlotOffsetsMs?.length ?? 0) : 1;
+          if (!this.wasmDailyPlanCanFinish(outputsPerMatchingDay, expanded)) return null;
+          const values =
+            this.opts.byHour || this.opts.byMinute || this.opts.bySecond
+              ? this.hasUniqueTimeSlotOffsets && this.timeSlotOffsetsMs
+                ? generateDailyExpandedWasm({
+                    ...common,
+                    startWallMs: startEpochMs,
+                    stepDays: this.opts.interval!,
+                    startDayOfWeek: this.originalDtstart.dayOfWeek,
+                    weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+                    timeSlotsMs: this.timeSlotOffsetsMs,
+                  })
+                : null
+              : generateDailyWasm({
+                  ...common,
+                  startMs: startEpochMs,
+                  stepDays: this.opts.interval!,
+                  startDayOfWeek: this.originalDtstart.dayOfWeek,
+                  weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+                });
+          return values ? {values, wallClock: false} : null;
+        }
+
+        if (this.opts.freq === 'HOURLY' || this.opts.freq === 'MINUTELY' || this.opts.freq === 'SECONDLY') {
+          if (this.opts.until === undefined && this.opts.count > this.maxIterations) return null;
+          const unitMs =
+            this.opts.freq === 'HOURLY' ? MS_PER_HOUR : this.opts.freq === 'MINUTELY' ? MS_PER_MINUTE : MS_PER_SECOND;
+          const values = generateFixedStepWasm({
+            ...common,
+            startMs: startEpochMs,
+            stepMs: unitMs * this.opts.interval!,
+          });
+          return values ? {values, wallClock: false} : null;
+        }
+      }
+
+      if (!this.canUseTzEpochFastPaths()) return null;
+      if (
+        (this.opts.freq === 'MINUTELY' ||
+          this.opts.freq === 'SECONDLY' ||
+          (this.opts.freq === 'HOURLY' && this.opts.interval !== 1)) &&
+        !this.opts.byDay &&
+        !this.opts.byHour &&
+        !this.opts.byMinute &&
+        !this.opts.bySecond
+      ) {
+        if (this.opts.until === undefined && this.opts.count > this.maxIterations) return null;
+        const unitMs =
+          this.opts.freq === 'HOURLY' ? MS_PER_HOUR : this.opts.freq === 'MINUTELY' ? MS_PER_MINUTE : MS_PER_SECOND;
+        const values = generateFixedStepWasm({
+          ...common,
+          startMs: startEpochMs,
+          stepMs: unitMs * this.opts.interval!,
+        });
+        return values ? {values, wallClock: false} : null;
+      }
+
+      if (this.opts.freq !== 'DAILY' || this.hasOrdinalByDay || this.opts.until) return null;
+      const startWallMs = this.wallMsOf(this.originalDtstart);
+      const timeSlots =
+        this.opts.byHour || this.opts.byMinute || this.opts.bySecond ? this.timeSlotOffsetsMs : undefined;
+      if (!this.wasmDailyPlanCanFinish(timeSlots?.length ?? 1, Boolean(timeSlots))) return null;
+      for (const timeOfDayMs of timeSlots ?? [startWallMs - Math.floor(startWallMs / MS_PER_DAY) * MS_PER_DAY]) {
+        if (this.wasmQueryGapHazard(timeOfDayMs, timeSlots?.length ?? 1)) return null;
+      }
+
+      const values = timeSlots
+        ? this.hasUniqueTimeSlotOffsets
+          ? generateDailyExpandedWasm({
+              count: this.opts.count,
+              maxIterations: this.maxIterations,
+              startWallMs,
+              stepDays: this.opts.interval!,
+              startDayOfWeek: this.originalDtstart.dayOfWeek,
+              weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+              timeSlotsMs: timeSlots,
+            })
+          : null
+        : generateDailyWasm({
+            count: this.opts.count,
+            maxIterations: this.maxIterations,
+            startMs: startWallMs,
+            stepDays: this.opts.interval!,
+            startDayOfWeek: this.originalDtstart.dayOfWeek,
+            weekdayMask: this.weekdayMask(this.simpleByDayIsoDays),
+          });
+      return values ? this.resolveWasmWallQuerySeries(values) : null;
+    } catch (error) {
+      // A query can stop before a full COUNT enumeration would hit the
+      // iteration limit. Preserve that behavior by falling through to the JS
+      // iterator engine if the eager packed-series attempt cannot complete.
+      if (error instanceof Error && error.message.startsWith('Maximum iterations')) return null;
+      throw error;
+    }
+  }
+
+  private wasmDailyPlanCanFinish(outputsPerMatchingDay: number, alignByCalendarDay: boolean): boolean {
+    if (this.opts.until !== undefined) return true;
+    if (outputsPerMatchingDay <= 0) return false;
+
+    const weekdayMask = this.weekdayMask(this.simpleByDayIsoDays);
+    let dayOfWeek = this.originalDtstart.dayOfWeek;
+    if (weekdayMask !== 0) {
+      const alignmentStep = alignByCalendarDay ? 1 : this.opts.interval!;
+      let alignmentPeriods = 0;
+      while (alignmentPeriods < 7 && (weekdayMask & (1 << (dayOfWeek - 1))) === 0) {
+        dayOfWeek = addIsoDays(dayOfWeek, alignmentStep);
+        alignmentPeriods += 1;
+      }
+      if ((weekdayMask & (1 << (dayOfWeek - 1))) === 0) return false;
+    }
+
+    let matchesPerSevenPeriods = 0;
+    let matchesInRemainder = 0;
+    const remainingPeriods = this.maxIterations % 7;
+    for (let period = 0; period < 7; period++) {
+      const matches = weekdayMask === 0 || (weekdayMask & (1 << (dayOfWeek - 1))) !== 0;
+      if (matches) {
+        matchesPerSevenPeriods += 1;
+        if (period < remainingPeriods) matchesInRemainder += 1;
+      }
+      dayOfWeek = addIsoDays(dayOfWeek, this.opts.interval!);
+    }
+
+    const matchingPeriods = Math.floor(this.maxIterations / 7) * matchesPerSevenPeriods + matchesInRemainder;
+    return this.opts.count! <= matchingPeriods * outputsPerMatchingDay;
+  }
+
+  private resolveWasmWallQuerySeries(values: Float64Array): WasmQuerySeries | null {
+    const resolver = this.getZoneResolver();
+    const epochs = new Float64Array(values.length);
+    for (let index = 0; index < values.length; index++) {
+      const resolution = resolver.epochMsForWall(values[index]!);
+      if (resolution.pushed) return null;
+      epochs[index] = resolution.epochMs;
+    }
+    return {values: epochs, wallClock: false};
+  }
+
+  /**
+   * Building a packed COUNT series is valuable for a late query, but it is
+   * needless work when the existing iterator can stop near DTSTART. Keep the
+   * automatic path behind a conservative distance crossover; forced-engine
+   * differential tests deliberately bypass this profitability decision.
+   */
+  private wasmQueryWorthwhile(reference: Temporal.Instant): boolean {
+    if (Boolean((globalThis as {__RRULE_TEMPORAL_FORCE_WASM__?: boolean}).__RRULE_TEMPORAL_FORCE_WASM__)) {
+      return true;
+    }
+
+    const distanceMs = reference.epochMilliseconds - this.originalDtstart.epochMilliseconds;
+    if (distanceMs <= 0) return false;
+
+    let periodMs: number;
+    switch (this.opts.freq) {
+      case 'DAILY':
+        periodMs = MS_PER_DAY;
+        break;
+      case 'HOURLY':
+        periodMs = MS_PER_HOUR;
+        break;
+      case 'MINUTELY':
+        periodMs = MS_PER_MINUTE;
+        break;
+      case 'SECONDLY':
+        periodMs = MS_PER_SECOND;
+        break;
+      default:
+        return false;
+    }
+
+    const minimumPeriods = Math.max(64, Math.ceil((this.opts.count ?? 0) / 256));
+    return distanceMs >= periodMs * this.opts.interval! * minimumPeriods;
+  }
+
+  private wasmQueryGapHazard(timeOfDayMs: number, occurrencesPerMatchingDay: number): boolean {
+    const matchingDayFactor = this.simpleByDayIsoDays?.length ? 7 : 1;
+    const matchingDays = Math.ceil(this.opts.count! / Math.max(occurrencesPerMatchingDay, 1));
+    const spanMs = matchingDays * matchingDayFactor * this.opts.interval! * MS_PER_DAY;
+    const maxSpanMs = 150 * 366 * MS_PER_DAY;
+    if (!Number.isSafeInteger(spanMs) || spanMs > maxSpanMs) return true;
+    const startMs = this.originalDtstart.epochMilliseconds;
+    return this.getZoneResolver().timeOfDayMayHitGap(timeOfDayMs, startMs - MS_PER_DAY, startMs + spanMs + MS_PER_DAY);
+  }
+
+  private lowerBound(values: Float64Array, target: number): number {
+    let low = 0;
+    let high = values.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (values[middle]! < target) low = middle + 1;
+      else high = middle;
+    }
+    return low;
+  }
+
+  private upperBound(values: Float64Array, target: number): number {
+    let low = 0;
+    let high = values.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (values[middle]! <= target) low = middle + 1;
+      else high = middle;
+    }
+    return low;
+  }
+
+  private queryCoordinate(instant: Temporal.Instant, wallClock: boolean): number {
+    if (!wallClock) return instant.epochMilliseconds;
+    return this.wallMsOf(instant.toZonedDateTimeISO(this.tzid));
+  }
+
+  private materializeQueryValue(value: number, wallClock: boolean): Temporal.ZonedDateTime | undefined {
+    if (!wallClock) {
+      return this.tzid === 'UTC' ? this.utcZdtFromEpochMilliseconds(value) : this.zdtFromEpochMs(value);
+    }
+    const resolution = this.getZoneResolver().epochMsForWall(value);
+    if (resolution.pushed) return undefined;
+    return this.zdtFromEpochMs(resolution.epochMs);
+  }
+
+  private betweenWasm(
+    startInst: Temporal.Instant,
+    endInst: Temporal.Instant,
+    inc: boolean,
+  ): Temporal.ZonedDateTime[] | null {
+    if (!this.wasmQueryWorthwhile(startInst)) return null;
+    const series = this.wasmQuerySeries();
+    if (!series) return null;
+
+    const startCoordinate = this.queryCoordinate(startInst, series.wallClock);
+    const endCoordinate = this.queryCoordinate(endInst, series.wallClock);
+    let startIndex = Math.max(0, this.lowerBound(series.values, startCoordinate) - 1);
+    const endIndex = Math.min(series.values.length, this.upperBound(series.values, endCoordinate) + 1);
+    const dates: Temporal.ZonedDateTime[] = [];
+
+    for (; startIndex < endIndex; startIndex++) {
+      const date = this.materializeQueryValue(series.values[startIndex]!, series.wallClock);
+      if (!date) return null;
+      const instant = date.toInstant();
+      const afterStart = inc
+        ? Temporal.Instant.compare(instant, startInst) >= 0
+        : Temporal.Instant.compare(instant, startInst) > 0;
+      const beforeEnd = inc
+        ? Temporal.Instant.compare(instant, endInst) <= 0
+        : Temporal.Instant.compare(instant, endInst) < 0;
+      if (afterStart && beforeEnd) dates.push(date);
+    }
+    return dates;
+  }
+
+  private nextWasm(afterInst: Temporal.Instant, inc: boolean): Temporal.ZonedDateTime | null | undefined {
+    if (!this.wasmQueryWorthwhile(afterInst)) return undefined;
+    const series = this.wasmQuerySeries();
+    if (!series) return undefined;
+    const coordinate = this.queryCoordinate(afterInst, series.wallClock);
+    let index = Math.max(0, this.lowerBound(series.values, coordinate) - 1);
+    for (; index < series.values.length; index++) {
+      const date = this.materializeQueryValue(series.values[index]!, series.wallClock);
+      if (!date) return undefined;
+      const comparison = Temporal.Instant.compare(date.toInstant(), afterInst);
+      if (inc ? comparison >= 0 : comparison > 0) return date;
+    }
+    return null;
+  }
+
+  private previousWasm(beforeInst: Temporal.Instant, inc: boolean): Temporal.ZonedDateTime | null | undefined {
+    if (!this.wasmQueryWorthwhile(beforeInst)) return undefined;
+    const series = this.wasmQuerySeries();
+    if (!series) return undefined;
+    const coordinate = this.queryCoordinate(beforeInst, series.wallClock);
+    let index = Math.min(series.values.length - 1, this.upperBound(series.values, coordinate));
+    for (; index >= 0; index--) {
+      const date = this.materializeQueryValue(series.values[index]!, series.wallClock);
+      if (!date) return undefined;
+      const comparison = Temporal.Instant.compare(date.toInstant(), beforeInst);
+      if (inc ? comparison <= 0 : comparison < 0) return date;
+    }
+    return null;
+  }
+
   /**
    * Returns all occurrences of the rule within a specified time window.
    * @param after - The start date or Temporal.ZonedDateTime object.
@@ -3621,6 +4277,11 @@ export class RRuleTemporal {
       before instanceof Date
         ? Temporal.Instant.from(before.toISOString())
         : normalizeZonedDateTime(before, 'before').toInstant();
+
+    const wasmDates = this.betweenWasm(startInst, endInst, inc);
+    if (wasmDates !== null) {
+      return RRuleTemporal.toPublicDates(wasmDates);
+    }
 
     const startZdt = Temporal.Instant.from(startInst).toZonedDateTimeISO(this.tzid);
     const beforeZdt = Temporal.Instant.from(endInst).toZonedDateTimeISO(this.tzid);
@@ -3780,6 +4441,11 @@ export class RRuleTemporal {
         ? Temporal.Instant.from(after.toISOString())
         : normalizeZonedDateTime(after, 'after').toInstant();
 
+    const wasmResult = this.nextWasm(afterInst, inc);
+    if (wasmResult !== undefined) {
+      return RRuleTemporal.toPublicDate(wasmResult);
+    }
+
     let result: Temporal.ZonedDateTime | null = null;
     const scanFrom = (rule: RRuleTemporal) => {
       rule.allInternal((occ) => {
@@ -3833,6 +4499,11 @@ export class RRuleTemporal {
       before instanceof Date
         ? Temporal.Instant.from(before.toISOString())
         : normalizeZonedDateTime(before, 'before').toInstant();
+
+    const wasmResult = this.previousWasm(beforeInst, inc);
+    if (wasmResult !== undefined) {
+      return RRuleTemporal.toPublicDate(wasmResult);
+    }
 
     const scanFrom = (rule: RRuleTemporal): Temporal.ZonedDateTime | null => {
       let prev: Temporal.ZonedDateTime | null = null;

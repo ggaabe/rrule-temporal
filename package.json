@@ -1,6 +1,6 @@
 {
   "name": "rrule-temporal",
-  "version": "2.0.2",
+  "version": "3.0.0-alpha.0",
   "description": "Recurrence rule (rrule) processing using Temporal PlainDate/PlainDateTime, with cross-timezone and cross-calendar rrule support",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
@@ -18,7 +18,9 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "npm run build:wasm && tsdown",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "check:wasm": "npm run build:wasm && git diff --exit-code -- src/generated/recurrence-wasm.ts",
     "test": "vitest run",
     "test:types": "npm run build && tsc -p tests/type-compat/tsconfig.json --noEmit",
     "coverage": "vitest run --coverage",
@@ -45,12 +47,15 @@
   },
   "homepage": "https://ggaabe.github.io/rrule-temporal/",
   "files": [
-    "dist"
+    "dist",
+    "docs/wasm-v3.md",
+    "CHANGELOG.md"
   ],
   "devDependencies": {
     "@js-temporal/polyfill": "^0.5.1",
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^4.1.0",
+    "assemblyscript": "0.28.20",
     "prettier": "^3.8.1",
     "temporal-polyfill": "^1.0.1",
     "tsdown": "^0.21.4",

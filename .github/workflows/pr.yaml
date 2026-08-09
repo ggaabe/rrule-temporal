@@ -32,5 +32,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify generated WASM is current
+        run: git diff --exit-code -- src/generated/recurrence-wasm.ts
+
       - name: Run unit tests
         run: npm test
+
+      - name: Check Temporal type compatibility
+        if: matrix.node-version == '24'
+        run: npm run test:types
