@@ -7,6 +7,8 @@
     "prebenchmark:quick": "npm --prefix .. run build",
     "benchmark": "node run.mjs",
     "benchmark:quick": "node run.mjs --warmup-ms=100 --sample-ms=150 --samples=3",
+    "prebenchmark:wasm": "npm --prefix .. run build",
+    "benchmark:wasm": "node wasm-v3.mjs",
     "preprofile:temporal": "npm --prefix .. run build",
     "profile:temporal": "node profile-temporal.mjs"
   },

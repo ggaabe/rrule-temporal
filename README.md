@@ -307,6 +307,17 @@ Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max
 (Node 25, polyfill backend). The full three-library comparison, including
 `rrule-rust` and cached-mode results, lives in `benchmarks/README.md`.
 
+### 3.0.0-alpha.0 WebAssembly candidate
+
+The v3 candidate embeds a synchronous WebAssembly recurrence kernel while
+preserving the constructor, query methods, accepted Temporal inputs, and
+returned `Temporal.ZonedDateTime` interface. Unsupported rules and runtimes
+fall through to the existing JavaScript engine automatically. Dense `all()`
+calls remain Temporal-materialization-bound; late COUNT-bounded range queries
+can avoid constructing thousands of discarded objects and exceed 100× on the
+measured workload. See [`docs/wasm-v3.md`](docs/wasm-v3.md) for the capability
+matrix, benchmark methodology, compatibility checks, and scoped results.
+
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
 | --- | --- | ---: | ---: | ---: |
 | 30 daily occurrences | UTC | 22,308 | 17,932 | 1.24x |

@@ -46,6 +46,19 @@ Profile only `rrule-temporal` on a single scenario:
 npm run profile:temporal -- --scenario monthly_last_weekday_240 --tzid UTC --iterations 20
 ```
 
+Benchmark the v3 embedded-WASM candidate against its forced JavaScript
+fallback using the same public API and eagerly checksummed results:
+
+```bash
+npm run benchmark:wasm
+```
+
+That harness reports eager `all()` separately from distant COUNT-bounded
+`next()`, `previous()`, and `between()` calls. This distinction is essential:
+WASM cannot construct JavaScript Temporal objects, so dense `all()` remains
+materialization-bound while sparse queries can avoid thousands of discarded
+objects. See `../docs/wasm-v3.md` for the capability matrix and latest results.
+
 ## Latest Results
 
 Uncached median ops/s from the latest run on a MacBook Pro M2 Max (Node 25,

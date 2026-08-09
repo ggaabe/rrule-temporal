@@ -1,0 +1,16 @@
+{
+  "entries": ["assembly/recurrence.ts"],
+  "options": {
+    "exportRuntime": true,
+    "initialMemory": 1,
+    "maximumMemory": 1024,
+    "noAssert": true,
+    "runtime": "stub"
+  },
+  "targets": {
+    "release": {
+      "optimizeLevel": 3,
+      "shrinkLevel": 0
+    }
+  }
+}
