@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.3 (2026-08-06)
+
+- Corrected RFC 5545 recurrence-set ordering so `COUNT` and `UNTIL` bound
+  RRULE-generated occurrences before `RDATE` values are added and `EXDATE`
+  values are removed.
+- Preserved lazy iterator behavior for recurrence sets with `RDATE` or
+  `EXDATE`, keeping `next()` and `previous()` from materializing the complete
+  bounded rule before returning.
+
 ## 2.0.2 (2026-07-25)
 
 - Added epoch-integer fast paths for simple `SECONDLY` rules and for

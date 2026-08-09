@@ -38,7 +38,7 @@ describe('RRuleTemporal - exDate exclusions', () => {
 
     const rule = new RRuleTemporal({
       freq: 'DAILY',
-      count: 10, // Generate more than we need so rDates can be added
+      count: 10,
       dtstart,
       rDate: [rDate1, rDate2],
       exDate: [exDate1, exDate2],
@@ -58,8 +58,84 @@ describe('RRuleTemporal - exDate exclusions', () => {
     expect(dateStrings).not.toContain('2025-01-02T10:00:00+00:00[UTC]');
     expect(dateStrings).not.toContain('2025-01-15T10:00:00+00:00[UTC]');
 
-    // Should have 10 dates total: 10 rule-generated minus 1 excluded (Jan 2) = 9, plus 1 rDate (Jan 10) = 10
-    expect(dates).toHaveLength(10);
+    // COUNT bounds the RRULE's 10 dates. Jan 10 is already one of them, then
+    // EXDATE removes Jan 2 and the additional Jan 15 RDATE.
+    expect(dates).toHaveLength(9);
+  });
+
+  test('applies COUNT before unioning RDATE and subtracting EXDATE', () => {
+    const rule = new RRuleTemporal({
+      rruleString: [
+        'DTSTART;VALUE=DATE:20260401',
+        'RRULE:FREQ=DAILY;COUNT=3',
+        'RDATE;VALUE=DATE:20260405',
+        'EXDATE;VALUE=DATE:20260402',
+      ].join('\n'),
+      strict: true,
+    });
+    const expected = ['2026-04-01', '2026-04-03', '2026-04-05'];
+
+    expect(rule.all().map((date) => date.toPlainDate().toString())).toEqual(expected);
+    expect(rule.all(() => true).map((date) => date.toPlainDate().toString())).toEqual(expected);
+    expect(rule.next(Temporal.ZonedDateTime.from('2026-04-03T00:00:00[UTC]'))?.toPlainDate().toString()).toBe(
+      '2026-04-05',
+    );
+  });
+
+  test('applies UNTIL only to RRULE dates before recurrence-set operations', () => {
+    const rule = new RRuleTemporal({
+      rruleString: [
+        'DTSTART;VALUE=DATE:20260401',
+        'RRULE:FREQ=DAILY;UNTIL=20260403',
+        'RDATE;VALUE=DATE:20260405',
+        'EXDATE;VALUE=DATE:20260402',
+      ].join('\n'),
+      strict: true,
+    });
+
+    expect(rule.all().map((date) => date.toPlainDate().toString())).toEqual(['2026-04-01', '2026-04-03', '2026-04-05']);
+  });
+
+  test('keeps next() lazy for large bounded rules with EXDATE', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2026-01-01T00:00:00[UTC]');
+    const exDate = Temporal.ZonedDateTime.from('2030-01-01T00:00:00[UTC]');
+    const countRule = new RRuleTemporal({
+      freq: 'SECONDLY',
+      count: 10_000,
+      dtstart,
+      exDate: [exDate],
+      maxIterations: 3,
+    });
+    const untilRule = new RRuleTemporal({
+      freq: 'SECONDLY',
+      until: dtstart.add({days: 1}),
+      dtstart,
+      exDate: [exDate],
+      maxIterations: 3,
+    });
+
+    expect(countRule.next(dtstart)?.toString()).toBe('2026-01-01T00:00:01+00:00[UTC]');
+    expect(untilRule.next(dtstart)?.toString()).toBe('2026-01-01T00:00:01+00:00[UTC]');
+  });
+
+  test('streams RDATE in order before applying an iterator limit', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2026-04-01T00:00:00[UTC]');
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 3,
+      dtstart,
+      rDate: [dtstart.subtract({days: 2})],
+      exDate: [dtstart.add({days: 1})],
+    });
+    const visited: string[] = [];
+
+    const dates = rule.all((date, index) => {
+      visited.push(date.toPlainDate().toString());
+      return index < 2;
+    });
+
+    expect(dates.map((date) => date.toPlainDate().toString())).toEqual(['2026-03-30', '2026-04-01']);
+    expect(visited).toEqual(['2026-03-30', '2026-04-01', '2026-04-03']);
   });
 
   test('exDate works with between() method', () => {

@@ -38,6 +38,7 @@ describe('temporal-polyfill compatibility', () => {
     expect(rule.between(dtstart, dtstart.add({days: 5}), true).map((date) => date.toString())).toEqual([
       '2026-02-01T10:00:00-05:00[America/New_York]',
       '2026-02-02T10:00:00-05:00[America/New_York]',
+      '2026-02-05T10:00:00-05:00[America/New_York]',
     ]);
     expect(rule.next(dtstart, true)?.toString()).toBe('2026-02-01T10:00:00-05:00[America/New_York]');
     expect(rule.previous(dtstart.add({days: 2}), true)?.toString()).toBe('2026-02-02T10:00:00-05:00[America/New_York]');

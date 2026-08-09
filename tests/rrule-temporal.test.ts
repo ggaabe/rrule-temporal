@@ -378,6 +378,23 @@ RRULE:FREQ=DAILY`.trim();
     const dates = rule.all((dt, i) => i < 3);
     expect(dates).toHaveLength(3);
   });
+
+  test('all() invokes an iterator once per occurrence', () => {
+    const boundedRule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 3,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T00:00:00[UTC]'),
+    });
+    const visitedIndexes: number[] = [];
+
+    const dates = boundedRule.all((_date, index) => {
+      visitedIndexes.push(index);
+      return true;
+    });
+
+    expect(dates).toHaveLength(3);
+    expect(visitedIndexes).toEqual([0, 1, 2]);
+  });
 });
 
 describe('RRuleTemporal - BYDAY frequencies', () => {
