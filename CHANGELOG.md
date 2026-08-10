@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.2.0 (2026-08-10)
+
+- Added the optional `temporal` rule option for selecting the Temporal
+  implementation used by public output values. TypeScript infers that
+  implementation's exact `ZonedDateTime` return type, including the matching
+  `PlainDate` type returned by `toPlainDate()`.
+- Applied the selected implementation consistently to `all()`, `between()`,
+  `next()`, `previous()`, iterator callbacks, resolved `options()`, and rules
+  created with `with()`. The default native-or-bundled implementation and
+  implementation-neutral `temporal-spec` types remain unchanged when the
+  option is omitted.
+
 ## 2.1.0 (2026-08-10)
 
 - Added lazily cached numeric query plans for proven COUNT-bound `SECONDLY`,

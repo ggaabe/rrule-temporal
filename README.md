@@ -114,6 +114,7 @@ below. These correspond to the recurrence rule parts defined in RFC&nbsp;5545:
 | `maxIterations` | Safety cap when generating occurrences. |
 | `includeDtstart` | Include `DTSTART` even if it does not match the pattern. |
 | `strict` | Enforce RFC 5545 constraints strictly (defaults to false). |
+| `temporal` | Optional Temporal namespace used for public output values and their inferred types. |
 | `dtstart` | First occurrence as `Temporal.ZonedDateTime`. |
 
 ### Reusable Option Lists
@@ -428,30 +429,43 @@ Inputs are accepted from **any** Temporal implementation: `dtstart`, `until`,
 objects from `@js-temporal/polyfill`, `temporal-polyfill`, or native Temporal
 interchangeably.
 
-Returned occurrences come from the library's active implementation (native
-when available, the bundled polyfill otherwise). They are fully spec-shaped,
-but they will not satisfy `instanceof` checks against a *different*
-implementation's classes. If your app needs instances of its own Temporal
-implementation, re-hydrate them:
+By default, returned occurrences come from the library's active implementation
+(native when available, the bundled polyfill otherwise) and use
+implementation-neutral `temporal-spec` types. To return instances from your
+application's Temporal implementation with its exact inferred TypeScript
+types, pass the optional `temporal` namespace:
 
 ```ts
-// your application's Temporal implementation
-import { Temporal as AppTemporal } from "temporal-polyfill";
-
+import { Temporal } from "@js-temporal/polyfill";
 import { RRuleTemporal } from "rrule-temporal";
 
-/** Weekly rule that fires 4 times starting 5 May 2025, 10 AM America/Chicago. */
 const rule = new RRuleTemporal({
+  temporal: Temporal,
   freq: "WEEKLY",
   count: 4,
-  dtstart: AppTemporal.ZonedDateTime.from(
-    "2025-05-05T10:00[America/Chicago]"
+  dtstart: Temporal.ZonedDateTime.from(
+    "2030-05-05T10:00[America/Chicago]"
   ),
 });
 
-const rawOccurrences = rule.all();
+const occurrence = rule.next(); // Temporal.ZonedDateTime | null
+const date = occurrence?.toPlainDate(); // Temporal.PlainDate | undefined
+```
 
-/** Convert each ZonedDateTime into your app's implementation. */
+The selected implementation is used for values returned by `all()`,
+`between()`, `next()`, `previous()`, iterator callbacks, `options()`, and
+rules created with `with()`. Recurrence calculations still use the optimized
+active implementation internally. Omitting `temporal` preserves the default
+behavior.
+
+Returned values from different implementations are fully spec-shaped but do
+not satisfy `instanceof` checks against each other's classes. If a rule was
+created without `temporal`, you can still re-hydrate individual results:
+
+```ts
+import { Temporal as AppTemporal } from "@js-temporal/polyfill";
+
+const rawOccurrences = existingRule.all();
 const appOccurrences = rawOccurrences.map((zdt) =>
   AppTemporal.ZonedDateTime.from(zdt.toString())
 );

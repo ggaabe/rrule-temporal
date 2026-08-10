@@ -15,6 +15,7 @@ const options: RRuleOptions = {
 };
 
 const rule = new RRuleTemporal(options);
+const typedOutputRule = new RRuleTemporal({...options, temporal: Temporal});
 
 rule.all((date) => date.equals(dtstart));
 rule.between(dtstart, until, true);
@@ -22,3 +23,6 @@ rule.next(dtstart);
 rule.previous(until);
 rule.occursOn(dtstart.toPlainDate());
 rule.with({dtstart, until, rDate: [rDate], exDate: [exDate]});
+
+const typedOutput: Temporal.ZonedDateTime | null = typedOutputRule.next(dtstart);
+void typedOutput;

@@ -135,7 +135,9 @@ function parseByDayToken(token: string): {ord: number; weekday: Weekday} | null 
 /**
  * Shared options for all rule constructors.
  */
-interface BaseOpts {
+interface BaseOpts<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> {
+  /** Temporal implementation used to construct public occurrence values. */
+  temporal?: TemporalImplementation<TOutput>;
   /** Time zone identifier as defined in RFC&nbsp;5545 §3.2.19. */
   tzid?: string;
   /** Safety cap when generating occurrences. */
@@ -164,8 +166,22 @@ export interface TemporalPlainDateInput {
   toString(): string;
 }
 
+/**
+ * The subset of a Temporal namespace needed to construct public occurrence
+ * values. Supplying an implementation makes output values and their inferred
+ * TypeScript types come from that implementation.
+ */
+export interface TemporalImplementation<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> {
+  readonly ZonedDateTime: {
+    from(value: string): TOutput;
+  };
+}
+
 type PolyfillZonedDateTime = Temporal.ZonedDateTime;
-export type RRuleTemporalIterator = (date: TemporalZonedDateTime, i: number) => boolean;
+export type RRuleTemporalIterator<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> = (
+  date: TOutput,
+  i: number,
+) => boolean;
 type InternalRRuleTemporalIterator = (date: PolyfillZonedDateTime, i: number) => boolean;
 export type DateFilter = Date | TemporalZonedDateTimeInput;
 
@@ -201,7 +217,7 @@ function normalizeZonedDateTimeList(
  * Manual rule definition following the recurrence rule parts defined in
  * RFC 5545 §3.3.10.
  */
-interface ManualOptions extends BaseOpts {
+interface ManualOptions<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> extends BaseOpts<TOutput> {
   /** FREQ: recurrence frequency */
   freq: Freq;
   /** INTERVAL between each occurrence of {@link freq} */
@@ -238,7 +254,7 @@ interface ManualOptions extends BaseOpts {
   dtstart: TemporalZonedDateTimeInput;
 }
 
-interface IcsOptions extends BaseOpts {
+interface IcsOptions<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> extends BaseOpts<TOutput> {
   rruleString: string; // full "DTSTART...\nRRULE..." snippet or bare RRULE/FREQ pattern
   dtstart?: TemporalZonedDateTimeInput; // optional separate DTSTART when rruleString lacks one
   /** COUNT: total number of occurrences, used when missing from rruleString */
@@ -251,23 +267,30 @@ interface IcsOptions extends BaseOpts {
   exDate?: TemporalZonedDateTimeInput[];
 }
 
-type ManualOpts = Omit<ManualOptions, 'dtstart' | 'until' | 'rDate' | 'exDate'> & {
+type ManualOpts = Omit<ManualOptions<TemporalZonedDateTimeInput>, 'dtstart' | 'until' | 'rDate' | 'exDate'> & {
   dtstart: PolyfillZonedDateTime;
   until?: PolyfillZonedDateTime;
   rDate?: PolyfillZonedDateTime[];
   exDate?: PolyfillZonedDateTime[];
 };
 
-export type RRuleOptions = ManualOptions | IcsOptions;
-export type RRuleResolvedOptions = Omit<ManualOptions, 'dtstart' | 'until' | 'rDate' | 'exDate'> & {
-  dtstart: TemporalZonedDateTime;
-  until?: TemporalZonedDateTime;
-  rDate?: TemporalZonedDateTime[];
-  exDate?: TemporalZonedDateTime[];
+export type RRuleOptions<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> =
+  | ManualOptions<TOutput>
+  | IcsOptions<TOutput>;
+export type RRuleResolvedOptions<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> = Omit<
+  ManualOptions<TOutput>,
+  'dtstart' | 'until' | 'rDate' | 'exDate'
+> & {
+  dtstart: TOutput;
+  until?: TOutput;
+  rDate?: TOutput[];
+  exDate?: TOutput[];
 };
 
-function isIcsOpts(opts: RRuleOptions): opts is IcsOptions {
-  return typeof (opts as IcsOptions).rruleString === 'string';
+function isIcsOpts<TOutput extends TemporalZonedDateTimeInput>(
+  opts: RRuleOptions<TOutput>,
+): opts is IcsOptions<TOutput> {
+  return typeof (opts as IcsOptions<TOutput>).rruleString === 'string';
 }
 
 function mergeDateLists(
@@ -594,10 +617,11 @@ function parseRRuleString(
   return opts;
 }
 
-export class RRuleTemporal {
+export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> {
   private readonly tzid: string;
   private readonly originalDtstart: Temporal.ZonedDateTime;
   private readonly opts: ManualOpts;
+  private readonly outputTemporal?: TemporalImplementation<TOutput>;
   private readonly maxIterations: number;
   private readonly includeDtstart: boolean;
   private readonly parsedByDayTokens?: Array<{ord: number; weekday: Weekday; isoDay: number}>;
@@ -623,19 +647,30 @@ export class RRuleTemporal {
     return normalizeZonedDateTime(zdt, 'Date');
   }
 
-  private static toInternalIterator(iterator?: RRuleTemporalIterator): InternalRRuleTemporalIterator | undefined {
-    return iterator as unknown as InternalRRuleTemporalIterator | undefined;
+  private toInternalIterator(iterator?: RRuleTemporalIterator<TOutput>): InternalRRuleTemporalIterator | undefined {
+    if (!iterator) return undefined;
+    return (date, i) => iterator(this.toPublicDate(date)!, i);
   }
 
-  private static toPublicDate(date: PolyfillZonedDateTime | null): TemporalZonedDateTime | null {
-    return date as unknown as TemporalZonedDateTime | null;
+  private toPublicDate(date: PolyfillZonedDateTime | null): TOutput | null {
+    if (!date) return null;
+
+    const outputConstructor = this.outputTemporal?.ZonedDateTime;
+    if (!outputConstructor || (outputConstructor as unknown) === Temporal.ZonedDateTime) {
+      return date as unknown as TOutput;
+    }
+    return outputConstructor.from(date.toString());
   }
 
-  private static toPublicDates(dates: PolyfillZonedDateTime[]): TemporalZonedDateTime[] {
-    return dates as unknown as TemporalZonedDateTime[];
+  private toPublicDates(dates: PolyfillZonedDateTime[]): TOutput[] {
+    if (!this.outputTemporal || (this.outputTemporal.ZonedDateTime as unknown) === Temporal.ZonedDateTime) {
+      return dates as unknown as TOutput[];
+    }
+    return dates.map((date) => this.outputTemporal!.ZonedDateTime.from(date.toString()));
   }
 
-  constructor(params: RRuleOptions) {
+  constructor(params: RRuleOptions<TOutput>) {
+    this.outputTemporal = params.temporal;
     let manual: ManualOpts;
     if (isIcsOpts(params)) {
       // Allow dtstart to be passed separately when rruleString doesn't contain DTSTART
@@ -665,6 +700,7 @@ export class RRuleTemporal {
         maxIterations: params.maxIterations,
         includeDtstart: params.includeDtstart,
         cache: params.cache,
+        temporal: params.temporal,
         tzid: this.tzid,
       } as ManualOpts;
     } else {
@@ -1404,8 +1440,16 @@ export class RRuleTemporal {
     });
   }
 
-  options(): RRuleResolvedOptions {
-    return this.cloneOptions() as unknown as RRuleResolvedOptions;
+  options(): RRuleResolvedOptions<TOutput> {
+    const {dtstart, until, rDate, exDate, temporal: _temporal, ...rest} = this.cloneOptions();
+    return {
+      ...rest,
+      ...(this.outputTemporal ? {temporal: this.outputTemporal} : {}),
+      dtstart: this.toPublicDate(dtstart)!,
+      until: until ? this.toPublicDate(until)! : undefined,
+      rDate: rDate ? this.toPublicDates(rDate) : undefined,
+      exDate: exDate ? this.toPublicDates(exDate) : undefined,
+    } as RRuleResolvedOptions<TOutput>;
   }
 
   private cloneOptions(): ManualOpts {
@@ -1440,8 +1484,8 @@ export class RRuleTemporal {
     } as ManualOpts;
   }
 
-  private cloneUpdateOptions(updates: Partial<ManualOptions>): Partial<ManualOptions> {
-    const cloned: Partial<ManualOptions> = {};
+  private cloneUpdateOptions(updates: Partial<ManualOptions<TOutput>>): Partial<ManualOptions<TOutput>> {
+    const cloned: Partial<ManualOptions<TOutput>> = {};
     if (Object.prototype.hasOwnProperty.call(updates, 'byHour')) {
       cloned.byHour = Array.isArray(updates.byHour) ? [...updates.byHour] : updates.byHour;
     }
@@ -1486,16 +1530,16 @@ export class RRuleTemporal {
    * const updated = rule.with({byMonthDay: [3]});
    * ```
    */
-  with(updates: Partial<ManualOptions>): RRuleTemporal {
+  with(updates: Partial<ManualOptions<TOutput>>): RRuleTemporal<TOutput> {
     const merged = {
       ...this.cloneOptions(),
       ...updates,
       ...this.cloneUpdateOptions(updates),
       tzid: updates.tzid ?? this.opts.tzid,
       dtstart: updates.dtstart ?? this.opts.dtstart,
-    } as RRuleOptions;
+    } as RRuleOptions<TOutput>;
 
-    return new RRuleTemporal(merged);
+    return new RRuleTemporal<TOutput>(merged);
   }
 
   private addDtstartIfNeeded(dates: Temporal.ZonedDateTime[], iterator?: InternalRRuleTemporalIterator): boolean {
@@ -3711,7 +3755,7 @@ export class RRuleTemporal {
    * @param iterator - An optional callback iterator function that can be used to filter or modify the occurrences.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
-  all(iterator?: RRuleTemporalIterator): TemporalZonedDateTime[] {
+  all(iterator?: RRuleTemporalIterator<TOutput>): TOutput[] {
     if (!iterator && this.opts.cache !== false) {
       // Rule instances are immutable, so the full occurrence list of a bounded
       // rule can be computed once and shared; return a copy so callers may
@@ -3719,9 +3763,9 @@ export class RRuleTemporal {
       if (!this.allResultCache) {
         this.allResultCache = this.allInternal();
       }
-      return RRuleTemporal.toPublicDates(this.allResultCache.slice());
+      return this.toPublicDates(this.allResultCache.slice());
     }
-    return RRuleTemporal.toPublicDates(this.allInternal(RRuleTemporal.toInternalIterator(iterator)));
+    return this.toPublicDates(this.allInternal(this.toInternalIterator(iterator)));
   }
 
   private allInternal(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
@@ -4238,7 +4282,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include the start and end dates in the results.
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule within the specified time window.
    */
-  between(after: DateFilter, before: DateFilter, inc = false): TemporalZonedDateTime[] {
+  between(after: DateFilter, before: DateFilter, inc = false): TOutput[] {
     const startInst =
       after instanceof Date
         ? Temporal.Instant.from(after.toISOString())
@@ -4250,7 +4294,7 @@ export class RRuleTemporal {
 
     const numericResult = this.tryNumericBetween(startInst.epochNanoseconds, endInst.epochNanoseconds, inc);
     if (numericResult.handled) {
-      return RRuleTemporal.toPublicDates(numericResult.value);
+      return this.toPublicDates(numericResult.value);
     }
 
     const startZdt = Temporal.Instant.from(startInst).toZonedDateTimeISO(this.tzid);
@@ -4269,10 +4313,13 @@ export class RRuleTemporal {
       tempOpts.dtstart = this.jumpAlignedDtstart(startZdt);
     }
 
-    const tempRule = new RRuleTemporal(tempOpts);
+    const tempRule = new RRuleTemporal<TOutput>({
+      ...tempOpts,
+      temporal: this.outputTemporal,
+    } as RRuleOptions<TOutput>);
     const allDates = tempRule.allInternal();
 
-    return RRuleTemporal.toPublicDates(
+    return this.toPublicDates(
       allDates.filter((date) => {
         const inst = date.toInstant();
         const afterStart = inc
@@ -4405,7 +4452,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the start date.
    * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
    */
-  next(after: DateFilter = new Date(), inc = false): TemporalZonedDateTime | null {
+  next(after: DateFilter = new Date(), inc = false): TOutput | null {
     const afterInst =
       after instanceof Date
         ? Temporal.Instant.from(after.toISOString())
@@ -4413,11 +4460,11 @@ export class RRuleTemporal {
 
     const numericResult = this.tryNumericNext(afterInst.epochNanoseconds, inc);
     if (numericResult.handled) {
-      return RRuleTemporal.toPublicDate(numericResult.value);
+      return this.toPublicDate(numericResult.value);
     }
 
     let result: Temporal.ZonedDateTime | null = null;
-    const scanFrom = (rule: RRuleTemporal) => {
+    const scanFrom = (rule: RRuleTemporal<TOutput>) => {
       rule.allInternal((occ) => {
         const inst = occ.toInstant();
         const ok = inc ? Temporal.Instant.compare(inst, afterInst) >= 0 : Temporal.Instant.compare(inst, afterInst) > 0;
@@ -4442,7 +4489,7 @@ export class RRuleTemporal {
       scanFrom(this.ruleFromAlignedDtstart(afterInst.toZonedDateTimeISO(this.tzid)));
     }
 
-    return RRuleTemporal.toPublicDate(result);
+    return this.toPublicDate(result);
   }
 
   /**
@@ -4450,12 +4497,17 @@ export class RRuleTemporal {
    * phase-aligned DTSTART for the given window start. The synthetic DTSTART
    * only keeps includeDtstart semantics when it coincides with the original.
    */
-  private ruleFromAlignedDtstart(windowStart: Temporal.ZonedDateTime): RRuleTemporal {
+  private ruleFromAlignedDtstart(windowStart: Temporal.ZonedDateTime): RRuleTemporal<TOutput> {
     const aligned = this.jumpAlignedDtstart(windowStart);
     if (aligned.epochNanoseconds === this.originalDtstart.epochNanoseconds) {
       return this;
     }
-    return new RRuleTemporal({...this.opts, dtstart: aligned, includeDtstart: false});
+    return new RRuleTemporal<TOutput>({
+      ...this.opts,
+      temporal: this.outputTemporal,
+      dtstart: aligned,
+      includeDtstart: false,
+    } as RRuleOptions<TOutput>);
   }
 
   /**
@@ -4464,7 +4516,7 @@ export class RRuleTemporal {
    * @param inc - Optional boolean flag to include occurrences on the end date.
    * @returns The previous occurrence of the rule before the specified date or null if no occurrences are found.
    */
-  previous(before: DateFilter = new Date(), inc = false): TemporalZonedDateTime | null {
+  previous(before: DateFilter = new Date(), inc = false): TOutput | null {
     const beforeInst =
       before instanceof Date
         ? Temporal.Instant.from(before.toISOString())
@@ -4472,10 +4524,10 @@ export class RRuleTemporal {
 
     const numericResult = this.tryNumericPrevious(beforeInst.epochNanoseconds, inc);
     if (numericResult.handled) {
-      return RRuleTemporal.toPublicDate(numericResult.value);
+      return this.toPublicDate(numericResult.value);
     }
 
-    const scanFrom = (rule: RRuleTemporal): Temporal.ZonedDateTime | null => {
+    const scanFrom = (rule: RRuleTemporal<TOutput>): Temporal.ZonedDateTime | null => {
       let prev: Temporal.ZonedDateTime | null = null;
       rule.allInternal((occ) => {
         const inst = occ.toInstant();
@@ -4491,7 +4543,7 @@ export class RRuleTemporal {
 
     // COUNT rules must enumerate from the true DTSTART (see next()).
     if (this.opts.count !== undefined) {
-      return RRuleTemporal.toPublicDate(scanFrom(this));
+      return this.toPublicDate(scanFrom(this));
     }
 
     // Scan forward from a phase-aligned start near the target, backing the
@@ -4506,10 +4558,10 @@ export class RRuleTemporal {
       const rule = this.ruleFromAlignedDtstart(target);
       const prev = scanFrom(rule);
       if (prev || rule === this) {
-        return RRuleTemporal.toPublicDate(prev);
+        return this.toPublicDate(prev);
       }
     }
-    return RRuleTemporal.toPublicDate(scanFrom(this));
+    return this.toPublicDate(scanFrom(this));
   }
 
   /** A duration of `count` steps in this rule's frequency unit. */

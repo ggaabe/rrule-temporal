@@ -8,5 +8,5 @@
     "skipLibCheck": false,
     "noEmit": true
   },
-  "include": ["temporal-polyfill-v1.ts"]
+  "include": ["temporal-polyfill-v1.ts", "js-temporal-polyfill-output.ts"]
 }
