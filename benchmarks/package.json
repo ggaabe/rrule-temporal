@@ -7,6 +7,10 @@
     "prebenchmark:quick": "npm --prefix .. run build",
     "benchmark": "node run.mjs",
     "benchmark:quick": "node run.mjs --warmup-ms=100 --sample-ms=150 --samples=3",
+    "prebenchmark:query": "npm --prefix .. run build",
+    "benchmark:query": "node query.mjs",
+    "prebenchmark:query:quick": "npm --prefix .. run build",
+    "benchmark:query:quick": "node query.mjs --warmup-ms=50 --sample-ms=75 --samples=3",
     "preprofile:temporal": "npm --prefix .. run build",
     "profile:temporal": "node profile-temporal.mjs"
   },

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.1.0 (2026-08-10)
+
+- Added lazily cached numeric query plans for proven COUNT-bound `SECONDLY`,
+  `MINUTELY`, `HOURLY`, `DAILY`, `WEEKLY`, and Gregorian `MONTHLY` shapes.
+  `next()`, `previous()`, narrow `between()`, and `matches()` now rank/select
+  epoch or wall-clock values and materialize only returned Temporal objects
+  instead of replaying every occurrence from `DTSTART`.
+- Preserved exact nanosecond query bounds, inclusive `UNTIL`, recurrence-period
+  `maxIterations`, DST-fold instant ordering, and the RFC recurrence-set stream.
+  Rules with `RDATE`/`EXDATE`, gap-sensitive wall times, sub-millisecond
+  occurrences, `includeDtstart`, RSCALE/non-ISO calendars, or unsupported
+  BYxxx combinations automatically use the existing engine.
+- Aligned interval-based weekly queries with the recurrence phase returned by
+  `all()` and `between()` when the first BYDAY in DTSTART's week has already
+  passed.
+- Corrected UTC monthly generation for years 0000 through 0099 by replacing
+  `Date.UTC`'s 1900 offset behavior with proleptic Gregorian integer math.
+- Added differential query tests and a dedicated first-call/warm benchmark.
+  On a MacBook Pro M2 Max with Node 25, warmed distant COUNT queries improved
+  from 48-806 ms to 9-13 microseconds for fixed-step/simple daily/weekly
+  selection, and a narrow expanded daily `between()` improved from 30.4 ms to
+  34.7 microseconds. A 9,000-count monthly last-weekday query improved from
+  186.3 ms to 31.9 microseconds, while both COUNT-128 cases also became faster.
+
 ## 2.0.3 (2026-08-06)
 
 - Corrected RFC 5545 recurrence-set ordering so `COUNT` and `UNTIL` bound

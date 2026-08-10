@@ -303,9 +303,31 @@ Notes
 
 ## Benchmarks
 
+COUNT-bound query results from a MacBook Pro M2 Max / Node 25 run, comparing
+`v2.0.3` with the `v2.1.0` candidate. Times are milliseconds per call; both
+builds used the same harness and result checksum.
+
+| Scenario | v2.0.3 first | v2.1.0 first | First speedup | v2.0.3 warm | v2.1.0 warm | Warm speedup |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| SECONDLY next, COUNT 128, rank 63 | 3.10 | 0.584 | 5.3x | 0.242 | 0.00951 | 25.5x |
+| SECONDLY next, COUNT 250k, rank 200k | 886.0 | 0.137 | 6,481x | 806.3 | 0.00950 | 84,874x |
+| DAILY next, COUNT 9k, rank 8.5k, UTC | 50.6 | 0.291 | 174x | 47.6 | 0.00984 | 4,837x |
+| DAILY previous, COUNT 9k, rank 8.5k, Chicago | 60.2 | 7.59 | 7.9x | 53.4 | 0.01250 | 4,272x |
+| DAILY weekdays next, COUNT 9k, distant, UTC | 68.7 | 0.0895 | 768x | 61.4 | 0.01010 | 6,079x |
+| DAILY slots narrow between, COUNT 9k, UTC | 32.6 | 0.326 | 100x | 30.4 | 0.03466 | 877x |
+| WEEKLY M/W/F slots next, COUNT 9k, UTC | 122.5 | 0.353 | 347x | 81.8 | 0.01037 | 7,888x |
+| MONTHLY last weekday next, COUNT 9k, UTC | 197.8 | 8.54 | 23.2x | 186.3 | 0.03191 | 5,838x |
+| MONTHLY last weekday next, COUNT 128, rank 63 | 1.49 | 0.321 | 4.6x | 1.40 | 0.02155 | 65.0x |
+
+The named-zone first call includes lazy transition-table construction. Its
+warmed path reuses both that table and the immutable rule's numeric query plan.
+
+### Full recurrence generation
+
 Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max
 (Node 25, polyfill backend). The full three-library comparison, including
-`rrule-rust` and cached-mode results, lives in `benchmarks/README.md`.
+`rrule-rust`, query methodology, and cached-mode results, lives in
+[`benchmarks/README.md`](benchmarks/README.md).
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
 | --- | --- | ---: | ---: | ---: |
