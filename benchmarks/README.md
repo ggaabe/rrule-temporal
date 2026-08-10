@@ -87,34 +87,35 @@ The named-zone first call includes lazy transition-table construction. Its
 warmed path reuses both that table and the immutable rule's numeric query plan.
 
 Uncached median ops/s from the latest run on a MacBook Pro M2 Max (Node 25,
-`rrule-temporal` running on its bundled `temporal-polyfill` backend):
+`rrule-temporal` v2.1.0 running on its bundled `temporal-polyfill` backend).
+Each result is the median of five 200 ms samples after a 200 ms warmup:
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | rrule-rust median ops/s |
 | --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 22,308 | 17,932 | 196,403 |
-| 30 daily occurrences | America/Chicago | 15,358 | 384 | 181,821 |
-| Daily weekdays across many cycles | UTC | 1,192 | 830 | 11,449 |
-| Daily weekdays across many cycles | America/Chicago | 873 | 20.9 | 10,629 |
-| Daily time-slot expansion | UTC | 611 | 1,199 | 11,060 |
-| Daily time-slot expansion | America/Chicago | 448 | 11.7 | 10,059 |
-| 720 hourly occurrences | UTC | 817 | 757 | 7,311 |
-| 720 hourly occurrences | America/Chicago | 588 | 13.9 | 6,842 |
-| 1,440 minutely occurrences | UTC | 392 | 364 | 4,200 |
-| 1,440 minutely occurrences | America/Chicago | 287 | 7.4 | 4,045 |
-| 3,600 secondly occurrences | UTC | 152 | 144 | 1,773 |
-| 3,600 secondly occurrences | America/Chicago | 113 | 2.9 | 1,734 |
-| Weekly MO/WE/FR across many cycles | UTC | 662 | 1,137 | 9,579 |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 493 | 14.7 | 8,653 |
-| Weekly day and time-slot expansion | UTC | 502 | 1,207 | 9,382 |
-| Weekly day and time-slot expansion | America/Chicago | 394 | 12.2 | 8,744 |
-| Monthly last weekday across 20 years | UTC | 1,314 | 1,119 | 11,539 |
-| Monthly last weekday across 20 years | America/Chicago | 1,043 | 41.7 | 10,322 |
-| Monthly first and last weekday across 20 years | UTC | 804 | 1,326 | 9,015 |
-| Monthly first and last weekday across 20 years | America/Chicago | 622 | 24.9 | 8,162 |
+| 30 daily occurrences | UTC | 18,847 | 14,581 | 174,900 |
+| 30 daily occurrences | America/Chicago | 12,796 | 328 | 164,890 |
+| Daily weekdays across many cycles | UTC | 961 | 713 | 10,519 |
+| Daily weekdays across many cycles | America/Chicago | 723 | 18.4 | 9,853 |
+| Daily time-slot expansion | UTC | 488 | 1,006 | 10,067 |
+| Daily time-slot expansion | America/Chicago | 371 | 10.7 | 9,462 |
+| 720 hourly occurrences | UTC | 685 | 723 | 6,786 |
+| 720 hourly occurrences | America/Chicago | 491 | 13.2 | 6,383 |
+| 1,440 minutely occurrences | UTC | 326 | 332 | 3,922 |
+| 1,440 minutely occurrences | America/Chicago | 245 | 6.8 | 3,837 |
+| 3,600 secondly occurrences | UTC | 121 | 130 | 1,637 |
+| 3,600 secondly occurrences | America/Chicago | 101 | 2.8 | 1,619 |
+| Weekly MO/WE/FR across many cycles | UTC | 538 | 1,126 | 8,968 |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 418 | 13.8 | 8,259 |
+| Weekly day and time-slot expansion | UTC | 426 | 1,197 | 8,914 |
+| Weekly day and time-slot expansion | America/Chicago | 343 | 11.7 | 8,245 |
+| Monthly last weekday across 20 years | UTC | 1,114 | 1,146 | 10,864 |
+| Monthly last weekday across 20 years | America/Chicago | 921 | 43.5 | 9,839 |
+| Monthly first and last weekday across 20 years | UTC | 664 | 1,287 | 8,461 |
+| Monthly first and last weekday across 20 years | America/Chicago | 553 | 23.4 | 7,720 |
 
 Time-zone-aware iteration now runs through an epoch-integer engine with a
 cached per-zone offset table, so the historical UTC-vs-named-zone gap is gone
-(e.g. monthly last weekday in Chicago went from 45.5 to 1,043 ops/s).
+(e.g. monthly last weekday in Chicago went from 45.5 to 921 ops/s).
 
 On runtimes with native Temporal (Node 26+), occurrence materialization is
 much cheaper. rrule-temporal alone, the earlier core scenarios
@@ -131,5 +132,7 @@ much cheaper. rrule-temporal alone, the earlier core scenarios
 | Monthly first and last weekday across 20 years | America/Chicago | 1,582 |
 
 Repeated `all()` calls on the same rule instance are served from an internal
-cache (disable per rule with `cache: false`); cached rows in the full report
-run at tens of millions of ops/s for every library that supports caching.
+cache (disable per rule with `cache: false`). In this run, cached medians ranged
+from about 6,800 ops/s for `rrule` on the largest second-level set to 32.5
+million ops/s for `rrule-temporal` on 30 daily occurrences; `rrule-rust`
+clustered around 7.5–7.8 million ops/s.

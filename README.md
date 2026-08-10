@@ -324,36 +324,36 @@ warmed path reuses both that table and the immutable rule's numeric query plan.
 
 ### Full recurrence generation
 
-Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max
-(Node 25, polyfill backend). The full three-library comparison, including
-`rrule-rust`, query methodology, and cached-mode results, lives in
-[`benchmarks/README.md`](benchmarks/README.md).
+Uncached median ops/s for `rrule-temporal` v2.1.0 on a MacBook Pro M2 Max
+(Node 25, polyfill backend). Each result is the median of five 200 ms samples
+after a 200 ms warmup. The three-library comparison, query methodology, and
+cached-mode summary live in [`benchmarks/README.md`](benchmarks/README.md).
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
 | --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 22,308 | 17,932 | 1.24x |
-| 30 daily occurrences | America/Chicago | 15,358 | 384 | 40.00x |
-| Daily weekdays across many cycles | UTC | 1,192 | 830 | 1.44x |
-| Daily weekdays across many cycles | America/Chicago | 873 | 20.9 | 41.77x |
-| Daily time-slot expansion | UTC | 611 | 1,199 | 0.51x |
-| Daily time-slot expansion | America/Chicago | 448 | 11.7 | 38.29x |
-| 720 hourly occurrences | UTC | 817 | 757 | 1.08x |
-| 720 hourly occurrences | America/Chicago | 588 | 13.9 | 42.30x |
-| 1,440 minutely occurrences | UTC | 392 | 364 | 1.08x |
-| 1,440 minutely occurrences | America/Chicago | 287 | 7.4 | 38.78x |
-| 3,600 secondly occurrences | UTC | 152 | 144 | 1.06x |
-| 3,600 secondly occurrences | America/Chicago | 113 | 2.9 | 38.97x |
-| Weekly MO/WE/FR across many cycles | UTC | 662 | 1,137 | 0.58x |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 493 | 14.7 | 33.54x |
-| Weekly day and time-slot expansion | UTC | 502 | 1,207 | 0.42x |
-| Weekly day and time-slot expansion | America/Chicago | 394 | 12.2 | 32.30x |
-| Monthly last weekday across 20 years | UTC | 1,314 | 1,119 | 1.17x |
-| Monthly last weekday across 20 years | America/Chicago | 1,043 | 41.7 | 25.01x |
-| Monthly first and last weekday across 20 years | UTC | 804 | 1,326 | 0.61x |
-| Monthly first and last weekday across 20 years | America/Chicago | 622 | 24.9 | 24.98x |
+| 30 daily occurrences | UTC | 18,847 | 14,581 | 1.29x |
+| 30 daily occurrences | America/Chicago | 12,796 | 328 | 39.01x |
+| Daily weekdays across many cycles | UTC | 961 | 713 | 1.35x |
+| Daily weekdays across many cycles | America/Chicago | 723 | 18.4 | 39.29x |
+| Daily time-slot expansion | UTC | 488 | 1,006 | 0.49x |
+| Daily time-slot expansion | America/Chicago | 371 | 10.7 | 34.67x |
+| 720 hourly occurrences | UTC | 685 | 723 | 0.95x |
+| 720 hourly occurrences | America/Chicago | 491 | 13.2 | 37.20x |
+| 1,440 minutely occurrences | UTC | 326 | 332 | 0.98x |
+| 1,440 minutely occurrences | America/Chicago | 245 | 6.8 | 36.03x |
+| 3,600 secondly occurrences | UTC | 121 | 130 | 0.93x |
+| 3,600 secondly occurrences | America/Chicago | 101 | 2.8 | 36.07x |
+| Weekly MO/WE/FR across many cycles | UTC | 538 | 1,126 | 0.48x |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 418 | 13.8 | 30.29x |
+| Weekly day and time-slot expansion | UTC | 426 | 1,197 | 0.36x |
+| Weekly day and time-slot expansion | America/Chicago | 343 | 11.7 | 29.32x |
+| Monthly last weekday across 20 years | UTC | 1,114 | 1,146 | 0.97x |
+| Monthly last weekday across 20 years | America/Chicago | 921 | 43.5 | 21.17x |
+| Monthly first and last weekday across 20 years | UTC | 664 | 1,287 | 0.52x |
+| Monthly first and last weekday across 20 years | America/Chicago | 553 | 23.4 | 23.63x |
 
 Time-zone-aware rules iterate through an epoch-integer engine with a cached
-per-zone offset table, so named-zone scenarios now run 25–42x faster than
+per-zone offset table, so named-zone scenarios now run 21–39x faster than
 `rrule` and within a small factor of their UTC equivalents. On UTC the two
 libraries are comparable on Node 25 (`rrule` stays ahead in several expanded
 and weekly/monthly scenarios where occurrence materialization dominates); on
