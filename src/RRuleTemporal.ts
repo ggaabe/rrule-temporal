@@ -916,9 +916,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return [base];
     }
 
-    const hours = this.opts.byHour ?? [base.hour];
-    const minutes = this.opts.byMinute ?? [base.minute];
-    const seconds = this.opts.bySecond ?? [base.second];
+    // Repeated values (e.g. BYHOUR=0,0,...) would otherwise blow up the cross product below.
+    const hours = this.opts.byHour ? [...new Set(this.opts.byHour)] : [base.hour];
+    const minutes = this.opts.byMinute ? [...new Set(this.opts.byMinute)] : [base.minute];
+    const seconds = this.opts.bySecond ? [...new Set(this.opts.bySecond)] : [base.second];
 
     if (hours.length === 1 && minutes.length === 1 && seconds.length === 1) {
       const hour = hours[0]!;
@@ -938,11 +939,19 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         }
       }
     }
-    return out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+    out.sort((a, b) => Temporal.ZonedDateTime.compare(a, b));
+    // BYHOUR/BYMINUTE/BYSECOND may list duplicate values (e.g. BYHOUR=0,0);
+    // dedupe so each instant is only emitted once.
+    return out.filter((d, i) => i === 0 || Temporal.ZonedDateTime.compare(d, out[i - 1]!) !== 0);
   }
 
   private nextCandidateSameDate(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    const {freq, interval = 1, byHour, byMinute, bySecond} = this.opts;
+    const {freq, interval = 1} = this.opts;
+    // Repeated values (e.g. BYHOUR=9,9,17) would otherwise make indexOf() find the
+    // same slot twice and return zdt unchanged, creating an infinite fixed point.
+    const byHour = this.opts.byHour ? [...new Set(this.opts.byHour)] : undefined;
+    const byMinute = this.opts.byMinute ? [...new Set(this.opts.byMinute)] : undefined;
+    const bySecond = this.opts.bySecond ? [...new Set(this.opts.bySecond)] : undefined;
 
     // Special case: HOURLY frequency with a single BYHOUR token would
     // otherwise keep returning the same time (e.g. always 12:00).  When
@@ -1635,9 +1644,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private buildTimeSlotOffsetsMs(): number[] | undefined {
     if (!this.canUseEpochMillisecondsPrecisionFlag) return undefined;
 
-    const hours = this.opts.byHour ?? [this.originalDtstart.hour];
-    const minutes = this.opts.byMinute ?? [this.originalDtstart.minute];
-    const seconds = this.opts.bySecond ?? [this.originalDtstart.second];
+    // Repeated values (e.g. BYHOUR=0,0,...) would otherwise blow up the cross product below.
+    const hours = this.opts.byHour ? [...new Set(this.opts.byHour)] : [this.originalDtstart.hour];
+    const minutes = this.opts.byMinute ? [...new Set(this.opts.byMinute)] : [this.originalDtstart.minute];
+    const seconds = this.opts.bySecond ? [...new Set(this.opts.bySecond)] : [this.originalDtstart.second];
     const baseMilliseconds = this.originalDtstart.millisecond;
     const offsets: number[] = [];
 
@@ -3768,7 +3778,355 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return this.toPublicDates(this.allInternal(this.toInternalIterator(iterator)));
   }
 
+  // The Gregorian calendar repeats leap-year shapes every 400 years, so an
+  // INTERVAL that shares a factor with 400 revisits the same shapes sooner.
+  // `yearStep` is the number of years advanced per generation step (not
+  // necessarily this.opts.interval - WEEKLY always steps one year at a time).
+  private gregorianCycleYearsToCheck(yearStep: number): number {
+    let divisor = yearStep;
+    let cycleLength = 400;
+    while (divisor !== 0) {
+      const remainder = cycleLength % divisor;
+      cycleLength = divisor;
+      divisor = remainder;
+    }
+    return this.opts.freq === 'YEARLY' || this.opts.freq === 'WEEKLY' ? 400 / cycleLength : 1;
+  }
+
+  // A large INTERVAL can walk past the years Temporal can represent.
+  private withYearIfRepresentable(base: Temporal.ZonedDateTime, year: number): Temporal.ZonedDateTime | undefined {
+    try {
+      return base.with({year});
+    } catch {
+      return undefined;
+    }
+  }
+
+  private hasPossibleOccurrenceInReachableYear(yearStart: Temporal.ZonedDateTime): boolean {
+    if (!this.opts.byYearDay) {
+      return true;
+    }
+
+    // _allYearlyComplex() advances one calendar year per step for WEEKLY
+    // regardless of INTERVAL (which only spaces out weeks within a year).
+    const yearStep = this.opts.freq === 'WEEKLY' ? 1 : (this.opts.interval ?? 1);
+    const yearsToCheck = this.gregorianCycleYearsToCheck(yearStep);
+    for (let index = 0; index < yearsToCheck; index += 1) {
+      const year = yearStart.year + index * yearStep;
+      if (this.opts.until && year > this.opts.until.year) {
+        break;
+      }
+      const candidateYear = this.withYearIfRepresentable(yearStart, year);
+      if (!candidateYear) break;
+      const lastDayOfYear = candidateYear.with({month: 12, day: 31}).dayOfYear;
+      if (
+        this.opts.byYearDay.some((yd) => {
+          const dayNum = yd > 0 ? yd : lastDayOfYear + yd + 1;
+          return dayNum > 0 && dayNum <= lastDayOfYear && this.matchesByWeekNo(candidateYear.add({days: dayNum - 1}));
+        })
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private denseYearlyOccurrences(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
+    const dates: Temporal.ZonedDateTime[] = [];
+    const start = this.originalDtstart;
+    if (!this.addDtstartIfNeeded(dates, iterator)) {
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // The blow-up is purely the BYHOUR x BYMINUTE x BYSECOND cross product, so
+    // resolve each year's matching dates with the time parts stripped (bounded
+    // to a few hundred per year) and expand the time one date at a time.
+    const noDayParts = !this.opts.byMonthDay && !this.opts.byDay && !this.opts.byYearDay && !this.opts.byWeekNo;
+    const dateOnly = this.with({
+      byHour: undefined,
+      byMinute: undefined,
+      bySecond: undefined,
+      // Without BYMONTHDAY/BYDAY/BYYEARDAY/BYWEEKNO a yearly rule fires on
+      // DTSTART's month/day, so pin both here instead of letting BYMONTHDAY
+      // imply all twelve months.
+      byMonthDay: noDayParts ? [start.day] : this.opts.byMonthDay,
+      byMonth: noDayParts ? (this.opts.byMonth ?? [start.month]) : this.opts.byMonth,
+    });
+    const interval = this.opts.interval ?? 1;
+    const untilYear = this.opts.until ? this.opts.until.year + (this.opts.byWeekNo ? 1 : 0) : undefined;
+    let iterationCount = 0;
+    let year = start.year;
+
+    while (true) {
+      if (untilYear !== undefined && year > untilYear) break;
+      if (++iterationCount > this.maxIterations) {
+        throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+      }
+      const yearStart = this.withYearIfRepresentable(start, year);
+      if (!yearStart) break;
+
+      let previous: Temporal.ZonedDateTime | undefined;
+      let shouldBreak = false;
+      for (const date of dateOnly.generateYearlyOccurrences(yearStart)) {
+        if (previous && Temporal.ZonedDateTime.compare(date, previous) === 0) continue;
+        previous = date;
+        ({shouldBreak} = this.processOccurrences(this.expandByTime(date), dates, start, iterator));
+        if (shouldBreak) break;
+      }
+      if (shouldBreak) break;
+
+      year += interval;
+    }
+
+    return this.applyCountLimitAndMergeRDates(dates, iterator);
+  }
+
+  // Neither _allMonthlyByWeekNo() nor _allMonthlyByYearDay() stream: both expand
+  // a whole year's BYHOUR x BYMINUTE x BYSECOND cross product per matching day
+  // before COUNT/UNTIL can stop them, so reject an oversized expansion up front.
+  private assertDenseMonthlyByPartWithinLimit(dayCount: number): void {
+    const timeSlotCount =
+      (new Set(this.opts.byHour).size || 1) * (new Set(this.opts.byMinute).size || 1) * (new Set(this.opts.bySecond).size || 1);
+    if (dayCount * timeSlotCount > this.maxIterations) {
+      throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
+    }
+  }
+
+  private hasDenseYearlyByPart(): boolean {
+    // _allYearlyComplex() is also reached for WEEKLY + BYYEARDAY/BYWEEKNO and
+    // materializes the same per-year BYHOUR x BYMINUTE x BYSECOND cross product.
+    if (this.opts.freq === 'WEEKLY') {
+      return !!(this.opts.byYearDay || this.opts.byWeekNo);
+    }
+    return !!(
+      this.opts.freq === 'YEARLY' &&
+      (this.opts.byMonth ||
+        this.opts.byMonthDay ||
+        this.opts.byHour ||
+        this.opts.byMinute ||
+        this.opts.bySecond ||
+        this.opts.byYearDay ||
+        this.opts.byWeekNo)
+    );
+  }
+
+  private denseYearlyCandidateCount(iterator?: InternalRRuleTemporalIterator): number {
+    const start = this.originalDtstart;
+    const noDayParts = !this.opts.byMonthDay && !this.opts.byDay && !this.opts.byYearDay && !this.opts.byWeekNo;
+    // Reuse the exact date generator instead of estimating per BY-part combination;
+    // BYSETPOS is stripped since it would otherwise shrink the date list we're counting.
+    // Selector arrays are deduplicated first: duplicate values (e.g. a huge
+    // repeated BYYEARDAY list) would otherwise make the generator itself
+    // perform the very allocation this estimate exists to guard against.
+    const dedupedByMonthDay = this.opts.byMonthDay ? [...new Set(this.opts.byMonthDay)] : undefined;
+    const dedupedByMonth = this.opts.byMonth ? [...new Set(this.opts.byMonth)] : undefined;
+    const dateOnly = this.with({
+      byHour: undefined,
+      byMinute: undefined,
+      bySecond: undefined,
+      bySetPos: undefined,
+      byMonthDay: noDayParts ? [start.day] : dedupedByMonthDay,
+      byMonth: noDayParts ? (dedupedByMonth ?? [start.month]) : dedupedByMonth,
+      byYearDay: this.opts.byYearDay ? [...new Set(this.opts.byYearDay)] : undefined,
+      byWeekNo: this.opts.byWeekNo ? [...new Set(this.opts.byWeekNo)] : undefined,
+      byDay: this.opts.byDay ? [...new Set(this.opts.byDay)] : undefined,
+    });
+    const timeSlotCount =
+      (new Set(this.opts.byHour).size || 1) * (new Set(this.opts.byMinute).size || 1) * (new Set(this.opts.bySecond).size || 1);
+
+    // A year shape that can't produce the selected date (e.g. no ISO week 53)
+    // isn't necessarily true of every reachable year, so scan the full cycle
+    // and keep the largest count instead of trusting DTSTART's year alone.
+    // _allYearlyComplex() advances one calendar year per step for WEEKLY
+    // regardless of INTERVAL (which only spaces out weeks within a year), so
+    // every year must be scanned rather than skipping by INTERVAL there.
+    const yearStep = this.opts.freq === 'WEEKLY' ? 1 : (this.opts.interval ?? 1);
+    const yearsToCheck = this.gregorianCycleYearsToCheck(yearStep);
+    // BYWEEKNO's ISO week 1 can spill into the next generation year (see
+    // denseYearlyOccurrences), so the scan must reach that year too.
+    const untilYear = this.opts.until ? this.opts.until.year + (this.opts.byWeekNo ? 1 : 0) : undefined;
+    // A bounded COUNT rule stops materializing further years once enough
+    // occurrences have been produced (see _allYearlyComplex()), so a later
+    // year's larger count is only relevant if generation would ever reach it.
+    // Skipped when EXDATE is set: excluded occurrences don't count toward
+    // COUNT when an iterator is present, so more years could still be visited.
+    const stopOnceCountSatisfied = this.opts.count !== undefined && !this.opts.exDate?.length;
+    // Duplicate selector values (e.g. BYYEARDAY=2,2) interleave duplicate
+    // instants throughout BYSETPOS's raw index space, making it unsafe to map
+    // a valid index back to a distinct credited occurrence there.
+    const hasDuplicateSelectorValues =
+      (!!this.opts.byYearDay && new Set(this.opts.byYearDay).size !== this.opts.byYearDay.length) ||
+      (!!this.opts.byWeekNo && new Set(this.opts.byWeekNo).size !== this.opts.byWeekNo.length) ||
+      (!!this.opts.byDay && new Set(this.opts.byDay).size !== this.opts.byDay.length);
+    // addDtstartIfNeeded() always includes DTSTART here (no iterator can
+    // exclude or reject it), so it counts toward COUNT before any year is scanned.
+    const dtstartCredit =
+      !iterator && this.includeDtstart && !this.matchesAll(this.originalDtstart) ? 1 : 0;
+    let accumulatedCount = dtstartCredit;
+    let maxDayCount = 0;
+    for (let index = 0; index < yearsToCheck; index += 1) {
+      const year = start.year + index * yearStep;
+      if (untilYear !== undefined && year > untilYear) break;
+      const candidateYear = this.withYearIfRepresentable(start, year);
+      if (!candidateYear) break;
+      const dayCandidates = dateOnly.generateYearlyOccurrences(candidateYear);
+      const dayCount = dayCandidates.length;
+      // BYYEARDAY/BYWEEKNO arrays can be adversarially large with mostly
+      // duplicate values; generateYearlyOccurrences() above already used a
+      // deduplicated (cheap) input for that case, but the real generator
+      // iterates the raw array, so the raw materialization size must be
+      // measured separately via cheap arithmetic instead of trusting dayCount.
+      const rawCount =
+        this.opts.byYearDay || this.opts.byWeekNo ? this.cheapRawSelectorCount(candidateYear) : dayCount;
+      if (rawCount > maxDayCount) {
+        maxDayCount = rawCount;
+        if (maxDayCount * timeSlotCount > this.maxIterations) break;
+      }
+      if (stopOnceCountSatisfied && dayCount > 0) {
+        // processOccurrences() discards candidates strictly before DTSTART, so
+        // the first scanned year can credit fewer occurrences than its raw
+        // day count (an occurrence equal to DTSTART is still kept).
+        let yearContribution: number;
+        if (this.opts.bySetPos) {
+          if (hasDuplicateSelectorValues) {
+            // Can't safely tell which BYSETPOS indexes collapse to the same
+            // instant, so don't credit this year rather than risk overcounting.
+            yearContribution = 0;
+          } else {
+            yearContribution =
+              index === 0
+                ? this.firstYearBySetPosContribution(dayCandidates, timeSlotCount, start)
+                : this.validBySetPosCount(dayCount * timeSlotCount);
+          }
+        } else {
+          // _allYearlyComplex() deduplicates candidates before applying COUNT,
+          // so duplicate selectors (e.g. BYYEARDAY=2,2) must not be double-counted.
+          const uniqueDayCandidates = dayCandidates.filter(
+            (d, i) => i === 0 || Temporal.ZonedDateTime.compare(d, dayCandidates[i - 1]!) !== 0,
+          );
+          const creditableDays =
+            index === 0 ? uniqueDayCandidates.filter((d) => Temporal.ZonedDateTime.compare(d, start) >= 0) : uniqueDayCandidates;
+          yearContribution = creditableDays.length * timeSlotCount;
+        }
+        accumulatedCount += yearContribution;
+        if (accumulatedCount >= this.opts.count!) break;
+      }
+    }
+    return maxDayCount * timeSlotCount;
+  }
+
+  // Estimates how many raw (undeduped) candidates generateYearlyOccurrences()
+  // would materialize for BYYEARDAY/BYWEEKNO in the given year, using only
+  // cheap arithmetic on the raw selector values - no ZonedDateTime is
+  // constructed - so a huge, mostly-duplicate selector array stays inexpensive
+  // to size even though the real generator would iterate every raw entry.
+  private cheapRawSelectorCount(candidateYear: Temporal.ZonedDateTime): number {
+    let count = 0;
+    if (this.opts.byYearDay) {
+      const lastDayOfYear = candidateYear.with({month: 12, day: 31}).dayOfYear;
+      for (const d of this.opts.byYearDay) {
+        const dayNum = d > 0 ? d : lastDayOfYear + d + 1;
+        if (dayNum > 0 && dayNum <= lastDayOfYear) count += 1;
+      }
+    }
+    if (this.opts.byWeekNo) {
+      const {lastWeek, tokens} = this.isoWeekByDay(candidateYear);
+      const uniqueTokenCount = new Set(tokens).size;
+      for (const weekNo of this.opts.byWeekNo) {
+        if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) continue;
+        count += uniqueTokenCount;
+      }
+    }
+    return count;
+  }
+
+  // Counts how many distinct BYSETPOS indexes on DTSTART's own year survive
+  // processOccurrences()'s `>= DTSTART` filter, since generateYearlyOccurrences()
+  // applies BYSETPOS to the raw (unfiltered) list before that filter runs.
+  private firstYearBySetPosContribution(
+    dayCandidates: Temporal.ZonedDateTime[],
+    timeSlotCount: number,
+    start: Temporal.ZonedDateTime,
+  ): number {
+    const totalRaw = dayCandidates.length * timeSlotCount;
+    if (!this.opts.bySetPos || totalRaw === 0) return 0;
+
+    let firstKeptRawIndex = totalRaw;
+    for (let i = 0; i < dayCandidates.length; i += 1) {
+      const cmp = Temporal.ZonedDateTime.compare(dayCandidates[i]!, start);
+      if (cmp > 0) {
+        firstKeptRawIndex = i * timeSlotCount;
+        break;
+      }
+      if (cmp === 0) {
+        // Boundary day: only the times at/after DTSTART's time-of-day survive.
+        const times = this.expandByTime(dayCandidates[i]!);
+        const offset = times.findIndex((t) => Temporal.ZonedDateTime.compare(t, start) >= 0);
+        firstKeptRawIndex = offset === -1 ? (i + 1) * timeSlotCount : i * timeSlotCount + offset;
+        break;
+      }
+      // cmp < 0: this whole day precedes DTSTART; keep scanning subsequent days.
+    }
+
+    const validIndices = new Set<number>();
+    for (const pos of this.opts.bySetPos) {
+      const idx = pos > 0 ? pos - 1 : totalRaw + pos;
+      if (idx >= 0 && idx < totalRaw && idx >= firstKeptRawIndex) validIndices.add(idx);
+    }
+    return validIndices.size;
+  }
+
+  // Counts how many distinct BYSETPOS indexes actually fall within a raw,
+  // unfiltered candidate list of the given length (see applyBySetPosToSortedList()).
+  private validBySetPosCount(rawCandidateCount: number): number {
+    if (!this.opts.bySetPos || rawCandidateCount === 0) return 0;
+    const validIndices = new Set<number>();
+    for (const pos of this.opts.bySetPos) {
+      const idx = pos > 0 ? pos - 1 : rawCandidateCount + pos;
+      if (idx >= 0 && idx < rawCandidateCount) validIndices.add(idx);
+    }
+    return validIndices.size;
+  }
+
+  // Empty rDate/exDate arrays are semantically absent; treat them as such so a
+  // plain bounded rule isn't mistaken for a recurrence set that needs merging.
+  private hasRecurrenceSetEntries(): boolean {
+    return !!(this.opts.rDate?.length || this.opts.exDate?.length);
+  }
+
   private allInternal(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] {
+    if (this.opts.count === 0) {
+      if (iterator && this.hasRecurrenceSetEntries()) {
+        return this.iterateRecurrenceSet(iterator);
+      }
+      return this.applyCountLimitAndMergeRDates([], iterator);
+    }
+
+    // An UNTIL before DTSTART can never produce an RRULE occurrence, regardless
+    // of which generator would otherwise run; RDATE entries are still merged in.
+    if (this.opts.until && Temporal.ZonedDateTime.compare(this.opts.until, this.originalDtstart) < 0) {
+      if (iterator && this.hasRecurrenceSetEntries()) {
+        return this.iterateRecurrenceSet(iterator);
+      }
+      // includeDtstart still promises DTSTART even though it's past UNTIL.
+      const dates: Temporal.ZonedDateTime[] = [];
+      this.addDtstartIfNeeded(dates, iterator);
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    // includeDtstart alone can already satisfy a COUNT=1 rule (addDtstartIfNeeded
+    // always pushes DTSTART here since no iterator can exclude or reject it), so
+    // no expansion - and no expansion-size guard - is needed at all.
+    if (!iterator && this.opts.count === 1 && this.includeDtstart && !this.matchesAll(this.originalDtstart)) {
+      const dates: Temporal.ZonedDateTime[] = [];
+      this.addDtstartIfNeeded(dates, iterator);
+      return this.applyCountLimitAndMergeRDates(dates, iterator);
+    }
+
+    if (!this.opts.count && !this.opts.until && !iterator) {
+      throw new Error('all() requires iterator when no COUNT/UNTIL');
+    }
+
     // RSCALE non-Gregorian engines (Chinese, Hebrew, Indian) for YEARLY/MONTHLY/WEEKLY
     if (this.opts.rscale && ['CHINESE', 'HEBREW', 'INDIAN'].includes(this.opts.rscale)) {
       if (
@@ -3780,34 +4138,40 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         return this._allRscaleNonGregorian(iterator);
       }
     }
-    if (this.opts.byWeekNo && this.opts.byYearDay) {
-      // If both byWeekNo and byYearDay are present, there is a high chance of conflict.
-      // To avoid an infinite loop, we can check if any of the byYearDay dates fall within any of the byWeekNo weeks.
-      const yearStart = this.originalDtstart.with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0});
-      const yearDays = this.opts.byYearDay.map((yd) => {
-        const lastDayOfYear = yearStart.with({month: 12, day: 31}).dayOfYear;
-        return yd > 0 ? yd : lastDayOfYear + yd + 1;
-      });
-
-      let possibleDate = false;
-      for (const yd of yearDays) {
-        const date = yearStart.add({days: yd - 1});
-        if (this.matchesByWeekNo(date)) {
-          possibleDate = true;
-          break;
-        }
-      }
-
-      if (!possibleDate) {
-        return [];
-      }
+    const yearStart = this.originalDtstart.with({month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0});
+    if (this.opts.byWeekNo && this.opts.byYearDay && !this.hasPossibleOccurrenceInReachableYear(yearStart)) {
+      return [];
     }
 
-    if (!this.opts.count && !this.opts.until && !iterator) {
-      throw new Error('all() requires iterator when no COUNT/UNTIL');
+    const hasDenseYearlyByPart = this.hasDenseYearlyByPart();
+    const denseYearlyCandidateCount = hasDenseYearlyByPart ? this.denseYearlyCandidateCount(iterator) : 0;
+
+    // These paths still materialize the full yearly expansion, so reject an
+    // expansion that is larger than the safety limit before it can allocate it.
+    if (
+      hasDenseYearlyByPart &&
+      denseYearlyCandidateCount > this.maxIterations &&
+      (this.opts.freq !== 'YEARLY' || // no streaming alternative exists outside YEARLY (e.g. WEEKLY)
+        this.opts.bySetPos ||
+        this.opts.rscale ||
+        this.hasRecurrenceSetEntries() ||
+        (this.opts.count === undefined && this.opts.until === undefined && iterator))
+    ) {
+      throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
     }
 
-    if (iterator && (this.opts.rDate || this.opts.exDate)) {
+    if (
+      hasDenseYearlyByPart &&
+      this.opts.freq === 'YEARLY' &&
+      (this.opts.count !== undefined || this.opts.until !== undefined) &&
+      !this.opts.rscale &&
+      !this.hasRecurrenceSetEntries() &&
+      !this.opts.bySetPos
+    ) {
+      return this.denseYearlyOccurrences(iterator);
+    }
+
+    if (iterator && this.hasRecurrenceSetEntries()) {
       return this.iterateRecurrenceSet(iterator);
     }
 
@@ -3878,6 +4242,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     // --- 6c) MONTHLY + BYWEEKNO (special case) ---
     if (this.opts.freq === 'MONTHLY' && this.opts.byWeekNo && this.opts.byWeekNo.length > 0) {
+      // _allMonthlyByWeekNo() materializes one week's BYHOUR x BYMINUTE x BYSECOND
+      // cross product at a time and checks COUNT between weeks, so only the
+      // largest single week's expansion needs to fit the limit, not the total
+      // across every selected week.
+      // Without BYDAY, isoWeekByDay() only uses DTSTART's own weekday (1 day).
+      // Distinct spellings of the same weekday (e.g. MO vs 1MO) still expand
+      // to a single day, matching isoWeekByDay()'s own normalization.
+      const uniqueWeekdayCount = this.opts.byDay
+        ? new Set(this.opts.byDay.map((token) => extractWeekdayToken(token)).filter((day): day is Weekday => day !== null)).size
+        : 1;
+      this.assertDenseMonthlyByPartWithinLimit(uniqueWeekdayCount);
       return this._allMonthlyByWeekNo(iterator);
     }
 
@@ -3889,6 +4264,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       !this.opts.byDay &&
       !this.opts.byMonthDay
     ) {
+      // _allMonthlyByYearDay() materializes one year-day's BYHOUR x BYMINUTE x
+      // BYSECOND cross product at a time and checks COUNT between days, so
+      // only that single day's expansion needs to fit the limit.
+      this.assertDenseMonthlyByPartWithinLimit(1);
       return this._allMonthlyByYearDay(iterator);
     }
 
@@ -4158,9 +4537,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (Temporal.PlainTime.compare(startTime, endTime) >= 0) return false;
 
     const base = this.originalDtstart;
-    const hours = this.opts.byHour ?? [base.hour];
-    const minutes = this.opts.byMinute ?? [base.minute];
-    const seconds = this.opts.bySecond ?? [base.second];
+    // Repeated values (e.g. BYHOUR=0,0,...) would otherwise blow up the cross product below.
+    const hours = this.opts.byHour ? [...new Set(this.opts.byHour)] : [base.hour];
+    const minutes = this.opts.byMinute ? [...new Set(this.opts.byMinute)] : [base.minute];
+    const seconds = this.opts.bySecond ? [...new Set(this.opts.bySecond)] : [base.second];
 
     for (const hour of hours) {
       for (const minute of minutes) {
@@ -4658,8 +5038,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const finalDays = this.generateMonthlyOccurrenceDays(monthStart);
     if (finalDays.length === 0) return [];
 
-    const hits = finalDays.map((d) => monthStart.with({day: d}));
-    return hits.flatMap((z) => this.expandByTime(z));
+    return finalDays.flatMap((day) => this.expandByTime(monthStart.with({day})));
   }
 
   /**
@@ -4762,7 +5141,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const dayMap = weekdayToIsoDay;
     const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
     const entries: Temporal.ZonedDateTime[] = [];
-    for (const tok of tokens) {
+    // Repeated tokens (e.g. BYDAY=MO,MO,...) would otherwise expand the same
+    // weekday once per duplicate instead of once per distinct weekday.
+    for (const tok of new Set(tokens)) {
       if (!tok) continue;
       const targetDow = dayMap[tok as keyof typeof dayMap]!;
       const inst = weekStart.add({days: (targetDow - wkst + 7) % 7});
