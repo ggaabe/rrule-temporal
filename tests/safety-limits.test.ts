@@ -95,6 +95,33 @@ describe('RRuleTemporal - Safety Limits', () => {
     expect((rule as any).maxIterations).toBe(10000);
   });
 
+  test('candidate evaluations use a separate inner-period safety limit', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T00:00:00[UTC]');
+    const options = {
+      freq: 'YEARLY' as const,
+      count: 1,
+      byMonth: [1],
+      byMonthDay: [1],
+      byHour: [0],
+      byMinute: [0],
+      bySecond: Array.from({length: 10}, (_, second) => second),
+      bySetPos: [10],
+      dtstart,
+    };
+
+    expect(() => new RRuleTemporal({...options, maxCandidateEvaluations: 9}).all()).toThrow(
+      'Maximum candidate evaluations (9) exceeded in all()',
+    );
+    expect(new RRuleTemporal({...options, maxCandidateEvaluations: 10}).all()[0]?.second).toBe(9);
+  });
+
+  test('maxCandidateEvaluations must be a positive safe integer', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T00:00:00[UTC]');
+    expect(() => new RRuleTemporal({freq: 'YEARLY', count: 1, maxCandidateEvaluations: 0, dtstart})).toThrow(
+      'maxCandidateEvaluations must be a positive safe integer',
+    );
+  });
+
   test('next() answers far-future queries without exhausting iteration limits', () => {
     const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
 
