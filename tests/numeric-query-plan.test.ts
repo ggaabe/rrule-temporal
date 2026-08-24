@@ -239,20 +239,33 @@ describe('numeric COUNT query plans', () => {
     expect(() => rule.between(dtstart, rank49, true)).toThrow('Maximum iterations (50) exceeded in all()');
   });
 
+  it('normalizes empty recurrence metadata and duplicate selectors before planning', () => {
+    const utcStart = Temporal.ZonedDateTime.from('2025-01-01T00:00:00[UTC]');
+    for (const rule of [
+      new RRuleTemporal({freq: 'DAILY', count: 10, rDate: [], dtstart: utcStart}),
+      new RRuleTemporal({freq: 'DAILY', count: 10, exDate: [], dtstart: utcStart}),
+    ]) {
+      rule.next(rule.all()[0]!, true);
+      expectPlan(rule, 'daily');
+    }
+
+    const rule = new RRuleTemporal({
+      freq: 'MONTHLY',
+      count: 10,
+      byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
+      bySetPos: [-1, -1],
+      dtstart: utcStart,
+    });
+    expect(rule.options().bySetPos).toEqual([-1]);
+    rule.next(rule.all()[0]!, true);
+    expectPlan(rule, 'monthly');
+  });
+
   it('falls back for unproven rule shapes and DST-gap-sensitive wall times', () => {
     const utcStart = Temporal.ZonedDateTime.from('2025-01-01T00:00:00[UTC]');
     const rules = [
-      new RRuleTemporal({freq: 'DAILY', count: 10, rDate: [], dtstart: utcStart}),
-      new RRuleTemporal({freq: 'DAILY', count: 10, exDate: [], dtstart: utcStart}),
       new RRuleTemporal({freq: 'DAILY', count: 10, includeDtstart: true, byDay: ['MO'], dtstart: utcStart}),
       new RRuleTemporal({freq: 'MONTHLY', count: 10, dtstart: utcStart}),
-      new RRuleTemporal({
-        freq: 'MONTHLY',
-        count: 10,
-        byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
-        bySetPos: [-1, -1],
-        dtstart: utcStart,
-      }),
       new RRuleTemporal({freq: 'DAILY', count: 10, rscale: 'GREGORIAN', dtstart: utcStart}),
       new RRuleTemporal({
         freq: 'SECONDLY',

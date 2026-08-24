@@ -111,7 +111,8 @@ below. These correspond to the recurrence rule parts defined in RFC&nbsp;5545:
 | `rDate` | Additional dates to include. |
 | `exDate` | Exception dates to exclude. |
 | `tzid` | Time zone identifier for interpreting dates. |
-| `maxIterations` | Safety cap when generating occurrences. |
+| `maxIterations` | Safety cap for advancing outer recurrence periods (defaults to 10,000). |
+| `maxCandidateEvaluations` | Safety cap for candidate datetimes evaluated within recurrence periods (defaults to 1,000,000). |
 | `includeDtstart` | Include `DTSTART` even if it does not match the pattern. |
 | `strict` | Enforce RFC 5545 constraints strictly (defaults to false). |
 | `temporal` | Optional Temporal namespace used for public output values and their inferred types. |

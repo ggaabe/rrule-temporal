@@ -10,6 +10,7 @@ const options: RRuleOptions = {
   freq: 'DAILY',
   dtstart,
   until,
+  maxCandidateEvaluations: 100,
   rDate: [rDate],
   exDate: [exDate],
 };
