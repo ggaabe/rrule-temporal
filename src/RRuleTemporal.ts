@@ -828,6 +828,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (!opts.strict) return;
 
     const freq = opts.freq;
+    if (opts.count !== undefined && opts.until !== undefined) {
+      throw new Error('COUNT and UNTIL MUST NOT occur in the same recurrence rule');
+    }
     if (opts.byWeekNo && freq !== 'YEARLY') {
       throw new Error('BYWEEKNO MUST NOT be used unless FREQ=YEARLY');
     }

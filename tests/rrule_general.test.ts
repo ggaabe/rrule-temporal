@@ -176,6 +176,17 @@ describe('General RRule tests', () => {
     ).toThrow('BYSETPOS MUST be used with another BYxxx rule part');
   });
 
+  it('strict rejects COUNT together with UNTIL', () => {
+    const rruleString = [
+      'DTSTART;TZID=UTC:20260801T090000',
+      'RRULE:FREQ=DAILY;COUNT=2;UNTIL=20260805T090000Z',
+    ].join('\n');
+
+    expect(() => new RRuleTemporal({rruleString, strict: true})).toThrow(
+      'COUNT and UNTIL MUST NOT occur in the same recurrence rule',
+    );
+  });
+
   it('testInvalidNthWeekday', () => {
     expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['0FR'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow(
       'Invalid BYDAY value',
