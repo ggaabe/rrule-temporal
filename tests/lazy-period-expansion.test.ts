@@ -323,6 +323,34 @@ describe('other dense calendar periods', () => {
       ),
     ).toEqual(['2025-06-15T12:00:00+00:00[UTC]', '2025-06-15T12:00:01+00:00[UTC]']);
   });
+
+  test('MONTHLY processes the final UNTIL month when it contains an earlier time slot', () => {
+    const rule = new RRuleTemporal({
+      freq: 'MONTHLY',
+      dtstart: Temporal.ZonedDateTime.from('2025-01-15T12:00:00[UTC]'),
+      until: Temporal.ZonedDateTime.from('2025-02-01T05:00:00[UTC]'),
+      byMonthDay: [1],
+      byHour: [0],
+      byMinute: [0],
+      bySecond: [0],
+    });
+
+    expect(strings(rule.all())).toEqual(['2025-02-01T00:00:00+00:00[UTC]']);
+  });
+
+  test('WEEKLY processes the final UNTIL week when it contains an earlier time slot', () => {
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      dtstart: Temporal.ZonedDateTime.from('2025-01-06T12:00:00[UTC]'),
+      until: Temporal.ZonedDateTime.from('2025-01-13T05:00:00[UTC]'),
+      byDay: ['MO'],
+      byHour: [0],
+      byMinute: [0],
+      bySecond: [0],
+    });
+
+    expect(strings(rule.all())).toEqual(['2025-01-13T00:00:00+00:00[UTC]']);
+  });
 });
 
 describe('frozen eager-yearly semantic oracle', () => {

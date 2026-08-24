@@ -3554,7 +3554,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       } catch {
         break;
       }
-      if (this.opts.until && Temporal.ZonedDateTime.compare(monthCursor, this.opts.until) > 0) break;
+      if (this.opts.until) {
+        const localUntil = this.opts.until.withTimeZone(this.tzid);
+        if (monthCursor.year * 12 + monthCursor.month > localUntil.year * 12 + localUntil.month) {
+          break;
+        }
+      }
     }
 
     return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -3627,7 +3632,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       } catch {
         break;
       }
-      if (this.opts.until && Temporal.ZonedDateTime.compare(weekCursor, this.opts.until) > 0) break;
+      if (this.opts.until) {
+        const localUntil = this.opts.until.withTimeZone(this.tzid);
+        if (Temporal.PlainDate.compare(weekCursor.toPlainDate(), localUntil.toPlainDate()) > 0) {
+          break;
+        }
+      }
     }
 
     return this.applyCountLimitAndMergeRDates(dates, iterator);
