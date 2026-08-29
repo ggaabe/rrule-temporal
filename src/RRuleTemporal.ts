@@ -4623,6 +4623,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     const tempRule = new RRuleTemporal<TOutput>({
       ...tempOpts,
+      // The source rule has already been validated in its requested mode.
+      // `beforeZdt` is only a traversal cap, not an RRULE UNTIL part, so the
+      // internal clone must not reject a valid strict COUNT rule.
+      strict: tempOpts.count !== undefined ? false : tempOpts.strict,
       temporal: this.outputTemporal,
     } as RRuleOptions<TOutput>);
     const allDates = tempRule.allInternal(undefined, tempOpts.count === undefined ? startZdt : undefined);

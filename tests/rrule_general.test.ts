@@ -187,6 +187,18 @@ describe('General RRule tests', () => {
     );
   });
 
+  it('strict COUNT rules support bounded queries', () => {
+    const rule = new RRuleTemporal({
+      rruleString: ['DTSTART;VALUE=DATE:20260401', 'RRULE:FREQ=YEARLY;COUNT=3'].join('\n'),
+      strict: true,
+    });
+
+    const dates = rule.between(zdt(2026, 1, 1, 0, 'UTC'), zdt(2029, 1, 1, 0, 'UTC'), true);
+
+    expect(dates.map((value) => value.toPlainDate().toString())).toEqual(['2026-04-01', '2027-04-01', '2028-04-01']);
+    expect(rule.options().strict).toBe(true);
+  });
+
   it('testInvalidNthWeekday', () => {
     expect(() => new RRuleTemporal({freq: 'WEEKLY', byDay: ['0FR'], dtstart: zdt(1997, 9, 2, 9, 'UTC')})).toThrow(
       'Invalid BYDAY value',
