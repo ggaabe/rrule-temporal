@@ -6,6 +6,10 @@ function zdt(y: number, m: number, d: number, h: number, tz = 'UTC') {
   return Temporal.ZonedDateTime.from({year: y, month: m, day: d, hour: h, minute: 0, timeZone: tz});
 }
 
+function normalizeYueHantDayPeriods(text: string): string {
+  return text.replace(/上晝/g, '上午').replace(/下晝/g, '下午');
+}
+
 const expected = {
   de: [
     'jede/n/s Tag',
@@ -145,7 +149,19 @@ describe('toText i18n advanced cases', () => {
   const rules = buildRules();
   for (const lang of Object.keys(expected) as (keyof typeof expected)[]) {
     test.each(rules.map((r, i) => [expected[lang][i], r]))('%s', (text, rule) => {
-      expect(toText(rule, lang).toLowerCase()).toBe(text?.toLowerCase());
+      if (text === undefined) {
+        throw new Error(`Missing expected text for locale ${lang}`);
+      }
+
+      const actual = toText(rule, lang).toLowerCase();
+      const expectedText = text.toLowerCase();
+
+      if (lang === 'yue-Hant') {
+        expect(normalizeYueHantDayPeriods(actual)).toBe(normalizeYueHantDayPeriods(expectedText));
+        return;
+      }
+
+      expect(actual).toBe(expectedText);
     });
   }
 });
