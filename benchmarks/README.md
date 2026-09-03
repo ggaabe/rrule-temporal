@@ -72,12 +72,12 @@ npm run profile:temporal -- --scenario monthly_last_weekday_240 --tzid UTC --ite
 ### COUNT-bound queries
 
 Measured September 3, 2026 on a MacBook Pro M2 Max with Node 25.2.1,
-comparing the exact `v2.2.2` tag (`6be2251`) with this post-v2.2.2 candidate.
-The table reports warmed median time per call from seven 300 ms samples after
-a 250 ms warmup; lower is better. Both builds used the same harness, and the
-candidate uses the production-minified bundle described below.
+comparing the exact `v2.2.2` tag (`6be2251`) with `v2.2.3`. The table reports
+warmed median time per call from seven 300 ms samples after a 250 ms warmup;
+lower is better. Both builds used the same harness, and version 2.2.3 uses the
+production-minified bundle described below.
 
-| Scenario | v2.2.2 | Candidate | Speedup |
+| Scenario | v2.2.2 | v2.2.3 | Speedup |
 | --- | ---: | ---: | ---: |
 | SECONDLY next, COUNT 128, rank 63 | 9.53 us | 1.10 us | 8.66x |
 | SECONDLY next, COUNT 250k, rank 200k | 9.53 us | 1.15 us | 8.29x |

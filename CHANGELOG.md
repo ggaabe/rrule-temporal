@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.2.3 (2026-09-03)
+
+- Added conservative numeric rank/select plans for Gregorian `YEARLY` rules
+  and exception-aware `RDATE`/`EXDATE` merging across supported COUNT-bound
+  plans. Boolean and point queries now avoid replaying or materializing the
+  complete recurrence set when the optimized shape is proven safe.
+- Reduced Temporal conversion overhead by consuming compatible
+  `epochNanoseconds` values directly, constructing selected public Temporal
+  outputs without string round-trips when supported, caching converted
+  `all()` results, and converting iterator values only once.
+- Minified the production ESM and CommonJS bundles, disabling
+  `temporal-polyfill`'s development-only per-instance debug strings. On the
+  documented Node 25 benchmark, UTC generation is now 1.27-5.26x faster than
+  `rrule`, while named-zone generation is 42-107x faster.
+- Added deterministic differential fuzzing for optimized query plans,
+  expanded regression coverage, and refreshed the query and full-generation
+  benchmark tables. The public API and recurrence semantics are unchanged.
+
 ## 2.2.0 (2026-08-10)
 
 - Added the optional `temporal` rule option for selecting the Temporal
