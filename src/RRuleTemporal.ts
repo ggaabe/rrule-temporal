@@ -46,7 +46,7 @@ interface NumericCandidate {
 }
 
 interface NumericQueryPlan {
-  readonly kind: 'fixed-step' | 'daily' | 'weekly' | 'monthly';
+  readonly kind: 'fixed-step' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   /** Number of RRULE occurrences after applying COUNT and inclusive UNTIL. */
   readonly count: number;
   /** Original COUNT before an optional UNTIL shortens the sequence. */
@@ -201,16 +201,48 @@ function isTemporalZonedDateTimeInput(value: unknown): value is TemporalZonedDat
   );
 }
 
+function zonedDateTimeEpochNanoseconds(value: TemporalZonedDateTimeInput): bigint | undefined {
+  const epochNanoseconds = (value as TemporalZonedDateTimeInput & {readonly epochNanoseconds?: unknown})
+    .epochNanoseconds;
+  return typeof epochNanoseconds === 'bigint' ? epochNanoseconds : undefined;
+}
+
 function normalizeZonedDateTime(value: TemporalZonedDateTimeInput, label: string): PolyfillZonedDateTime {
   if (!isTemporalZonedDateTimeInput(value)) {
     throw new Error(`${label} must be a ZonedDateTime`);
   }
 
   try {
+    const epochNanoseconds = zonedDateTimeEpochNanoseconds(value);
+    if (epochNanoseconds !== undefined) {
+      const calendarId = (value as TemporalZonedDateTimeInput & {readonly calendarId?: unknown}).calendarId;
+      return new Temporal.ZonedDateTime(
+        epochNanoseconds,
+        value.timeZoneId,
+        typeof calendarId === 'string' ? calendarId : 'iso8601',
+      );
+    }
     return Temporal.ZonedDateTime.from(value.toString());
   } catch {
     throw new Error(`${label} must be a ZonedDateTime`);
   }
+}
+
+function dateFilterEpochNanoseconds(value: DateFilter, label: string): bigint {
+  if (value instanceof Date) {
+    const epochMilliseconds = value.getTime();
+    if (!Number.isFinite(epochMilliseconds)) {
+      // Preserve Date's established invalid-value error rather than silently
+      // turning it into an arbitrary instant.
+      value.toISOString();
+    }
+    return BigInt(epochMilliseconds) * NS_PER_MILLISECOND;
+  }
+
+  if (!isTemporalZonedDateTimeInput(value)) {
+    throw new Error(`${label} must be a ZonedDateTime`);
+  }
+  return zonedDateTimeEpochNanoseconds(value) ?? normalizeZonedDateTime(value, label).epochNanoseconds;
 }
 
 function normalizeZonedDateTimeList(
@@ -642,7 +674,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private readonly hasUniqueTimeSlotOffsets: boolean;
   private readonly numericByMonths?: number[];
   private exDateEpochNs?: Set<bigint>;
+  private numericRDatesCache?: Temporal.ZonedDateTime[];
   private allResultCache?: Temporal.ZonedDateTime[];
+  private publicAllResultCache?: TOutput[];
+  private outputConstructorFastPathAvailable?: boolean;
   private zoneResolver?: ZoneOffsetResolver;
   private emitAnchorZdt?: Temporal.ZonedDateTime;
   private numericQueryPlanCache: NumericQueryPlan | null | undefined;
@@ -656,17 +691,29 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return normalizeZonedDateTime(zdt, 'Date');
   }
 
-  private toInternalIterator(iterator?: RRuleTemporalIterator<TOutput>): InternalRRuleTemporalIterator | undefined {
-    if (!iterator) return undefined;
-    return (date, i) => iterator(this.toPublicDate(date)!, i);
-  }
-
   private toPublicDate(date: PolyfillZonedDateTime | null): TOutput | null {
     if (!date) return null;
 
     const outputConstructor = this.outputTemporal?.ZonedDateTime;
     if (!outputConstructor || (outputConstructor as unknown) === Temporal.ZonedDateTime) {
       return date as unknown as TOutput;
+    }
+
+    if (this.outputConstructorFastPathAvailable !== false) {
+      try {
+        const ConstructableZonedDateTime = outputConstructor as unknown as new (
+          epochNanoseconds: bigint,
+          timeZone: string,
+          calendar?: string,
+        ) => TOutput;
+        const converted = new ConstructableZonedDateTime(date.epochNanoseconds, date.timeZoneId, date.calendarId);
+        this.outputConstructorFastPathAvailable = true;
+        return converted;
+      } catch {
+        // Some implementation adapters intentionally expose only `.from()`.
+        // Remember that capability once and retain the documented fallback.
+        this.outputConstructorFastPathAvailable = false;
+      }
     }
     return outputConstructor.from(date.toString());
   }
@@ -675,7 +722,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (!this.outputTemporal || (this.outputTemporal.ZonedDateTime as unknown) === Temporal.ZonedDateTime) {
       return dates as unknown as TOutput[];
     }
-    return dates.map((date) => this.outputTemporal!.ZonedDateTime.from(date.toString()));
+    return dates.map((date) => this.toPublicDate(date)!);
   }
 
   constructor(params: RRuleOptions<TOutput>) {
@@ -2352,6 +2399,225 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return plan;
   }
 
+  /**
+   * Build one Gregorian recurrence year's wall-clock occurrences as as-if-UTC
+   * epoch milliseconds. This deliberately covers the common YEARLY shapes
+   * whose calendar membership repeats on the 400-year Gregorian cycle.
+   */
+  private generateYearlyOccurrenceEpochsUtc(year: number, applyBySetPos = true): number[] {
+    const timeSlotOffsets = this.timeSlotOffsetsMs;
+    if (!timeSlotOffsets?.length) return [];
+
+    const hasDateExpansion = Boolean(this.opts.byDay || this.opts.byMonthDay);
+    const byMonthOnly = Boolean(this.numericByMonths?.length) && !hasDateExpansion;
+    const months = this.numericByMonths?.length
+      ? [...this.numericByMonths].sort((left, right) => left - right)
+      : hasDateExpansion
+        ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        : [this.originalDtstart.month];
+
+    const calendarDays: Array<{month: number; day: number}> = [];
+    if (this.hasOrdinalByDay && !this.numericByMonths?.length) {
+      // With no BYMONTH, RFC 5545 interprets an ordinal BYDAY against the
+      // complete year rather than independently in each month.
+      const daysInYear = this.isGregorianLeapYear(year) ? 366 : 365;
+      const firstDayOfWeek = this.gregorianIsoDayOfWeek(year, 1, 1);
+      const lastDayOfWeek = addIsoDays(firstDayOfWeek, daysInYear - 1);
+      const selectedYearDays = new Set<number>();
+      for (const token of this.parsedByDayTokens ?? []) {
+        if (token.ord === 0) continue;
+        const yearDay =
+          token.ord > 0
+            ? 1 + ((token.isoDay - firstDayOfWeek + 7) % 7) + 7 * (token.ord - 1)
+            : daysInYear - ((lastDayOfWeek - token.isoDay + 7) % 7) + 7 * (token.ord + 1);
+        if (yearDay >= 1 && yearDay <= daysInYear) selectedYearDays.add(yearDay);
+      }
+
+      for (const yearDay of [...selectedYearDays].sort((left, right) => left - right)) {
+        let remaining = yearDay;
+        let month = 1;
+        while (remaining > this.daysInGregorianMonth(year, month)) {
+          remaining -= this.daysInGregorianMonth(year, month);
+          month += 1;
+        }
+        calendarDays.push({month, day: remaining});
+      }
+    } else {
+      for (const month of months) {
+        let days: number[];
+        if (byMonthOnly) {
+          // _allYearlyByMonth() uses ZonedDateTime.with(), whose default
+          // overflow behavior constrains (for example) January 31 to Feb 28.
+          days = [Math.min(this.originalDtstart.day, this.daysInGregorianMonth(year, month))];
+        } else if (!hasDateExpansion) {
+          days = [this.originalDtstart.day];
+        } else {
+          days = this.generateMonthlyOccurrenceDaysUtc(year, month);
+        }
+        for (const day of days) calendarDays.push({month, day});
+      }
+    }
+
+    const walls: number[] = [];
+    for (const {month, day} of calendarDays) {
+      const dayStartMilliseconds = gregorianEpochDay(year, month, day) * MS_PER_DAY;
+      if (!isSafeTemporalEpochMilliseconds(dayStartMilliseconds)) return [];
+      for (const timeSlotOffset of timeSlotOffsets) {
+        walls.push(dayStartMilliseconds + timeSlotOffset);
+      }
+    }
+    walls.sort((left, right) => left - right);
+
+    if (!applyBySetPos || !this.opts.bySetPos?.length) return walls;
+    const selected = this.applyBySetPosToSortedList(walls).sort((left, right) => left - right);
+    return selected.filter((wall, index) => index === 0 || wall !== selected[index - 1]);
+  }
+
+  private yearlyCandidateEvaluationCountUtc(year: number): number {
+    const candidateCount = this.generateYearlyOccurrenceEpochsUtc(year, false).length;
+    const positions = this.opts.bySetPos;
+    if (!positions?.length) return candidateCount;
+
+    let positiveLimit = 0;
+    let negativeLimit = 0;
+    for (const position of positions) {
+      if (position > 0) positiveLimit = Math.max(positiveLimit, position);
+      else negativeLimit = Math.max(negativeLimit, -position);
+    }
+    return Math.min(candidateCount, positiveLimit) + Math.min(candidateCount, negativeLimit);
+  }
+
+  private buildYearlyNumericQueryPlan(maximumCount: number): NumericQueryPlan | null {
+    const interval = this.opts.interval!;
+    const timeSlotOffsets = this.timeSlotOffsetsMs;
+    if (!timeSlotOffsets?.length || !this.hasUniqueTimeSlotOffsets) return null;
+    if (this.opts.byMonth?.some((value) => typeof value !== 'number')) return null;
+    if (this.opts.byYearDay || this.opts.byWeekNo) return null;
+
+    const hasDateExpansion = Boolean(this.opts.byDay || this.opts.byMonthDay);
+    const byMonthOnly = Boolean(this.opts.byMonth) && !hasDateExpansion;
+    const simpleAnnual = !this.opts.byMonth && !hasDateExpansion;
+
+    // The general simple-YEARLY cursor clamps Feb 29 on the first non-leap
+    // step and remains clamped thereafter. That stateful edge is uncommon and
+    // intentionally stays on the source-of-truth path.
+    if (simpleAnnual && this.originalDtstart.month === 2 && this.originalDtstart.day === 29) return null;
+    // Simple YEARLY time expansion advances one cursor slot per iteration,
+    // while date-expanded YEARLY rules count outer years. Keep maxIterations
+    // behavior exact by optimizing only the single-slot simple form.
+    if (simpleAnnual && timeSlotOffsets.length !== 1) return null;
+    // _allYearlyByMonth() currently selects the first time override and does
+    // not apply BYSETPOS; only optimize the exact shape it emits.
+    if (byMonthOnly && (timeSlotOffsets.length !== 1 || this.opts.bySetPos)) return null;
+    if (
+      this.hasOrdinalByDay &&
+      !this.numericByMonths?.length &&
+      (this.opts.byMonthDay || this.parsedByDayTokens?.some((token) => token.ord === 0))
+    ) {
+      return null;
+    }
+
+    const startEpochMilliseconds = this.originalDtstart.epochMilliseconds;
+    const startYear = this.originalDtstart.year;
+    const wallsForPeriod = (periodIndex: number): number[] | null => {
+      const yearDelta = periodIndex * interval;
+      const year = startYear + yearDelta;
+      if (!Number.isSafeInteger(yearDelta) || !Number.isSafeInteger(year)) return null;
+      return this.generateYearlyOccurrenceEpochsUtc(year);
+    };
+
+    const firstWalls = wallsForPeriod(0);
+    if (!firstWalls) return null;
+    const firstCandidates: NumericCandidate[] = [];
+    for (const wallMilliseconds of firstWalls) {
+      const epochMilliseconds = this.resolveNumericWallMilliseconds(wallMilliseconds);
+      if (epochMilliseconds === null) return null;
+      if (epochMilliseconds >= startEpochMilliseconds) {
+        firstCandidates.push({
+          epochMilliseconds,
+          periodIndex: 0,
+          occurrenceIndex: firstCandidates.length,
+        });
+      }
+    }
+
+    const cyclePeriods = 400 / gcd(interval, 400);
+    const requiredCycleOccurrences = Math.max(0, maximumCount - firstCandidates.length);
+    const cyclePrefixCounts = [0];
+    const cyclePrefixEvaluations = [0];
+    for (
+      let periodOffset = 0;
+      periodOffset < cyclePeriods && cyclePrefixCounts.at(-1)! < requiredCycleOccurrences;
+      periodOffset++
+    ) {
+      const walls = wallsForPeriod(1 + periodOffset);
+      if (!walls) return null;
+      cyclePrefixCounts.push(cyclePrefixCounts[periodOffset]! + walls.length);
+      const year = startYear + (1 + periodOffset) * interval;
+      cyclePrefixEvaluations.push(cyclePrefixEvaluations[periodOffset]! + this.yearlyCandidateEvaluationCountUtc(year));
+    }
+    const precomputedPeriods = cyclePrefixCounts.length - 1;
+    const completedCycle = precomputedPeriods === cyclePeriods;
+    const occurrencesPerPrecomputedSpan = cyclePrefixCounts.at(-1)!;
+    if (occurrencesPerPrecomputedSpan === 0 && firstCandidates.length < maximumCount) return null;
+
+    if (hasDateExpansion) {
+      let candidateEvaluations = this.yearlyCandidateEvaluationCountUtc(startYear);
+      if (completedCycle && requiredCycleOccurrences > 0) {
+        const fullCycles = Math.floor(requiredCycleOccurrences / occurrencesPerPrecomputedSpan);
+        const remainder = requiredCycleOccurrences % occurrencesPerPrecomputedSpan;
+        candidateEvaluations += fullCycles * cyclePrefixEvaluations.at(-1)!;
+        if (remainder > 0) {
+          let period = 1;
+          while (cyclePrefixCounts[period]! < remainder) period += 1;
+          candidateEvaluations += cyclePrefixEvaluations[period]!;
+        }
+      } else {
+        candidateEvaluations += cyclePrefixEvaluations.at(-1)!;
+      }
+      if (candidateEvaluations > this.maxCandidateEvaluations) return null;
+    }
+
+    const select = (index: number): NumericCandidate | null => {
+      if (index < firstCandidates.length) {
+        return {...firstCandidates[index]!, occurrenceIndex: index};
+      }
+      if (occurrencesPerPrecomputedSpan === 0) return null;
+
+      const remainingIndex = index - firstCandidates.length;
+      const cycleIndex = completedCycle ? Math.floor(remainingIndex / occurrencesPerPrecomputedSpan) : 0;
+      const indexWithinCycle = completedCycle ? remainingIndex % occurrencesPerPrecomputedSpan : remainingIndex;
+      if (indexWithinCycle >= occurrencesPerPrecomputedSpan) return null;
+
+      let low = 1;
+      let high = cyclePrefixCounts.length - 1;
+      while (low < high) {
+        const middle = low + Math.floor((high - low) / 2);
+        if (cyclePrefixCounts[middle]! > indexWithinCycle) high = middle;
+        else low = middle + 1;
+      }
+
+      const periodOffset = low - 1;
+      const periodIndex = 1 + cycleIndex * cyclePeriods + periodOffset;
+      if (!Number.isSafeInteger(periodIndex)) return null;
+      const walls = wallsForPeriod(periodIndex);
+      if (!walls) return null;
+      const occurrenceWithinPeriod = indexWithinCycle - cyclePrefixCounts[periodOffset]!;
+      const wallMilliseconds = walls[occurrenceWithinPeriod];
+      if (wallMilliseconds === undefined) return null;
+      const epochMilliseconds = this.resolveNumericWallMilliseconds(wallMilliseconds);
+      if (epochMilliseconds === null) return null;
+      return {epochMilliseconds, periodIndex, occurrenceIndex: index};
+    };
+
+    const plan = this.createNumericQueryPlan('yearly', maximumCount, select);
+    const last = plan?.select(maximumCount - 1);
+    if (last && timeSlotOffsets.some((offset) => this.numericQueryGapHazard(offset, last.epochMilliseconds))) {
+      return null;
+    }
+    return plan;
+  }
+
   private buildNumericQueryPlan(): NumericQueryPlan | null {
     const maximumCount = this.opts.count;
     const interval = this.opts.interval;
@@ -2365,8 +2631,6 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       this.maxIterations <= 0 ||
       this.includeDtstart ||
       this.opts.rscale !== undefined ||
-      this.opts.rDate !== undefined ||
-      this.opts.exDate !== undefined ||
       !this.canUseEpochMillisecondsPrecisionFlag ||
       this.originalDtstart.timeZoneId !== this.tzid ||
       !['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)
@@ -2402,6 +2666,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           return null;
         }
         return this.buildMonthlyNumericQueryPlan(maximumCount);
+      case 'YEARLY':
+        return this.buildYearlyNumericQueryPlan(maximumCount);
       default:
         return null;
     }
@@ -3589,20 +3855,15 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         ? [...Object.values(dayMap)]
         : [start.dayOfWeek];
 
-    // Find the very first weekCursor: the earliest of this week’s matching days ≥ start
-    const firstWeekDates = dows.map((dw) => {
-      const delta = (dw - start.dayOfWeek + 7) % 7;
-      return start.add({days: delta});
-    });
-    const firstOccurrence = firstWeekDates.reduce((a, b) => (Temporal.ZonedDateTime.compare(a, b) <= 0 ? a : b));
-
     // Get the week start day (default to Monday if not specified)
     const wkstToken = extractWeekdayToken(this.opts.wkst || 'MO') ?? 'MO';
     const wkstDay = dayMap[wkstToken] ?? 1;
 
-    // Align weekCursor to the week start that contains the first occurrence
-    const firstOccWeekOffset = (firstOccurrence.dayOfWeek - wkstDay + 7) % 7;
-    let weekCursor = firstOccurrence.subtract({days: firstOccWeekOffset});
+    // RFC 5545 anchors WEEKLY INTERVAL periods to DTSTART's week. In
+    // particular, do not re-anchor the cadence to the following week when all
+    // matching weekdays in DTSTART's week are already in the past.
+    const startWeekOffset = (start.dayOfWeek - wkstDay + 7) % 7;
+    let weekCursor = start.subtract({days: startWeekOffset});
 
     while (true) {
       // Generate this week’s occurrences
@@ -4067,6 +4328,20 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule.
    */
   all(iterator?: RRuleTemporalIterator<TOutput>): TOutput[] {
+    if (iterator) {
+      // Convert each emitted value exactly once. The old adapter converted for
+      // the callback and then converted the returned internal array a second
+      // time after traversal completed.
+      const publicDates: TOutput[] = [];
+      this.allInternal((date, index) => {
+        const publicDate = this.toPublicDate(date)!;
+        if (!iterator(publicDate, index)) return false;
+        publicDates.push(publicDate);
+        return true;
+      });
+      return publicDates;
+    }
+
     if (!iterator && this.opts.cache !== false) {
       // Rule instances are immutable, so the full occurrence list of a bounded
       // rule can be computed once and shared; return a copy so callers may
@@ -4074,9 +4349,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       if (!this.allResultCache) {
         this.allResultCache = this.allInternal();
       }
-      return this.toPublicDates(this.allResultCache.slice());
+      if (!this.publicAllResultCache) {
+        this.publicAllResultCache = this.toPublicDates(this.allResultCache);
+      }
+      return this.publicAllResultCache.slice();
     }
-    return this.toPublicDates(this.allInternal(this.toInternalIterator(iterator)));
+    return this.toPublicDates(this.allInternal());
   }
 
   private allInternal(
@@ -4337,13 +4615,50 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * @returns True if the date is excluded
    */
   private isExcluded(date: Temporal.ZonedDateTime): boolean {
+    return this.isExcludedEpoch(date.epochNanoseconds);
+  }
+
+  private isExcludedEpoch(epochNanoseconds: bigint): boolean {
     if (!this.opts.exDate || this.opts.exDate.length === 0) return false;
     // ZonedDateTime.compare() === 0 is exact-instant equality, so a Set of
     // epochNanoseconds bigints gives the same semantics in O(1) per lookup.
     if (this.exDateEpochNs === undefined) {
       this.exDateEpochNs = new Set(this.opts.exDate.map((exDate) => exDate.epochNanoseconds));
     }
-    return this.exDateEpochNs.has(date.epochNanoseconds);
+    return this.exDateEpochNs.has(epochNanoseconds);
+  }
+
+  /** Sorted, de-duplicated, and EXDATE-filtered explicit recurrence dates. */
+  private getNumericRDates(): Temporal.ZonedDateTime[] {
+    if (this.numericRDatesCache) return this.numericRDatesCache;
+
+    const sorted = [...(this.opts.rDate ?? [])].sort((left, right) =>
+      left.epochNanoseconds < right.epochNanoseconds ? -1 : left.epochNanoseconds > right.epochNanoseconds ? 1 : 0,
+    );
+    const dates: Temporal.ZonedDateTime[] = [];
+    let previousEpoch: bigint | undefined;
+    for (const date of sorted) {
+      if (date.epochNanoseconds === previousEpoch) continue;
+      previousEpoch = date.epochNanoseconds;
+      if (!this.isExcludedEpoch(previousEpoch)) dates.push(date);
+    }
+    return (this.numericRDatesCache = dates);
+  }
+
+  private numericRDateLowerBound(targetEpochNanoseconds: bigint, strict: boolean): number {
+    const dates = this.getNumericRDates();
+    let low = 0;
+    let high = dates.length;
+    while (low < high) {
+      const middle = low + Math.floor((high - low) / 2);
+      const epoch = dates[middle]!.epochNanoseconds;
+      if (strict ? epoch > targetEpochNanoseconds : epoch >= targetEpochNanoseconds) {
+        high = middle;
+      } else {
+        low = middle + 1;
+      }
+    }
+    return low;
   }
 
   /**
@@ -4516,16 +4831,45 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const plan = this.getNumericQueryPlan();
     if (!plan) return {handled: false};
 
-    const index = plan.lowerBound(targetEpochNanoseconds, !inclusive);
-    if (index >= plan.count) {
-      this.assertNumericCandidateReachable(this.numericExhaustionCandidate(plan));
-      return {handled: true, value: null};
+    let index = plan.lowerBound(targetEpochNanoseconds, !inclusive);
+    if (!this.opts.rDate && !this.opts.exDate) {
+      if (index >= plan.count) {
+        this.assertNumericCandidateReachable(this.numericExhaustionCandidate(plan));
+        return {handled: true, value: null};
+      }
+
+      const candidate = plan.select(index);
+      if (!candidate) return {handled: false};
+      this.assertNumericCandidateReachable(candidate);
+      return {handled: true, value: this.zdtFromEpochMs(candidate.epochMilliseconds)};
     }
 
-    const candidate = plan.select(index);
-    if (!candidate) return {handled: false};
-    this.assertNumericCandidateReachable(candidate);
-    return {handled: true, value: this.zdtFromEpochMs(candidate.epochMilliseconds)};
+    const rDates = this.getNumericRDates();
+    const rDate = rDates[this.numericRDateLowerBound(targetEpochNanoseconds, !inclusive)];
+
+    while (index < plan.count) {
+      const candidate = plan.select(index);
+      if (!candidate) return {handled: false};
+      const candidateEpochNanoseconds = BigInt(candidate.epochMilliseconds) * NS_PER_MILLISECOND;
+
+      // The streaming recurrence-set merge flushes earlier RDATE values from
+      // inside the next RRULE callback, after that RRULE period's iteration
+      // guard has run. Preserve the same maxIterations boundary here.
+      this.assertNumericCandidateReachable(candidate);
+      if (rDate && rDate.epochNanoseconds < candidateEpochNanoseconds) {
+        return {handled: true, value: rDate};
+      }
+
+      if (!this.isExcludedEpoch(candidateEpochNanoseconds)) {
+        // RRULE wins an exact-instant tie, matching the recurrence-set merge.
+        return {handled: true, value: this.zdtFromEpochMs(candidate.epochMilliseconds)};
+      }
+      index += 1;
+    }
+
+    const exhaustionCandidate = this.numericExhaustionCandidate(plan);
+    this.assertNumericCandidateReachable(exhaustionCandidate);
+    return {handled: true, value: rDate ?? null};
   }
 
   private tryNumericPrevious(
@@ -4541,13 +4885,35 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const reachedCandidate = stopIndex < plan.count ? plan.select(stopIndex) : this.numericExhaustionCandidate(plan);
     this.assertNumericCandidateReachable(reachedCandidate);
 
-    const resultIndex = stopIndex - 1;
-    if (resultIndex < 0) {
-      return {handled: true, value: null};
+    let resultIndex = stopIndex - 1;
+    if (!this.opts.rDate && !this.opts.exDate) {
+      if (resultIndex < 0) {
+        return {handled: true, value: null};
+      }
+      const candidate = plan.select(resultIndex);
+      if (!candidate) return {handled: false};
+      return {handled: true, value: this.zdtFromEpochMs(candidate.epochMilliseconds)};
     }
-    const candidate = plan.select(resultIndex);
-    if (!candidate) return {handled: false};
-    return {handled: true, value: this.zdtFromEpochMs(candidate.epochMilliseconds)};
+
+    let ruleCandidate: NumericCandidate | null = null;
+    while (resultIndex >= 0) {
+      const candidate = plan.select(resultIndex);
+      if (!candidate) return {handled: false};
+      if (!this.isExcludedEpoch(BigInt(candidate.epochMilliseconds) * NS_PER_MILLISECOND)) {
+        ruleCandidate = candidate;
+        break;
+      }
+      resultIndex -= 1;
+    }
+
+    const rDates = this.getNumericRDates();
+    const rDateIndex = this.numericRDateLowerBound(targetEpochNanoseconds, inclusive) - 1;
+    const rDate = rDateIndex >= 0 ? rDates[rDateIndex]! : null;
+    if (!ruleCandidate) return {handled: true, value: rDate};
+    if (rDate && rDate.epochNanoseconds > BigInt(ruleCandidate.epochMilliseconds) * NS_PER_MILLISECOND) {
+      return {handled: true, value: rDate};
+    }
+    return {handled: true, value: this.zdtFromEpochMs(ruleCandidate.epochMilliseconds)};
   }
 
   private tryNumericBetween(
@@ -4570,15 +4936,47 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       scanStopIndex < plan.count ? plan.select(scanStopIndex) : this.numericExhaustionCandidate(plan);
     this.assertNumericCandidateReachable(reachedCandidate);
 
-    if (firstIndex >= endIndex) {
+    if (firstIndex >= endIndex && !this.opts.rDate) {
       return {handled: true, value: []};
     }
 
-    const dates = new Array<Temporal.ZonedDateTime>(endIndex - firstIndex);
+    if (!this.opts.rDate && !this.opts.exDate) {
+      const dates = new Array<Temporal.ZonedDateTime>(endIndex - firstIndex);
+      for (let index = firstIndex; index < endIndex; index++) {
+        const candidate = plan.select(index);
+        if (!candidate) return {handled: false};
+        dates[index - firstIndex] = this.zdtFromEpochMs(candidate.epochMilliseconds);
+      }
+      return {handled: true, value: dates};
+    }
+
+    const ruleDates: Temporal.ZonedDateTime[] = [];
     for (let index = firstIndex; index < endIndex; index++) {
       const candidate = plan.select(index);
       if (!candidate) return {handled: false};
-      dates[index - firstIndex] = this.zdtFromEpochMs(candidate.epochMilliseconds);
+      const candidateEpochNanoseconds = BigInt(candidate.epochMilliseconds) * NS_PER_MILLISECOND;
+      if (!this.isExcludedEpoch(candidateEpochNanoseconds)) {
+        ruleDates.push(this.zdtFromEpochMs(candidate.epochMilliseconds));
+      }
+    }
+
+    const rDates = this.getNumericRDates();
+    const firstRDateIndex = this.numericRDateLowerBound(startEpochNanoseconds, !inclusive);
+    const endRDateIndex = this.numericRDateLowerBound(endEpochNanoseconds, inclusive);
+    const dates: Temporal.ZonedDateTime[] = [];
+    let ruleIndex = 0;
+    let rDateIndex = firstRDateIndex;
+    while (ruleIndex < ruleDates.length || rDateIndex < endRDateIndex) {
+      const ruleDate = ruleDates[ruleIndex];
+      const rDate = rDates[rDateIndex];
+      if (!rDate || (ruleDate && ruleDate.epochNanoseconds <= rDate.epochNanoseconds)) {
+        dates.push(ruleDate!);
+        ruleIndex += 1;
+        if (rDate && rDate.epochNanoseconds === ruleDate!.epochNanoseconds) rDateIndex += 1;
+      } else {
+        dates.push(rDate);
+        rDateIndex += 1;
+      }
     }
     return {handled: true, value: dates};
   }
@@ -4591,22 +4989,16 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * @returns An array of Temporal.ZonedDateTime objects representing all occurrences of the rule within the specified time window.
    */
   between(after: DateFilter, before: DateFilter, inc = false): TOutput[] {
-    const startInst =
-      after instanceof Date
-        ? Temporal.Instant.from(after.toISOString())
-        : normalizeZonedDateTime(after, 'after').toInstant();
-    const endInst =
-      before instanceof Date
-        ? Temporal.Instant.from(before.toISOString())
-        : normalizeZonedDateTime(before, 'before').toInstant();
+    const startEpochNanoseconds = dateFilterEpochNanoseconds(after, 'after');
+    const endEpochNanoseconds = dateFilterEpochNanoseconds(before, 'before');
 
-    const numericResult = this.tryNumericBetween(startInst.epochNanoseconds, endInst.epochNanoseconds, inc);
+    const numericResult = this.tryNumericBetween(startEpochNanoseconds, endEpochNanoseconds, inc);
     if (numericResult.handled) {
       return this.toPublicDates(numericResult.value);
     }
 
-    const startZdt = Temporal.Instant.from(startInst).toZonedDateTimeISO(this.tzid);
-    const beforeZdt = Temporal.Instant.from(endInst).toZonedDateTimeISO(this.tzid);
+    const startZdt = new Temporal.ZonedDateTime(startEpochNanoseconds, this.tzid);
+    const beforeZdt = new Temporal.ZonedDateTime(endEpochNanoseconds, this.tzid);
 
     const tempOpts = {...this.opts};
 
@@ -4633,14 +5025,13 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     return this.toPublicDates(
       allDates.filter((date) => {
-        const inst = date.toInstant();
         const afterStart = inc
-          ? Temporal.Instant.compare(inst, startInst) >= 0
-          : Temporal.Instant.compare(inst, startInst) > 0;
+          ? date.epochNanoseconds >= startEpochNanoseconds
+          : date.epochNanoseconds > startEpochNanoseconds;
 
         const beforeEnd = inc
-          ? Temporal.Instant.compare(inst, endInst) <= 0
-          : Temporal.Instant.compare(inst, endInst) < 0;
+          ? date.epochNanoseconds <= endEpochNanoseconds
+          : date.epochNanoseconds < endEpochNanoseconds;
 
         return afterStart && beforeEnd;
       }),
@@ -4741,7 +5132,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * This checks full date-time equality (including time and time zone).
    */
   matches(date: DateFilter): boolean {
-    return this.between(date, date, true).length > 0;
+    const targetEpochNanoseconds = dateFilterEpochNanoseconds(date, 'date');
+    return this.nextInternal(targetEpochNanoseconds, true)?.epochNanoseconds === targetEpochNanoseconds;
   }
 
   /**
@@ -4754,36 +5146,25 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       timeZone: this.tzid,
       plainTime: Temporal.PlainTime.from('00:00'),
     });
-    const endOfDay = startOfDay.add({days: 1}).subtract({nanoseconds: 1});
-    return this.between(startOfDay, endOfDay, true).length > 0;
+    const nextDay = startOfDay.add({days: 1});
+    const occurrence = this.nextInternal(startOfDay.epochNanoseconds, true);
+    return occurrence !== null && occurrence.epochNanoseconds < nextDay.epochNanoseconds;
   }
 
-  /**
-   * Returns the next occurrence of the rule after a specified date.
-   * @param after - The start date or Temporal.ZonedDateTime object.
-   * @param inc - Optional boolean flag to include occurrences on the start date.
-   * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
-   */
-  next(after: DateFilter = new Date(), inc = false): TOutput | null {
-    const afterInst =
-      after instanceof Date
-        ? Temporal.Instant.from(after.toISOString())
-        : normalizeZonedDateTime(after, 'after').toInstant();
-
-    const numericResult = this.tryNumericNext(afterInst.epochNanoseconds, inc);
+  private nextInternal(afterEpochNanoseconds: bigint, inc: boolean): Temporal.ZonedDateTime | null {
+    const numericResult = this.tryNumericNext(afterEpochNanoseconds, inc);
     if (numericResult.handled) {
-      return this.toPublicDate(numericResult.value);
+      return numericResult.value;
     }
 
     let result: Temporal.ZonedDateTime | null = null;
     const scanFrom = (rule: RRuleTemporal<TOutput>) => {
       rule.allInternal((occ) => {
-        const inst = occ.toInstant();
-        const ok = inc ? Temporal.Instant.compare(inst, afterInst) >= 0 : Temporal.Instant.compare(inst, afterInst) > 0;
+        const ok = inc ? occ.epochNanoseconds >= afterEpochNanoseconds : occ.epochNanoseconds > afterEpochNanoseconds;
         if (ok) {
           // Keep the minimum defensively; recurrence-set iterators emit in
           // chronological order, so this is normally the first match.
-          if (!result || Temporal.ZonedDateTime.compare(occ, result) < 0) {
+          if (!result || occ.epochNanoseconds < result.epochNanoseconds) {
             result = occ;
           }
           return false;
@@ -4798,10 +5179,20 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (this.opts.count !== undefined) {
       scanFrom(this);
     } else {
-      scanFrom(this.ruleFromAlignedDtstart(afterInst.toZonedDateTimeISO(this.tzid)));
+      scanFrom(this.ruleFromAlignedDtstart(new Temporal.ZonedDateTime(afterEpochNanoseconds, this.tzid)));
     }
 
-    return this.toPublicDate(result);
+    return result;
+  }
+
+  /**
+   * Returns the next occurrence of the rule after a specified date.
+   * @param after - The start date or Temporal.ZonedDateTime object.
+   * @param inc - Optional boolean flag to include occurrences on the start date.
+   * @returns The next occurrence of the rule after the specified date or null if no occurrences are found.
+   */
+  next(after: DateFilter = new Date(), inc = false): TOutput | null {
+    return this.toPublicDate(this.nextInternal(dateFilterEpochNanoseconds(after, 'after'), inc));
   }
 
   /**
@@ -4829,12 +5220,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * @returns The previous occurrence of the rule before the specified date or null if no occurrences are found.
    */
   previous(before: DateFilter = new Date(), inc = false): TOutput | null {
-    const beforeInst =
-      before instanceof Date
-        ? Temporal.Instant.from(before.toISOString())
-        : normalizeZonedDateTime(before, 'before').toInstant();
+    const beforeEpochNanoseconds = dateFilterEpochNanoseconds(before, 'before');
 
-    const numericResult = this.tryNumericPrevious(beforeInst.epochNanoseconds, inc);
+    const numericResult = this.tryNumericPrevious(beforeEpochNanoseconds, inc);
     if (numericResult.handled) {
       return this.toPublicDate(numericResult.value);
     }
@@ -4842,10 +5230,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const scanFrom = (rule: RRuleTemporal<TOutput>): Temporal.ZonedDateTime | null => {
       let prev: Temporal.ZonedDateTime | null = null;
       rule.allInternal((occ) => {
-        const inst = occ.toInstant();
         const beyond = inc
-          ? Temporal.Instant.compare(inst, beforeInst) > 0
-          : Temporal.Instant.compare(inst, beforeInst) >= 0;
+          ? occ.epochNanoseconds > beforeEpochNanoseconds
+          : occ.epochNanoseconds >= beforeEpochNanoseconds;
         if (beyond) return false;
         prev = occ;
         return true;
@@ -4861,7 +5248,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     // Scan forward from a phase-aligned start near the target, backing the
     // start off exponentially until an occurrence before the target is found
     // (or the original DTSTART is reached, meaning there is none).
-    const beforeZdt = beforeInst.toZonedDateTimeISO(this.tzid);
+    const beforeZdt = new Temporal.ZonedDateTime(beforeEpochNanoseconds, this.tzid);
     const anchor =
       this.opts.until && Temporal.ZonedDateTime.compare(this.opts.until, beforeZdt) < 0 ? this.opts.until : beforeZdt;
     const interval = this.opts.interval ?? 1;

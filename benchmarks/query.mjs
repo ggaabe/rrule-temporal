@@ -44,6 +44,10 @@ function summarize(values) {
 let checksumSink = 0n;
 
 function consume(result) {
+  if (typeof result === 'boolean') {
+    checksumSink = BigInt.asUintN(64, checksumSink + (result ? 1n : 0n));
+    return 1;
+  }
   const values = Array.isArray(result) ? result : result ? [result] : [];
   let checksum = 0n;
   for (const value of values) checksum ^= value.epochNanoseconds;
@@ -209,6 +213,70 @@ const SCENARIOS = [
         cache: false,
       });
       return {run: () => rule.next(target), expectedLength: 1};
+    },
+  },
+  {
+    id: 'secondly_occurs_on_100000',
+    label: 'SECONDLY occursOn, COUNT 100k, first day',
+    build: (RRuleTemporal) => {
+      const dtstart = utc('2025-01-01T00:00:00');
+      const rule = new RRuleTemporal({
+        freq: 'SECONDLY',
+        count: 100_000,
+        maxIterations: 100_001,
+        dtstart,
+        cache: false,
+      });
+      return {run: () => rule.occursOn(dtstart.toPlainDate()), expectedLength: 1};
+    },
+  },
+  {
+    id: 'daily_exceptions_next_9000_rank_8500',
+    label: 'DAILY RDATE/EXDATE next, COUNT 9k, rank 8.5k',
+    build: (RRuleTemporal) => {
+      const dtstart = utc('2000-01-01T09:00:00');
+      const target = dtstart.add({days: 8_500});
+      const rule = new RRuleTemporal({
+        freq: 'DAILY',
+        count: 9_000,
+        dtstart,
+        exDate: [target],
+        rDate: [dtstart.add({days: 10_000})],
+        cache: false,
+      });
+      return {run: () => rule.next(target, true), expectedLength: 1};
+    },
+  },
+  {
+    id: 'yearly_month_day_next_9000_rank_8500',
+    label: 'YEARLY BYMONTH/BYMONTHDAY next, COUNT 9k, rank 8.5k',
+    build: (RRuleTemporal) => {
+      const dtstart = utc('2000-01-01T09:00:00');
+      const target = utc('6250-03-15T09:00:00');
+      const rule = new RRuleTemporal({
+        freq: 'YEARLY',
+        byMonth: [3, 9],
+        byMonthDay: [15],
+        count: 9_000,
+        dtstart,
+        cache: false,
+      });
+      return {run: () => rule.next(target, true), expectedLength: 1};
+    },
+  },
+  {
+    id: 'explicit_temporal_output_all_3600',
+    label: 'SECONDLY all, COUNT 3.6k, explicit Temporal output',
+    build: (RRuleTemporal) => {
+      const dtstart = chicago('2025-01-01T00:00:00');
+      const rule = new RRuleTemporal({
+        temporal: Temporal,
+        freq: 'SECONDLY',
+        count: 3_600,
+        dtstart,
+        cache: false,
+      });
+      return {run: () => rule.all(), expectedLength: 3_600};
     },
   },
 ];

@@ -9,7 +9,7 @@ function epochKeys(values: ReturnType<RRuleTemporal['all']>): bigint[] {
   return values.map((value) => value.epochNanoseconds);
 }
 
-function expectPlan(rule: RRuleTemporal, kind: 'fixed-step' | 'daily' | 'weekly' | 'monthly'): void {
+function expectPlan(rule: RRuleTemporal, kind: 'fixed-step' | 'daily' | 'weekly' | 'monthly' | 'yearly'): void {
   expect((rule as InspectableRule).numericQueryPlanCache?.kind).toBe(kind);
 }
 
@@ -119,6 +119,31 @@ describe('numeric COUNT query plans', () => {
     expectPlan(rule, 'weekly');
   });
 
+  it('anchors WEEKLY exception sets to DTSTART week when the first period has no remaining slots', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-08T09:00:00[UTC]');
+    const options = {
+      freq: 'WEEKLY' as const,
+      interval: 2,
+      byDay: ['MO'],
+      count: 4,
+      dtstart,
+      rDate: [Temporal.ZonedDateTime.from('2025-01-15T09:00:00[UTC]')],
+      exDate: [Temporal.ZonedDateTime.from('2025-01-20T09:00:00[UTC]')],
+      cache: false,
+    };
+    const rule = new RRuleTemporal(options);
+
+    expect(rule.all().map((value) => value.toPlainDate().toString())).toEqual([
+      '2025-01-15',
+      '2025-02-03',
+      '2025-02-17',
+      '2025-03-03',
+    ]);
+    expect(epochKeys(new RRuleTemporal(options).all(() => true))).toEqual(epochKeys(rule.all()));
+    expectQueriesMatchOccurrenceSet(rule);
+    expectPlan(rule, 'weekly');
+  });
+
   it('selects MONTHLY occurrences through the cached Gregorian cycle', () => {
     const rules = [
       new RRuleTemporal({
@@ -153,6 +178,117 @@ describe('numeric COUNT query plans', () => {
       expectQueriesMatchOccurrenceSet(rule);
       expectPlan(rule, 'monthly');
     }
+  });
+
+  it('selects Gregorian YEARLY occurrences through the 400-year cycle', () => {
+    const rules = [
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        interval: 3,
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        interval: 2,
+        byMonth: [1, 3, 11],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[America/Chicago]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        byMonth: [2, 6],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-01-31T09:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        byMonth: [3, 6, 9, 12],
+        byMonthDay: [15, -1],
+        byHour: [9, 17],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T12:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        interval: 7,
+        byDay: ['1TU', '-1TH'],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        interval: 3,
+        byMonth: [1, 3, 11],
+        byDay: ['2TU', '-1TH'],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        byMonthDay: [1, 3, -1],
+        byDay: ['TU', 'TH'],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        byDay: ['SU'],
+        bySetPos: [1, 10, -1],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T12:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        byMonthDay: [15],
+        byHour: [6, 18],
+        bySetPos: [3, -3],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[UTC]'),
+        cache: false,
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        byMonth: [1],
+        byMonthDay: [1],
+        bySetPos: [1, -1],
+        count: 90,
+        dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[UTC]'),
+        cache: false,
+      }),
+    ];
+
+    for (const rule of rules) {
+      expectQueriesMatchOccurrenceSet(rule);
+      expectPlan(rule, 'yearly');
+    }
+  });
+
+  it('keeps numeric rank/select active across RDATE union and EXDATE subtraction', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T09:00:00[UTC]');
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 40,
+      dtstart,
+      rDate: [dtstart.subtract({days: 2}), dtstart.add({days: 100}), dtstart.add({days: 10})],
+      exDate: [dtstart.add({days: 3}), dtstart.add({days: 10})],
+      cache: false,
+    });
+
+    expectQueriesMatchOccurrenceSet(rule);
+    expect(rule.next(dtstart.add({days: 39}))?.epochNanoseconds).toBe(dtstart.add({days: 100}).epochNanoseconds);
+    expect(rule.previous(dtstart.subtract({days: 1}))?.epochNanoseconds).toBe(
+      dtstart.subtract({days: 2}).epochNanoseconds,
+    );
+    expectPlan(rule, 'daily');
   });
 
   it('uses instant ordering through a DST fold with several repeated-hour slots', () => {
@@ -239,6 +375,26 @@ describe('numeric COUNT query plans', () => {
     expect(() => rule.between(dtstart, rank49, true)).toThrow('Maximum iterations (50) exceeded in all()');
   });
 
+  it('falls back when a YEARLY numeric plan would bypass the candidate-evaluation limit', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T00:00:00[UTC]');
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 1,
+      byMonth: [1],
+      byMonthDay: [1],
+      bySecond: Array.from({length: 10}, (_, second) => second),
+      bySetPos: [10],
+      maxCandidateEvaluations: 9,
+      dtstart,
+      cache: false,
+    });
+
+    expect(() => rule.next(dtstart.subtract({nanoseconds: 1}))).toThrow(
+      'Maximum candidate evaluations (9) exceeded in all()',
+    );
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
   it('normalizes empty recurrence metadata and duplicate selectors before planning', () => {
     const utcStart = Temporal.ZonedDateTime.from('2025-01-01T00:00:00[UTC]');
     for (const rule of [
@@ -282,6 +438,18 @@ describe('numeric COUNT query plans', () => {
         byMonthDay: [10],
         count: 30,
         dtstart: Temporal.ZonedDateTime.from('2023-01-10T02:30:00[America/Chicago]'),
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        count: 10,
+        dtstart: Temporal.ZonedDateTime.from('2024-02-29T09:00:00[UTC]'),
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        byWeekNo: [20],
+        byDay: ['MO'],
+        count: 10,
+        dtstart: utcStart,
       }),
     ];
 

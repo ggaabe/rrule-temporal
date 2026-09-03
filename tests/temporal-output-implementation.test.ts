@@ -69,4 +69,62 @@ describe('explicit Temporal output implementation', () => {
     expect(rule.all().every((date) => date instanceof JsTemporal.ZonedDateTime)).toBe(true);
     expect(rule.options().dtstart).toBeInstanceOf(JsTemporal.ZonedDateTime);
   });
+
+  test('constructs primitive-backed outputs once and caches the converted all() result', () => {
+    class TrackingZonedDateTime {
+      static constructions = 0;
+      static fromCalls = 0;
+      readonly value: InstanceType<typeof JsTemporal.ZonedDateTime>;
+
+      constructor(epochNanoseconds: bigint, timeZone: string, calendar = 'iso8601') {
+        TrackingZonedDateTime.constructions += 1;
+        this.value = new JsTemporal.ZonedDateTime(epochNanoseconds, timeZone, calendar);
+      }
+
+      static from(value: string): TrackingZonedDateTime {
+        TrackingZonedDateTime.fromCalls += 1;
+        const date = JsTemporal.ZonedDateTime.from(value);
+        return new TrackingZonedDateTime(date.epochNanoseconds, date.timeZoneId, date.calendarId);
+      }
+
+      get timeZoneId(): string {
+        return this.value.timeZoneId;
+      }
+
+      toString(): string {
+        return this.value.toString();
+      }
+    }
+
+    const temporal = {ZonedDateTime: TrackingZonedDateTime};
+    const rule = new RRuleTemporal({temporal, freq: 'DAILY', count: 3, dtstart});
+    const first = rule.all();
+    const second = rule.all();
+
+    expect(first).not.toBe(second);
+    expect(first.every((date) => date instanceof TrackingZonedDateTime)).toBe(true);
+    expect(TrackingZonedDateTime.constructions).toBe(3);
+    expect(TrackingZonedDateTime.fromCalls).toBe(0);
+
+    TrackingZonedDateTime.constructions = 0;
+    const iterated = new RRuleTemporal({temporal, freq: 'DAILY', count: 3, dtstart, cache: false}).all(() => true);
+    expect(iterated).toHaveLength(3);
+    expect(TrackingZonedDateTime.constructions).toBe(3);
+  });
+
+  test('retains the from(string) fallback for non-constructable adapters', () => {
+    let fromCalls = 0;
+    const temporal = {
+      ZonedDateTime: {
+        from(value: string) {
+          fromCalls += 1;
+          return JsTemporal.ZonedDateTime.from(value);
+        },
+      },
+    };
+    const rule = new RRuleTemporal({temporal, freq: 'DAILY', count: 3, dtstart, cache: false});
+
+    expect(rule.all().every((date) => date instanceof JsTemporal.ZonedDateTime)).toBe(true);
+    expect(fromCalls).toBe(3);
+  });
 });
