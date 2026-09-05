@@ -583,6 +583,33 @@ describe('DST timezones and repeat', () => {
     ]);
   });
 
+  // A window query clones the rule with a phase-aligned DTSTART. When the aligned instant is the
+  // occurrence that a gap shifted, the clone must not take the shifted time as the rule's own.
+  it('should agree with full iteration when a window query aligns onto a shifted occurrence', () => {
+    const tz = 'Europe/Berlin';
+    const rule = `DTSTART;TZID=${tz}:20260327T023000\nRRULE:FREQ=DAILY`;
+    const afterTheGap = new Date('2026-03-29T02:00:00.000Z'); // 04:00 in Berlin, past that day's occurrence
+
+    expect(format(tz)(parse(rule).next(afterTheGap)!)).toEqual('2026-03-30T02:30:00+02:00[Europe/Berlin]');
+
+    assertDates({rule: parse(rule), between: [afterTheGap, new Date('2026-04-01T12:00:00.000Z')], print: format(tz)}, [
+      '2026-03-30T02:30:00+02:00[Europe/Berlin]',
+      '2026-03-31T02:30:00+02:00[Europe/Berlin]',
+      '2026-04-01T02:30:00+02:00[Europe/Berlin]',
+    ]);
+  });
+
+  it('should still report the shifted occurrence when the window covers the transition day', () => {
+    const tz = 'Europe/Berlin';
+    const rule = `DTSTART;TZID=${tz}:20260327T023000\nRRULE:FREQ=DAILY`;
+    const between: [Date, Date] = [new Date('2026-03-28T00:00:00.000Z'), new Date('2026-03-31T00:00:00.000Z')];
+    assertDates({rule: parse(rule), between, print: format(tz)}, [
+      '2026-03-28T02:30:00+01:00[Europe/Berlin]',
+      '2026-03-29T03:30:00+02:00[Europe/Berlin]',
+      '2026-03-30T02:30:00+02:00[Europe/Berlin]',
+    ]);
+  });
+
   it('should keep the earlier instant of a repeated hour on fall-back (DAILY, time from DTSTART)', () => {
     const tz = 'Europe/Berlin';
     const rule = `DTSTART;TZID=${tz}:20261024T023000\nRRULE:FREQ=DAILY;COUNT=3`;

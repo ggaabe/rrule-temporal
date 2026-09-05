@@ -5256,6 +5256,23 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       }
     }
 
+    // Jumping whole days, weeks, months or years can land on a wall time that does not exist --
+    // 02:30 on the day a zone springs forward -- which `compatible` disambiguation resolves an hour
+    // later. The window query clones this rule with the aligned instant as its DTSTART, so a
+    // shifted anchor would make the clone treat the shifted time as the rule's own time of day and
+    // hand it to every later occurrence. Step back to the previous anchor instead, which costs one
+    // extra occurrence of iteration and leaves the clone's DTSTART on the canonical wall time.
+    if (['years', 'months', 'weeks', 'days'].includes(unit)) {
+      const canonicalTime = this.originalDtstart.toPlainTime();
+      let stepsBack = 0;
+      while (stepsBack < 2 && steps - stepsBack > 0 && !candidate.toPlainTime().equals(canonicalTime)) {
+        stepsBack += 1;
+        candidate = RRuleTemporal.normalizeToPolyfill(
+          this.opts.dtstart.add(durationForJump((steps - stepsBack) * interval)),
+        );
+      }
+    }
+
     const dtstartForCompare = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart);
 
     // Ensure we never start before the original DTSTART
