@@ -1499,13 +1499,43 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return this.applyTimeOverride(this.rawAdvance(zdt));
   }
 
+  /**
+   * Re-asserts the time of day an occurrence is supposed to have.
+   *
+   * A BYxxx part wins where one is given. Where none is, RFC 5545 3.3.10 takes the value from
+   * DTSTART, so that is what gets restored here -- the same fallback the candidate generators
+   * already apply (`this.opts.byHour ?? [this.originalDtstart.hour]`).
+   *
+   * Restoring it matters because advancing a cursor across a spring-forward gap moves the wall
+   * time: 02:30 + 1 day lands on a time that does not exist and `compatible` disambiguation
+   * resolves it to 03:30. Without re-asserting DTSTART's time, that shifted time is what the next
+   * advance builds on, so every later occurrence in the series keeps it.
+   *
+   * Only fields the frequency does not own are pinned: HOURLY advances the hour, MINUTELY the
+   * minute, SECONDLY the second, so those are left alone.
+   */
   private applyTimeOverride(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    const {byHour, byMinute, bySecond} = this.opts;
-    if (!byHour && !byMinute && !bySecond) return zdt;
+    const {freq, byHour, byMinute, bySecond} = this.opts;
+    // Only frequencies that repeat a fixed time of day take it from DTSTART. HOURLY, MINUTELY and
+    // SECONDLY advance within the day, so their time fields are the iteration's own business.
+    const dtstartTime = freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY';
+    if (!byHour && !byMinute && !bySecond && !dtstartTime) return zdt;
+
     const fields: {hour?: number; minute?: number; second?: number} = {};
     if (byHour) fields.hour = byHour[0];
+    else if (dtstartTime) fields.hour = this.originalDtstart.hour;
+
     if (byMinute) fields.minute = byMinute[0];
+    else if (dtstartTime) fields.minute = this.originalDtstart.minute;
+
     if (bySecond) fields.second = bySecond[0];
+    else if (dtstartTime) fields.second = this.originalDtstart.second;
+
+    // Most calendar steps already carry the intended time. Avoid rebuilding
+    // an identical ZonedDateTime for every occurrence on these common paths.
+    if (dtstartTime && fields.hour === zdt.hour && fields.minute === zdt.minute && fields.second === zdt.second) {
+      return zdt;
+    }
     return zdt.with(fields);
   }
 
@@ -3451,9 +3481,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
   /**
    * True if the rule's nominal time of day can be skipped by a DST gap
-   * anywhere in the (estimated) iteration range. The general engine chains
-   * its cursor through gap days — even filtered-out ones — permanently
-   * shifting the time of day, so affected rules must use it for parity.
+   * anywhere in the (estimated) iteration range. Conservatively keep these
+   * rules on the general engine for Temporal's compatible gap resolution.
    */
   private tzFastPathGapHazard(timeOfDayMs: number): boolean {
     const startMs = this.originalDtstart.epochMilliseconds;
@@ -5228,6 +5257,23 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           steps -= 1;
           candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(durationForJump(steps * interval)));
         }
+      }
+    }
+
+    // Jumping whole days, weeks, months or years can land on a wall time that does not exist --
+    // 02:30 on the day a zone springs forward -- which `compatible` disambiguation resolves an hour
+    // later. The window query clones this rule with the aligned instant as its DTSTART, so a
+    // shifted anchor would make the clone treat the shifted time as the rule's own time of day and
+    // hand it to every later occurrence. Step back in whole intervals until an anchor carries the
+    // canonical time; several consecutive occurrences can land in gaps with larger intervals.
+    if (['years', 'months', 'weeks', 'days'].includes(unit)) {
+      const canonicalTime = this.originalDtstart.toPlainTime();
+      let stepsBack = 0;
+      while (steps - stepsBack > 0 && !candidate.toPlainTime().equals(canonicalTime)) {
+        stepsBack += 1;
+        candidate = RRuleTemporal.normalizeToPolyfill(
+          this.opts.dtstart.add(durationForJump((steps - stepsBack) * interval)),
+        );
       }
     }
 
