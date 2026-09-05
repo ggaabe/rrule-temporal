@@ -305,22 +305,24 @@ Notes
 
 ## Benchmarks
 
-### UTC generation improvements (unreleased)
+### UTC generation improvements (v2.2.4)
 
 Measured September 5, 2026 on an Apple M2 Max with Node 25.2.1 and the
 bundled Temporal polyfill, comparing a build of `v2.2.3` (`474c88c`) with the
-working-tree implementation. These are uncached `all()` calls: seven samples
-of at least 300 ms after a 200 ms warmup, alternating baseline/candidate order
-each sample. Rule construction is outside the timings. Every scenario's complete
-result was compared against the baseline before timing.
+v2.2.4 implementation after the DST fix (`0274381`). These are uncached
+`all()` calls: seven samples of at least 300 ms after a 200 ms warmup,
+alternating baseline/candidate order each sample. Rule construction is outside
+the timings. Every scenario's complete result was compared against the baseline
+before timing. These are local medians; sample ranges are recorded with the raw
+results, and timings vary with machine load.
 
-| UTC scenario | v2.2.3 | Unreleased | Speedup |
+| UTC scenario | v2.2.3 | v2.2.4 | Speedup |
 | --- | ---: | ---: | ---: |
-| YEARLY last weekday, COUNT 1,000 | 1,413.491 ms | 22.500 ms | 62.82x |
-| YEARLY quarterly months / two month days, COUNT 1,000 | 18.116 ms | 1.505 ms | 12.04x |
-| MONTHLY weekdays / four time slots, COUNT 1,000 | 5.478 ms | 1.050 ms | 5.22x |
-| MONTHLY first/last weekday time slots, COUNT 240 | 15.748 ms | 0.793 ms | 19.86x |
-| DAILY RDATE/EXDATE, COUNT 1,000 | 3.134 ms | 0.621 ms | 5.05x |
+| YEARLY last weekday, COUNT 1,000 | 1,866.627 ms | 27.755 ms | 67.25x |
+| YEARLY quarterly months / two month days, COUNT 1,000 | 22.255 ms | 2.046 ms | 10.88x |
+| MONTHLY weekdays / four time slots, COUNT 1,000 | 6.402 ms | 1.192 ms | 5.37x |
+| MONTHLY first/last weekday time slots, COUNT 240 | 20.788 ms | 0.825 ms | 25.20x |
+| DAILY RDATE/EXDATE, COUNT 1,000 | 3.645 ms | 0.720 ms | 5.06x |
 
 UTC monthly/yearly generation now selects calendar days and BYSETPOS ranks
 using integers, then constructs only the Temporal candidates that the visitor
@@ -329,11 +331,11 @@ generators when RDATE/EXDATE are present; exceptions are applied afterward in
 recurrence-set order. Unsupported shapes retain the general engine, including
 expanded exception rules whose iteration limits differ.
 
-The initial 20 UTC/Chicago full-generation controls and 13 query benchmarks
-were broadly unchanged; the largest measured slowdown in that sweep was about
-4%. Follow-up measurements did not reproduce a consistent named-zone
-regression. The full 1,138-test suite passed on Node 25.2.1 with the polyfill
-and Node 26.7.0 with native Temporal. These timings use the polyfill only.
+The release passed all 1,167 tests on both Temporal backends, plus CI on
+Node 20, 24, and 26. The timings above use the polyfill only. The general
+calendar engine now restores DTSTART's time after DST gaps; this has a cost
+in fallback cases. The Chicago DAILY exception control measured 3.960 ms
+for v2.2.3 and 4.840 ms for v2.2.4, about 22% slower in this run.
 
 See [`benchmarks/README.md`](benchmarks/README.md) for all scenarios, raw
 measurements, and the reproduction command.

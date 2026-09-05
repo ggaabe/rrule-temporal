@@ -1,10 +1,21 @@
 # Changelog
 
-## Unreleased
+## 2.2.4 (2026-09-05)
 
+- Accelerated UTC `MONTHLY` and `YEARLY` generation by selecting calendar days,
+  time slots, and `BYSETPOS` ranks numerically before constructing occurrences.
+  Targeted local polyfill benchmarks against v2.2.3 measured 5.37-67.75x gains
+  for the selected monthly/yearly shapes; callback generation remains lazy.
+- Kept simple UTC generators on their fast paths when `RDATE`/`EXDATE` are
+  present, preserving recurrence-set ordering. The selected DAILY and SECONDLY
+  exception benchmarks improved by 5.06x and 1.93x respectively.
 - Fixed calendar recurrences keeping a shifted wall time after a daylight-saving
-  gap when time fields are inherited from `DTSTART` (#136). Later occurrences
-  restore the original time, including queries that begin on the gap occurrence.
+  gap when time fields are inherited from `DTSTART` (#136, #137). Later occurrences
+  restore the original time, including queries after consecutive gap occurrences
+  and half-hour timezone transitions. Thanks to @timgit for the original fix.
+- Avoided redundant time conversions in the DST fix and added regression coverage
+  for generation, queries, intervals, exceptions, and subsecond precision. All
+  1,167 tests pass on both Temporal backends and CI's Node 20, 24, and 26 matrix.
 
 ## 2.2.3 (2026-09-03)
 

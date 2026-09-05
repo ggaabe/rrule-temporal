@@ -69,25 +69,27 @@ npm run profile:temporal -- --scenario monthly_last_weekday_240 --tzid UTC --ite
 
 ## Latest Results
 
-### UTC generation improvements (unreleased)
+### UTC generation improvements (v2.2.4)
 
 Measured September 5, 2026 on an Apple M2 Max with Node 25.2.1 and the
 bundled Temporal polyfill, comparing a build of `v2.2.3` (`474c88c`) with the
-working-tree implementation. These are uncached `all()` calls: seven samples
-of at least 300 ms after a 200 ms warmup, alternating baseline/candidate order
-each sample. Rule construction is outside the timings. Every scenario's complete
-result was compared against the baseline before timing.
+v2.2.4 implementation after the DST fix (`0274381`). These are uncached
+`all()` calls: seven samples of at least 300 ms after a 200 ms warmup,
+alternating baseline/candidate order each sample. Rule construction is outside
+the timings. Every scenario's complete result was compared against the baseline
+before timing. These are local medians; sample ranges are recorded with the raw
+results, and timings vary with machine load.
 
-| UTC scenario | v2.2.3 | Unreleased | Speedup |
+| UTC scenario | v2.2.3 | v2.2.4 | Speedup |
 | --- | ---: | ---: | ---: |
-| YEARLY last weekday, COUNT 1,000 | 1,413.491 ms | 22.500 ms | 62.82x |
-| YEARLY quarterly months / two month days, COUNT 1,000 | 18.116 ms | 1.505 ms | 12.04x |
-| MONTHLY weekdays / four time slots, COUNT 1,000 | 5.478 ms | 1.050 ms | 5.22x |
-| MONTHLY first/last weekday time slots, COUNT 240 | 15.748 ms | 0.793 ms | 19.86x |
-| YEARLY dense time slots, BYSETPOS=1,-1, COUNT 2 | 1.544 ms | 0.024 ms | 64.95x |
-| DAILY RDATE/EXDATE, COUNT 1,000 | 3.134 ms | 0.621 ms | 5.05x |
-| SECONDLY RDATE/EXDATE, COUNT 3,600 | 4.451 ms | 2.309 ms | 1.93x |
-| YEARLY last weekday, callback stops after 3 | 5.457 ms | 0.089 ms | 61.12x |
+| YEARLY last weekday, COUNT 1,000 | 1,866.627 ms | 27.755 ms | 67.25x |
+| YEARLY quarterly months / two month days, COUNT 1,000 | 22.255 ms | 2.046 ms | 10.88x |
+| MONTHLY weekdays / four time slots, COUNT 1,000 | 6.402 ms | 1.192 ms | 5.37x |
+| MONTHLY first/last weekday time slots, COUNT 240 | 20.788 ms | 0.825 ms | 25.20x |
+| YEARLY dense time slots, BYSETPOS=1,-1, COUNT 2 | 1.903 ms | 0.028 ms | 67.75x |
+| DAILY RDATE/EXDATE, COUNT 1,000 | 3.645 ms | 0.720 ms | 5.06x |
+| SECONDLY RDATE/EXDATE, COUNT 3,600 | 4.731 ms | 2.450 ms | 1.93x |
+| YEARLY last weekday, callback stops after 3 | 5.474 ms | 0.093 ms | 58.88x |
 
 UTC monthly/yearly generation now selects calendar days and BYSETPOS ranks
 using integers, then constructs only the Temporal candidates that the visitor
@@ -96,22 +98,23 @@ generators when RDATE/EXDATE are present; exceptions are applied afterward in
 recurrence-set order. Unsupported shapes retain the general engine, including
 expanded exception rules whose iteration limits differ.
 
-The initial 20 UTC/Chicago full-generation controls and 13 query benchmarks
-were broadly unchanged; the largest measured slowdown in that sweep was about
-4%. Follow-up measurements did not reproduce a consistent named-zone
-regression. The full 1,138-test suite passed on Node 25.2.1 with the polyfill
-and Node 26.7.0 with native Temporal. These timings use the polyfill only.
+The release passed all 1,167 tests on both Temporal backends, plus CI on
+Node 20, 24, and 26. The timings above use the polyfill only. The general
+calendar engine now restores DTSTART's time after DST gaps; this has a cost
+in fallback cases. The Chicago DAILY exception control measured 3.960 ms
+for v2.2.3 and 4.840 ms for v2.2.4, about 22% slower in this run.
 
 The dense YEARLY case has over 22 million possible date/time combinations;
 only its two selected candidates are constructed. Candidate-budget accounting
 still includes the same logical forward/reverse visits as the general engine.
 The callback case also remains lazy and stops before generating the remaining
-years. The named-zone exception experiment was left out because transition-table
-setup made one-shot calls slower; its control remains in the harness.
+years.
 
-[Raw measurements](results/utc-2026-09-05.json) include medians, sample ranges,
-and first-call timings. First-call timings exclude construction and are single
-observations, so warmed medians are the repeatable comparison above.
+[Release measurements](results/utc-v2.2.4-2026-09-05.json) include medians,
+sample ranges, first-call timings, and the exact source hash. First-call timings
+exclude construction and are single observations, so warmed medians are the
+repeatable comparison above. The [initial UTC measurements](results/utc-2026-09-05.json)
+are retained separately; they preceded the DST fix.
 
 Build the baseline checkout first, then run from the repository root:
 
@@ -123,15 +126,16 @@ Omit `--suite=targeted` to include the 20 existing full-generation controls.
 Use `--filter=yearly` to select scenario IDs containing a substring, or
 `--package-root=/absolute/path/to/candidate` to compare another candidate build.
 
-### Regression follow-up
+### Earlier UTC-only regression follow-up
 
-A follow-up on September 5 checked the small timing differences against the
-same v2.2.3 build and unchanged candidate source. Fifteen alternating pairs of
+Before the DST fix, a follow-up on September 5 checked small timing differences
+against v2.2.3 and the UTC optimization at `5696658`. These historical controls
+do not include the subsequent DST changes in v2.2.4. Fifteen alternating pairs of
 fresh Node 25.2.1 processes were used per scenario, so neither implementation
 could pre-warm the other's Intl, Temporal, or timezone state. Complete outputs
 matched in every pair. Medians for the first `all()` call were:
 
-| Scenario | v2.2.3 | Unreleased |
+| Scenario | v2.2.3 | `5696658` (before DST fix) |
 | --- | ---: | ---: |
 | Chicago DAILY, COUNT 30 | 2.428 ms | 2.422 ms |
 | Chicago weekdays, COUNT 520 | 6.925 ms | 6.907 ms |
