@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed calendar recurrences keeping a shifted wall time after a daylight-saving
+  gap when time fields are inherited from `DTSTART` (#136). Later occurrences
+  restore the original time, including queries that begin on the gap occurrence.
+
 ## 2.2.3 (2026-09-03)
 
 - Added conservative numeric rank/select plans for Gregorian `YEARLY` rules
