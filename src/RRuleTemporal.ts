@@ -1067,8 +1067,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return {evaluated: 0, seenOccurrences: new Set<bigint>()};
   }
 
-  private recordCandidateEvaluation(work: CandidateWorkBudget): void {
-    work.evaluated += 1;
+  private recordCandidateEvaluation(work: CandidateWorkBudget, count = 1): void {
+    work.evaluated += count;
     if (work.evaluated > this.maxCandidateEvaluations) {
       throw new Error(`Maximum candidate evaluations (${this.maxCandidateEvaluations}) exceeded in all()`);
     }
@@ -1255,6 +1255,98 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       if (notBefore && Temporal.ZonedDateTime.compare(candidate, notBefore) < 0) continue;
       if (notAfter && Temporal.ZonedDateTime.compare(candidate, notAfter) > 0) continue;
       if (!visit(candidate)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * In UTC, calendar days and sorted time slots form an ordered Cartesian
+   * product. Select positions and clip query bounds on integers, constructing
+   * Temporal values only for the candidates the visitor actually consumes.
+   * Keep the general visitor's work accounting, including both BYSETPOS passes.
+   */
+  private visitUtcPeriodCandidates(
+    sample: Temporal.ZonedDateTime,
+    visit: (candidate: Temporal.ZonedDateTime) => boolean,
+    notBefore: Temporal.ZonedDateTime | undefined,
+    notAfter: Temporal.ZonedDateTime | undefined,
+    work: CandidateWorkBudget,
+  ): boolean | null {
+    const slots = this.timeSlotOffsetsMs;
+    if (
+      this.tzid !== 'UTC' ||
+      sample.timeZoneId !== 'UTC' ||
+      !['iso8601', 'gregory'].includes(sample.calendarId) ||
+      this.opts.rscale !== undefined ||
+      this.opts.byYearDay ||
+      this.opts.byWeekNo ||
+      this.opts.byMonth?.some((month) => typeof month !== 'number') ||
+      !slots?.length ||
+      !this.hasUniqueTimeSlotOffsets ||
+      !Number.isSafeInteger(this.opts.interval) ||
+      sample.year <= -271_821 ||
+      sample.year >= 275_760
+    ) {
+      return null;
+    }
+    // Reuse only the date-expanded Gregorian shapes shared with the numeric
+    // query planner. Other frequencies and ordinal intersections stay general.
+    if (!(this.opts.byDay || this.opts.byMonthDay)) return null;
+    let days: number[];
+    if (this.opts.freq === 'MONTHLY') {
+      const monthStart = gregorianEpochDay(sample.year, sample.month, 1);
+      days = this.generateMonthlyOccurrenceDaysUtc(sample.year, sample.month).map((day) => monthStart + day - 1);
+    } else if (this.opts.freq === 'YEARLY') {
+      if (
+        this.hasOrdinalByDay &&
+        !this.numericByMonths?.length &&
+        (this.opts.byMonthDay || this.parsedByDayTokens?.some((token) => token.ord === 0 || Math.abs(token.ord) > 52))
+      ) {
+        return null;
+      }
+      days = this.generateYearlyOccurrenceDaysUtc(sample.year);
+    } else {
+      return null;
+    }
+
+    const size = days.length * slots.length;
+    const select = (index: number): number =>
+      days[Math.floor(index / slots.length)]! * MS_PER_DAY + slots[index % slots.length]!;
+    const lowerBound = (target: number): number => {
+      let low = 0;
+      let high = size;
+      while (low < high) {
+        const middle = low + Math.floor((high - low) / 2);
+        if (select(middle) < target) low = middle + 1;
+        else high = middle;
+      }
+      return low;
+    };
+    const first = notBefore ? lowerBound(Number(ceilDivBigInt(notBefore.epochNanoseconds, NS_PER_MILLISECOND))) : 0;
+    const end = notAfter ? lowerBound(Number(floorDivBigInt(notAfter.epochNanoseconds, NS_PER_MILLISECOND)) + 1) : size;
+    const emit = (index: number): boolean =>
+      visit(new Temporal.ZonedDateTime(BigInt(select(index)) * NS_PER_MILLISECOND, 'UTC', sample.calendarId));
+
+    const positions = this.opts.bySetPos;
+    if (positions?.length) {
+      let positiveLimit = 0;
+      let negativeLimit = 0;
+      const selected = new Set<number>();
+      for (const position of positions) {
+        if (position > 0) positiveLimit = Math.max(positiveLimit, position);
+        else negativeLimit = Math.max(negativeLimit, -position);
+        const index = position > 0 ? position - 1 : size + position;
+        if (index >= 0 && index < size) selected.add(index);
+      }
+      this.recordCandidateEvaluation(work, Math.min(size, positiveLimit) + Math.min(size, negativeLimit));
+      for (const index of [...selected].sort((left, right) => left - right)) {
+        if (index >= first && index < end && !emit(index)) return false;
+      }
+    } else {
+      for (let index = first; index < end; index++) {
+        this.recordCandidateEvaluation(work);
+        if (!emit(index)) return false;
+      }
     }
     return true;
   }
@@ -1914,7 +2006,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   private canUseUtcLinearFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
-    if (iterator || this.tzid !== 'UTC' || this.opts.rscale || this.opts.rDate || this.opts.exDate) {
+    if (iterator || this.tzid !== 'UTC' || this.opts.rscale) {
+      return false;
+    }
+    if (
+      (this.opts.rDate || this.opts.exDate) &&
+      (this.originalDtstart.timeZoneId !== this.tzid ||
+        this.originalDtstart.calendarId !== 'iso8601' ||
+        this.opts.byHour ||
+        this.opts.byMinute ||
+        this.opts.bySecond)
+    ) {
       return false;
     }
 
@@ -2400,14 +2502,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   /**
-   * Build one Gregorian recurrence year's wall-clock occurrences as as-if-UTC
-   * epoch milliseconds. This deliberately covers the common YEARLY shapes
+   * Build one Gregorian recurrence year's matching epoch days, without time
+   * expansion. This deliberately covers the common YEARLY shapes
    * whose calendar membership repeats on the 400-year Gregorian cycle.
    */
-  private generateYearlyOccurrenceEpochsUtc(year: number, applyBySetPos = true): number[] {
-    const timeSlotOffsets = this.timeSlotOffsetsMs;
-    if (!timeSlotOffsets?.length) return [];
-
+  private generateYearlyOccurrenceDaysUtc(year: number): number[] {
     const hasDateExpansion = Boolean(this.opts.byDay || this.opts.byMonthDay);
     const byMonthOnly = Boolean(this.numericByMonths?.length) && !hasDateExpansion;
     const months = this.numericByMonths?.length
@@ -2458,9 +2557,15 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       }
     }
 
+    return calendarDays.map(({month, day}) => gregorianEpochDay(year, month, day));
+  }
+
+  private generateYearlyOccurrenceEpochsUtc(year: number, applyBySetPos = true): number[] {
+    const timeSlotOffsets = this.timeSlotOffsetsMs;
+    if (!timeSlotOffsets?.length) return [];
     const walls: number[] = [];
-    for (const {month, day} of calendarDays) {
-      const dayStartMilliseconds = gregorianEpochDay(year, month, day) * MS_PER_DAY;
+    for (const epochDay of this.generateYearlyOccurrenceDaysUtc(year)) {
+      const dayStartMilliseconds = epochDay * MS_PER_DAY;
       if (!isSafeTemporalEpochMilliseconds(dayStartMilliseconds)) return [];
       for (const timeSlotOffset of timeSlotOffsets) {
         walls.push(dayStartMilliseconds + timeSlotOffset);
@@ -3810,13 +3915,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
       }
 
-      const completed = this.visitPeriodCandidates(
-        this.generateMonthlyDateCandidates(monthCursor),
-        (candidate) => this.processOccurrence(candidate, dates, start, iterator, undefined, work),
-        queryLowerBound ?? start,
-        this.opts.until,
-        work,
-      );
+      const visit = (candidate: Temporal.ZonedDateTime) =>
+        this.processOccurrence(candidate, dates, start, iterator, undefined, work);
+      const completed =
+        this.visitUtcPeriodCandidates(monthCursor, visit, queryLowerBound ?? start, this.opts.until, work) ??
+        this.visitPeriodCandidates(
+          this.generateMonthlyDateCandidates(monthCursor),
+          visit,
+          queryLowerBound ?? start,
+          this.opts.until,
+          work,
+        );
       if (!completed) break;
       try {
         monthCursor = monthCursor.add({months: this.opts.interval!});
@@ -4036,14 +4145,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         throw new Error(`Maximum iterations (${this.maxIterations}) exceeded in all()`);
       }
 
-      const dateCandidates = this.generateYearlyDateCandidates(yearCursor);
-      const completed = this.visitPeriodCandidates(
-        dateCandidates,
-        (candidate) => this.processOccurrence(candidate, dates, start, iterator, undefined, work),
-        queryLowerBound ?? start,
-        this.opts.until,
-        work,
-      );
+      const visit = (candidate: Temporal.ZonedDateTime) =>
+        this.processOccurrence(candidate, dates, start, iterator, undefined, work);
+      const completed =
+        this.visitUtcPeriodCandidates(yearCursor, visit, queryLowerBound ?? start, this.opts.until, work) ??
+        this.visitPeriodCandidates(
+          this.generateYearlyDateCandidates(yearCursor),
+          visit,
+          queryLowerBound ?? start,
+          this.opts.until,
+          work,
+        );
       if (!completed) break;
 
       const interval = this.opts.freq === 'WEEKLY' ? 1 : this.opts.interval!;
@@ -4399,7 +4511,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
     const utcFastPathDates = this.allUtcFastPath(iterator);
     if (utcFastPathDates) {
-      return utcFastPathDates;
+      return this.opts.rDate || this.opts.exDate
+        ? this.applyCountLimitAndMergeRDates(utcFastPathDates)
+        : utcFastPathDates;
     }
 
     const tzFastPathDates = this.allTzEpochFastPath(iterator);

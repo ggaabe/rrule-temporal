@@ -305,6 +305,39 @@ Notes
 
 ## Benchmarks
 
+### UTC generation improvements (unreleased)
+
+Measured September 5, 2026 on an Apple M2 Max with Node 25.2.1 and the
+bundled Temporal polyfill, comparing a build of `v2.2.3` (`474c88c`) with the
+working-tree implementation. These are uncached `all()` calls: seven samples
+of at least 300 ms after a 200 ms warmup, alternating baseline/candidate order
+each sample. Rule construction is outside the timings. Every scenario's complete
+result was compared against the baseline before timing.
+
+| UTC scenario | v2.2.3 | Unreleased | Speedup |
+| --- | ---: | ---: | ---: |
+| YEARLY last weekday, COUNT 1,000 | 1,413.491 ms | 22.500 ms | 62.82x |
+| YEARLY quarterly months / two month days, COUNT 1,000 | 18.116 ms | 1.505 ms | 12.04x |
+| MONTHLY weekdays / four time slots, COUNT 1,000 | 5.478 ms | 1.050 ms | 5.22x |
+| MONTHLY first/last weekday time slots, COUNT 240 | 15.748 ms | 0.793 ms | 19.86x |
+| DAILY RDATE/EXDATE, COUNT 1,000 | 3.134 ms | 0.621 ms | 5.05x |
+
+UTC monthly/yearly generation now selects calendar days and BYSETPOS ranks
+using integers, then constructs only the Temporal candidates that the visitor
+consumes. Simple UTC DAILY/HOURLY/MINUTELY/SECONDLY rules retain their fast
+generators when RDATE/EXDATE are present; exceptions are applied afterward in
+recurrence-set order. Unsupported shapes retain the general engine, including
+expanded exception rules whose iteration limits differ.
+
+The initial 20 UTC/Chicago full-generation controls and 13 query benchmarks
+were broadly unchanged; the largest measured slowdown in that sweep was about
+4%. Follow-up measurements did not reproduce a consistent named-zone
+regression. The full 1,138-test suite passed on Node 25.2.1 with the polyfill
+and Node 26.7.0 with native Temporal. These timings use the polyfill only.
+
+See [`benchmarks/README.md`](benchmarks/README.md) for all scenarios, raw
+measurements, and the reproduction command.
+
 ### COUNT-bound queries
 
 Measured September 3, 2026 on a MacBook Pro M2 Max with Node 25.2.1,

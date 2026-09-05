@@ -12,7 +12,11 @@
     "prebenchmark:query:quick": "npm --prefix .. run build",
     "benchmark:query:quick": "node query.mjs --warmup-ms=50 --sample-ms=75 --samples=3",
     "preprofile:temporal": "npm --prefix .. run build",
-    "profile:temporal": "node profile-temporal.mjs"
+    "profile:temporal": "node profile-temporal.mjs",
+    "prebenchmark:utc": "npm --prefix .. run build",
+    "benchmark:utc": "node utc.mjs",
+    "prebenchmark:cold": "npm --prefix .. run build",
+    "benchmark:cold": "node cold.mjs"
   },
   "dependencies": {
     "rrule": "^2.8.1",

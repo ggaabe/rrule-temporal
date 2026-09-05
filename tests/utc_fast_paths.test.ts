@@ -91,10 +91,10 @@ RRULE:FREQ=DAILY;INTERVAL=2;BYDAY=MO,WE,FR;BYHOUR=9,17;BYMINUTE=0,30;COUNT=7`.tr
         dtstart: Temporal.ZonedDateTime.from(`2025-01-01T00:00:00[${timeZone}]`),
         cache: false,
       });
-      const forcedGeneralRule = fastEligibleRule.with({exDate: []});
+      const forcedGeneralRule = fastEligibleRule.with({cache: false});
 
       expect(fastEligibleRule.all().map((date) => date.toString())).toEqual(
-        forcedGeneralRule.all().map((date) => date.toString()),
+        forcedGeneralRule.all(() => true).map((date) => date.toString()),
       );
     }
   });
