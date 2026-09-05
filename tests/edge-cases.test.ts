@@ -540,6 +540,59 @@ describe('DST timezones and repeat', () => {
       '2025-10-12T11:00:00.000Z',
     ]);
   });
+
+  // Advancing across a spring-forward gap moves the wall time (02:30 does not exist on the day
+  // Europe/Berlin loses an hour, and `compatible` disambiguation resolves it to 03:30). The time of
+  // day comes from DTSTART when no BYHOUR/BYMINUTE is given (RFC 5545 3.3.10), so the occurrences
+  // after the transition go back to 02:30 rather than keeping the shifted time.
+  it('should not carry a spring-forward shift into later occurrences (DAILY, time from DTSTART)', () => {
+    const tz = 'Europe/Berlin';
+    const rule = `DTSTART;TZID=${tz}:20260327T023000\nRRULE:FREQ=DAILY;COUNT=5`;
+    assertDates({rule: parse(rule), print: format(tz)}, [
+      '2026-03-27T02:30:00+01:00[Europe/Berlin]',
+      '2026-03-28T02:30:00+01:00[Europe/Berlin]',
+      // 02:30 does not exist on the 29th, so this one occurrence shifts
+      '2026-03-29T03:30:00+02:00[Europe/Berlin]',
+      '2026-03-30T02:30:00+02:00[Europe/Berlin]',
+      '2026-03-31T02:30:00+02:00[Europe/Berlin]',
+    ]);
+    assertDates({rule: parse(rule)}, [
+      '2026-03-27T01:30:00.000Z',
+      '2026-03-28T01:30:00.000Z',
+      '2026-03-29T01:30:00.000Z',
+      '2026-03-30T00:30:00.000Z',
+      '2026-03-31T00:30:00.000Z',
+    ]);
+  });
+
+  it('should give the same occurrences whether the time comes from DTSTART or from BYHOUR/BYMINUTE', () => {
+    const tz = 'Europe/Berlin';
+    const implicit = parse(`DTSTART;TZID=${tz}:20260327T023000\nRRULE:FREQ=DAILY;COUNT=5`);
+    const explicit = parse(`DTSTART;TZID=${tz}:20260327T023000\nRRULE:FREQ=DAILY;BYHOUR=2;BYMINUTE=30;COUNT=5`);
+    expect(implicit.all().map(format(tz))).toEqual(explicit.all().map(format(tz)));
+  });
+
+  it('should not carry a spring-forward shift into later years (YEARLY, time from DTSTART)', () => {
+    const tz = 'Europe/Berlin';
+    const rule = `DTSTART;TZID=${tz}:20250329T023000\nRRULE:FREQ=YEARLY;COUNT=3`;
+    assertDates({rule: parse(rule), print: format(tz)}, [
+      '2025-03-29T02:30:00+01:00[Europe/Berlin]',
+      // 2026-03-29 is the transition day in Berlin, so this occurrence shifts
+      '2026-03-29T03:30:00+02:00[Europe/Berlin]',
+      '2027-03-29T02:30:00+02:00[Europe/Berlin]',
+    ]);
+  });
+
+  it('should keep the earlier instant of a repeated hour on fall-back (DAILY, time from DTSTART)', () => {
+    const tz = 'Europe/Berlin';
+    const rule = `DTSTART;TZID=${tz}:20261024T023000\nRRULE:FREQ=DAILY;COUNT=3`;
+    assertDates({rule: parse(rule), print: format(tz)}, [
+      '2026-10-24T02:30:00+02:00[Europe/Berlin]',
+      // 02:30 happens twice on the 25th; the first one is the occurrence
+      '2026-10-25T02:30:00+02:00[Europe/Berlin]',
+      '2026-10-26T02:30:00+01:00[Europe/Berlin]',
+    ]);
+  });
 });
 
 describe('includeDtstart option', () => {

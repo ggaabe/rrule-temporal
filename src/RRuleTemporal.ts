@@ -1499,13 +1499,38 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return this.applyTimeOverride(this.rawAdvance(zdt));
   }
 
+  /**
+   * Re-asserts the time of day an occurrence is supposed to have.
+   *
+   * A BYxxx part wins where one is given. Where none is, RFC 5545 3.3.10 takes the value from
+   * DTSTART, so that is what gets restored here -- the same fallback the candidate generators
+   * already apply (`this.opts.byHour ?? [this.originalDtstart.hour]`).
+   *
+   * Restoring it matters because advancing a cursor across a spring-forward gap moves the wall
+   * time: 02:30 + 1 day lands on a time that does not exist and `compatible` disambiguation
+   * resolves it to 03:30. Without re-asserting DTSTART's time, that shifted time is what the next
+   * advance builds on, so every later occurrence in the series keeps it.
+   *
+   * Only fields the frequency does not own are pinned: HOURLY advances the hour, MINUTELY the
+   * minute, SECONDLY the second, so those are left alone.
+   */
   private applyTimeOverride(zdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-    const {byHour, byMinute, bySecond} = this.opts;
-    if (!byHour && !byMinute && !bySecond) return zdt;
+    const {freq, byHour, byMinute, bySecond} = this.opts;
+    // Only frequencies that repeat a fixed time of day take it from DTSTART. HOURLY, MINUTELY and
+    // SECONDLY advance within the day, so their time fields are the iteration's own business.
+    const dtstartTime = freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY';
+    if (!byHour && !byMinute && !bySecond && !dtstartTime) return zdt;
+
     const fields: {hour?: number; minute?: number; second?: number} = {};
     if (byHour) fields.hour = byHour[0];
+    else if (dtstartTime) fields.hour = this.originalDtstart.hour;
+
     if (byMinute) fields.minute = byMinute[0];
+    else if (dtstartTime) fields.minute = this.originalDtstart.minute;
+
     if (bySecond) fields.second = bySecond[0];
+    else if (dtstartTime) fields.second = this.originalDtstart.second;
+
     return zdt.with(fields);
   }
 
