@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.5 (2026-09-12)
 
 - Fixed `previous()` skipping RRULE occurrences when an earlier `RDATE` ended
   its aligned search prematurely (#138). Rule occurrences and explicit dates
@@ -11,6 +11,9 @@
 - Preserved the DTSTART calendar in `previous()` search anchors, including
   when UNTIL uses another calendar or time zone, to avoid calendar mismatch
   errors for non-ISO recurrences.
+- Added 39 regression cases covering recurrence-set boundaries, exclusions,
+  COUNT/UNTIL, BYSETPOS, DST transitions, calendars, nanosecond precision, and
+  distant live or expired rules. All 1,218 tests pass on Node 20, 24, and 26.
 
 ## 2.2.4 (2026-09-05)
 
