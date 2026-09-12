@@ -5387,6 +5387,51 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return this.toPublicDate(numericResult.value);
     }
 
+    let rDate: Temporal.ZonedDateTime | null = null;
+    if (this.opts.rDate?.length) {
+      const rDateIndex = this.numericRDateLowerBound(beforeEpochNanoseconds, inc) - 1;
+      rDate = rDateIndex >= 0 ? this.getNumericRDates()[rDateIndex]! : null;
+    }
+    const ruleCandidate = this.previousFromRule(beforeEpochNanoseconds, inc, rDate?.epochNanoseconds);
+
+    // The rule half and the RDATE half are composed here rather than scanned together, the
+    // way tryNumericPrevious() composes them: whichever of the two is later is the answer.
+    if (!ruleCandidate) {
+      return this.toPublicDate(rDate);
+    }
+    if (rDate && rDate.epochNanoseconds > ruleCandidate.epochNanoseconds) {
+      return this.toPublicDate(rDate);
+    }
+    return this.toPublicDate(ruleCandidate);
+  }
+
+  /**
+   * The latest occurrence of the RRULE itself at or before the target, with explicit RDATEs
+   * held out of the scan.
+   *
+   * They have to be held out. The scan does not start from DTSTART: it starts from a
+   * phase-aligned dtstart near the target and walks forward, so the occurrences between the
+   * real DTSTART and that anchor are never generated. An RDATE is an absolute instant rather
+   * than a phase, so iterateRecurrenceSet() flushes any that predate the anchor into the same
+   * pass, and this scan keeps the last date it is handed. That leaves the last flushed RDATE
+   * standing in for a rule occurrence the aligned scan never produced -- and because the scan
+   * then has a non-null answer, the backoff loop below returns it instead of widening the
+   * window to look for the real one. previous() merges the RDATEs back in afterwards.
+   */
+  private previousFromRule(
+    beforeEpochNanoseconds: bigint,
+    inc: boolean,
+    rDateEpochNanoseconds?: bigint,
+  ): Temporal.ZonedDateTime | null {
+    const base: RRuleTemporal<TOutput> =
+      this.opts.rDate && this.opts.rDate.length > 0
+        ? new RRuleTemporal<TOutput>({
+            ...this.opts,
+            temporal: this.outputTemporal,
+            rDate: undefined,
+          } as RRuleOptions<TOutput>)
+        : this;
+
     const scanFrom = (rule: RRuleTemporal<TOutput>): Temporal.ZonedDateTime | null => {
       let prev: Temporal.ZonedDateTime | null = null;
       rule.allInternal((occ) => {
@@ -5401,26 +5446,39 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     };
 
     // COUNT rules must enumerate from the true DTSTART (see next()).
-    if (this.opts.count !== undefined) {
-      return this.toPublicDate(scanFrom(this));
+    if (base.opts.count !== undefined) {
+      return scanFrom(base);
     }
 
     // Scan forward from a phase-aligned start near the target, backing the
     // start off exponentially until an occurrence before the target is found
     // (or the original DTSTART is reached, meaning there is none).
-    const beforeZdt = new Temporal.ZonedDateTime(beforeEpochNanoseconds, this.tzid);
-    const anchor =
-      this.opts.until && Temporal.ZonedDateTime.compare(this.opts.until, beforeZdt) < 0 ? this.opts.until : beforeZdt;
-    const interval = this.opts.interval ?? 1;
+    // Calendar arithmetic must use DTSTART's calendar, even when the query or
+    // UNTIL was supplied in a different calendar or time zone.
+    const untilEpochNanoseconds = base.opts.until?.epochNanoseconds;
+    const anchor = new Temporal.ZonedDateTime(
+      untilEpochNanoseconds !== undefined && untilEpochNanoseconds < beforeEpochNanoseconds
+        ? untilEpochNanoseconds
+        : beforeEpochNanoseconds,
+      base.tzid,
+      base.originalDtstart.calendarId,
+    );
+    const interval = base.opts.interval ?? 1;
     for (let backoff = 0; backoff < 16; backoff++) {
-      const target = backoff === 0 ? anchor : anchor.subtract(this.freqDuration(interval * 4 ** backoff));
-      const rule = this.ruleFromAlignedDtstart(target);
+      let target = backoff === 0 ? anchor : anchor.subtract(base.freqDuration(interval * 4 ** backoff));
+      // Once this instant is covered, older RRULE occurrences cannot beat the
+      // eligible RDATE. Clamping also avoids replaying dense, irrelevant history.
+      const reachedRDate = rDateEpochNanoseconds !== undefined && target.epochNanoseconds <= rDateEpochNanoseconds;
+      if (reachedRDate) {
+        target = new Temporal.ZonedDateTime(rDateEpochNanoseconds, base.tzid, base.originalDtstart.calendarId);
+      }
+      const rule = base.ruleFromAlignedDtstart(target);
       const prev = scanFrom(rule);
-      if (prev || rule === this) {
-        return this.toPublicDate(prev);
+      if (prev || rule === base || reachedRDate) {
+        return prev;
       }
     }
-    return this.toPublicDate(scanFrom(this));
+    return scanFrom(base);
   }
 
   /** A duration of `count` steps in this rule's frequency unit. */

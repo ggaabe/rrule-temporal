@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Fixed `previous()` skipping RRULE occurrences when an earlier `RDATE` ended
+  its aligned search prematurely (#138). Rule occurrences and explicit dates
+  are now resolved separately, preserving exclusions, query bounds, and
+  distant-query performance. Thanks to @timgit for the report and original fix.
+- Bounded the backward search by the latest eligible RDATE so sparse rules do
+  not replay older dense periods when an explicit date already wins.
+- Preserved the DTSTART calendar in `previous()` search anchors, including
+  when UNTIL uses another calendar or time zone, to avoid calendar mismatch
+  errors for non-ISO recurrences.
+
 ## 2.2.4 (2026-09-05)
 
 - Accelerated UTC `MONTHLY` and `YEARLY` generation by selecting calendar days,
