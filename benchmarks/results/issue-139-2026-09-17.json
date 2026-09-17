@@ -1,0 +1,562 @@
+{
+  "date": "2026-09-17",
+  "baseline": "npm rrule-temporal@2.2.5 (e985535)",
+  "benchmarkRuntime": "Node 25.2.1 / bundled polyfill",
+  "hardware": "Apple M2 Max",
+  "fullSuite": {
+    "tests": 1260,
+    "files": 55,
+    "nodes": [
+      "20.20.2",
+      "24.20.0",
+      "26.7.0"
+    ]
+  },
+  "windowFuzz": [
+    {
+      "seed": 139,
+      "casesPerFrequency": 600,
+      "totalRules": 4200,
+      "checks": 151200,
+      "mismatches": 0,
+      "runtime": "Node 26.7.0 / native Temporal"
+    },
+    {
+      "seed": 99139,
+      "casesPerFrequency": 400,
+      "totalRules": 2800,
+      "checks": 100800,
+      "mismatches": 0,
+      "runtime": "Node 24.20.0 / bundled polyfill"
+    }
+  ],
+  "numericFuzz": {
+    "rules": 600,
+    "seed": "0x6d2b79f5",
+    "runtime": "Node 26.7.0 / native Temporal",
+    "mismatches": 0
+  },
+  "generationBenchmarks": [
+    {
+      "id": "yearly_last_weekday_1000",
+      "count": 1000,
+      "baselineColdMs": 35.130333,
+      "candidateColdMs": 35.963542000000004,
+      "baseline": {
+        "medianMs": 21.759494142857143,
+        "minMs": 20.218661499999996,
+        "maxMs": 25.01653466666666
+      },
+      "candidate": {
+        "medianMs": 21.429285714285715,
+        "minMs": 21.089781249999987,
+        "maxMs": 22.27519057142857
+      },
+      "speedup": 1.0154092130262324
+    },
+    {
+      "id": "yearly_dates_1000",
+      "count": 1000,
+      "baselineColdMs": 2.2495409999999083,
+      "candidateColdMs": 2.1154579999999896,
+      "baseline": {
+        "medianMs": 1.3413753750000004,
+        "minMs": 1.2851036324786325,
+        "maxMs": 1.437999600000001
+      },
+      "candidate": {
+        "medianMs": 1.3444557321428559,
+        "minMs": 1.3276721946902688,
+        "maxMs": 1.3955636574074073
+      },
+      "speedup": 0.997708844501748
+    },
+    {
+      "id": "monthly_slots_1000",
+      "count": 1000,
+      "baselineColdMs": 1.588083000000097,
+      "candidateColdMs": 1.4747090000000753,
+      "baseline": {
+        "medianMs": 0.9272139938271597,
+        "minMs": 0.9143396484848464,
+        "maxMs": 0.9508997911392368
+      },
+      "candidate": {
+        "medianMs": 0.9161831829268322,
+        "minMs": 0.8978960764705869,
+        "maxMs": 0.9475007861635231
+      },
+      "speedup": 1.0120399622104923
+    },
+    {
+      "id": "monthly_slot_positions_240",
+      "count": 240,
+      "baselineColdMs": 1.1619170000003578,
+      "candidateColdMs": 1.3015409999998155,
+      "baseline": {
+        "medianMs": 0.7428011584158439,
+        "minMs": 0.7171275809523779,
+        "maxMs": 0.7835957031250018
+      },
+      "candidate": {
+        "medianMs": 0.728401092233009,
+        "minMs": 0.723349759615386,
+        "maxMs": 0.7522518749999972
+      },
+      "speedup": 1.0197694187122779
+    },
+    {
+      "id": "yearly_dense_positions_2",
+      "count": 2,
+      "baselineColdMs": 0.21170799999981682,
+      "candidateColdMs": 1.776082999999744,
+      "baseline": {
+        "medianMs": 0.02315034722222211,
+        "minMs": 0.022970269943347128,
+        "maxMs": 0.026185518065980046
+      },
+      "candidate": {
+        "medianMs": 0.02304948269025465,
+        "minMs": 0.022380986125615454,
+        "maxMs": 0.02379688166243671
+      },
+      "speedup": 1.0043759998140915
+    },
+    {
+      "id": "daily_exdate_1000",
+      "count": 999,
+      "baselineColdMs": 0.9687080000003334,
+      "candidateColdMs": 1.105082999998558,
+      "baseline": {
+        "medianMs": 0.5294367640845067,
+        "minMs": 0.5253084230769266,
+        "maxMs": 0.565587946428572
+      },
+      "candidate": {
+        "medianMs": 0.5583879685314663,
+        "minMs": 0.5343868612099638,
+        "maxMs": 0.5740225801526752
+      },
+      "speedup": 0.9481521700349312
+    },
+    {
+      "id": "secondly_exdate_3600",
+      "count": 3600,
+      "baselineColdMs": 2.1431250000005093,
+      "candidateColdMs": 1.8654999999998836,
+      "baseline": {
+        "medianMs": 1.9672617564102461,
+        "minMs": 1.9331677435897383,
+        "maxMs": 2.020189389610379
+      },
+      "candidate": {
+        "medianMs": 1.9723961038961026,
+        "minMs": 1.9659859350649405,
+        "maxMs": 2.01554701282051
+      },
+      "speedup": 0.9973968983837909
+    },
+    {
+      "id": "daily_exdate_chicago_1000",
+      "count": 999,
+      "baselineColdMs": 5.437749999999141,
+      "candidateColdMs": 5.232833000000028,
+      "baseline": {
+        "medianMs": 3.3437296222222357,
+        "minMs": 3.2889012826086876,
+        "maxMs": 3.509468999999986
+      },
+      "candidate": {
+        "medianMs": 3.5488892045454206,
+        "minMs": 3.265911239130456,
+        "maxMs": 3.686338414634165
+      },
+      "speedup": 0.9421904797533786
+    },
+    {
+      "id": "yearly_callback_first_3",
+      "count": 3,
+      "baselineColdMs": 0.34479100000135077,
+      "candidateColdMs": 0.25170799999978044,
+      "baseline": {
+        "medianMs": 0.08589653692043436,
+        "minMs": 0.0846639390519195,
+        "maxMs": 0.09686087798579752
+      },
+      "candidate": {
+        "medianMs": 0.0869145903823871,
+        "minMs": 0.08431338932584234,
+        "maxMs": 0.08786924297423898
+      },
+      "speedup": 0.9882867369278998
+    },
+    {
+      "id": "daily_30_America/Chicago",
+      "count": 30,
+      "baselineColdMs": 3.3212500000000063,
+      "candidateColdMs": 5.234791000000001,
+      "baseline": {
+        "medianMs": 0.03061581632653062,
+        "minMs": 0.029032449583897814,
+        "maxMs": 0.03239397538328654
+      },
+      "candidate": {
+        "medianMs": 0.03094817227150816,
+        "minMs": 0.0297546608488695,
+        "maxMs": 0.03256372541784238
+      },
+      "speedup": 0.9892608861660138
+    },
+    {
+      "id": "daily_weekdays_520_America/Chicago",
+      "count": 520,
+      "baselineColdMs": 3.777625000000171,
+      "candidateColdMs": 17.661584000000175,
+      "baseline": {
+        "medianMs": 0.5333443263888884,
+        "minMs": 0.5230770905923332,
+        "maxMs": 0.5451059535714291
+      },
+      "candidate": {
+        "medianMs": 0.5343550887372015,
+        "minMs": 0.5169304123711344,
+        "maxMs": 0.5623509662921347
+      },
+      "speedup": 0.9981084444227868
+    },
+    {
+      "id": "daily_time_slots_1000_America/Chicago",
+      "count": 1000,
+      "baselineColdMs": 7.0262079999997695,
+      "candidateColdMs": 33.00212499999998,
+      "baseline": {
+        "medianMs": 1.044362931034479,
+        "minMs": 1.0249863945578217,
+        "maxMs": 1.0573192464788739
+      },
+      "candidate": {
+        "medianMs": 1.0184470743243224,
+        "minMs": 1.0092785234899309,
+        "maxMs": 1.0665800780141852
+      },
+      "speedup": 1.0254464442615738
+    },
+    {
+      "id": "hourly_720_America/Chicago",
+      "count": 720,
+      "baselineColdMs": 1.0510420000000522,
+      "candidateColdMs": 0.8762079999996786,
+      "baseline": {
+        "medianMs": 0.7425342918660314,
+        "minMs": 0.718917640186914,
+        "maxMs": 0.7700239333333323
+      },
+      "candidate": {
+        "medianMs": 0.7369936666666669,
+        "minMs": 0.6746821748878933,
+        "maxMs": 0.7574032663316583
+      },
+      "speedup": 1.0075178735584311
+    },
+    {
+      "id": "minutely_1440_America/Chicago",
+      "count": 1440,
+      "baselineColdMs": 1.2264589999995223,
+      "candidateColdMs": 1.0747910000000047,
+      "baseline": {
+        "medianMs": 1.3829292844036716,
+        "minMs": 1.2971688189655135,
+        "maxMs": 1.460592233009698
+      },
+      "candidate": {
+        "medianMs": 1.2902699487179459,
+        "minMs": 1.271459042372884,
+        "maxMs": 1.3945192962962918
+      },
+      "speedup": 1.0718139144275933
+    },
+    {
+      "id": "secondly_3600_America/Chicago",
+      "count": 3600,
+      "baselineColdMs": 2.678749999999127,
+      "candidateColdMs": 2.9936670000006416,
+      "baseline": {
+        "medianMs": 3.4202102272727397,
+        "minMs": 3.2693242608695625,
+        "maxMs": 3.49763179069766
+      },
+      "candidate": {
+        "medianMs": 3.4253219772727292,
+        "minMs": 3.305603260869564,
+        "maxMs": 3.461166681818213
+      },
+      "speedup": 0.9985076585401588
+    },
+    {
+      "id": "weekly_mwf_780_America/Chicago",
+      "count": 780,
+      "baselineColdMs": 0.9390419999999722,
+      "candidateColdMs": 0.8419169999997393,
+      "baseline": {
+        "medianMs": 0.8210373442622961,
+        "minMs": 0.7381162156862761,
+        "maxMs": 0.9046458333333314
+      },
+      "candidate": {
+        "medianMs": 0.8776883567251395,
+        "minMs": 0.779370036269434,
+        "maxMs": 0.912036115151513
+      },
+      "speedup": 0.9354542964723589
+    },
+    {
+      "id": "weekly_time_slots_1000_America/Chicago",
+      "count": 1000,
+      "baselineColdMs": 1.5586670000011509,
+      "candidateColdMs": 1.241583000000901,
+      "baseline": {
+        "medianMs": 1.064347128378383,
+        "minMs": 0.975339012987017,
+        "maxMs": 1.0767017857142882
+      },
+      "candidate": {
+        "medianMs": 1.140520220588234,
+        "minMs": 0.9843254379085052,
+        "maxMs": 1.1766552734374898
+      },
+      "speedup": 0.9332119756977529
+    },
+    {
+      "id": "monthly_last_weekday_240_America/Chicago",
+      "count": 240,
+      "baselineColdMs": 12.120374999998603,
+      "candidateColdMs": 69.86633299999994,
+      "baseline": {
+        "medianMs": 0.5961722896825392,
+        "minMs": 0.5873930664062499,
+        "maxMs": 0.6065409959677371
+      },
+      "candidate": {
+        "medianMs": 0.592208661417324,
+        "minMs": 0.579771235521232,
+        "maxMs": 0.6527076086956541
+      },
+      "speedup": 1.0066929589576235
+    },
+    {
+      "id": "monthly_first_last_weekday_480_America/Chicago",
+      "count": 480,
+      "baselineColdMs": 22.998125000000073,
+      "candidateColdMs": 132.45716699999866,
+      "baseline": {
+        "medianMs": 0.8996387245508862,
+        "minMs": 0.8850737705882399,
+        "maxMs": 0.9025840778442957
+      },
+      "candidate": {
+        "medianMs": 0.9058182710843363,
+        "minMs": 0.8886898402366816,
+        "maxMs": 0.9450351194968417
+      },
+      "speedup": 0.9931779400673242
+    }
+  ],
+  "queryBenchmarks": [
+    {
+      "scenario": "SECONDLY next, COUNT 128, rank 63",
+      "baseline": {
+        "firstCall": "789.8 us",
+        "warmMedian": "1.04 us",
+        "warmMin": "1.02 us",
+        "warmMax": "1.13 us"
+      },
+      "candidate": {
+        "firstCall": "549.0 us",
+        "warmMedian": "1.11 us",
+        "warmMin": "1.05 us",
+        "warmMax": "1.23 us"
+      }
+    },
+    {
+      "scenario": "SECONDLY next, COUNT 250k, rank 200k",
+      "baseline": {
+        "firstCall": "90.04 us",
+        "warmMedian": "1.22 us",
+        "warmMin": "1.16 us",
+        "warmMax": "1.65 us"
+      },
+      "candidate": {
+        "firstCall": "90.58 us",
+        "warmMedian": "2.37 us",
+        "warmMin": "1.36 us",
+        "warmMax": "8.00 us"
+      }
+    },
+    {
+      "scenario": "DAILY next, COUNT 9k, rank 8.5k, UTC",
+      "baseline": {
+        "firstCall": "269.6 us",
+        "warmMedian": "1.73 us",
+        "warmMin": "1.69 us",
+        "warmMax": "1.78 us"
+      },
+      "candidate": {
+        "firstCall": "308.2 us",
+        "warmMedian": "1.99 us",
+        "warmMin": "1.77 us",
+        "warmMax": "2.31 us"
+      }
+    },
+    {
+      "scenario": "DAILY previous, COUNT 9k, rank 8.5k, Chicago",
+      "baseline": {
+        "firstCall": "7.56 ms",
+        "warmMedian": "2.16 us",
+        "warmMin": "2.09 us",
+        "warmMax": "2.23 us"
+      },
+      "candidate": {
+        "firstCall": "45.4 ms",
+        "warmMedian": "2.20 us",
+        "warmMin": "2.12 us",
+        "warmMax": "2.25 us"
+      }
+    },
+    {
+      "scenario": "DAILY weekdays next, COUNT 9k, distant, UTC",
+      "baseline": {
+        "firstCall": "67.29 us",
+        "warmMedian": "2.61 us",
+        "warmMin": "1.82 us",
+        "warmMax": "16.27 us"
+      },
+      "candidate": {
+        "firstCall": "67.00 us",
+        "warmMedian": "1.76 us",
+        "warmMin": "1.74 us",
+        "warmMax": "1.78 us"
+      }
+    },
+    {
+      "scenario": "DAILY slots narrow between, COUNT 9k, UTC",
+      "baseline": {
+        "firstCall": "1.10 ms",
+        "warmMedian": "11.80 us",
+        "warmMin": "10.61 us",
+        "warmMax": "13.97 us"
+      },
+      "candidate": {
+        "firstCall": "334.0 us",
+        "warmMedian": "9.83 us",
+        "warmMin": "9.40 us",
+        "warmMax": "10.09 us"
+      }
+    },
+    {
+      "scenario": "WEEKLY M/W/F slots next, COUNT 9k, UTC",
+      "baseline": {
+        "firstCall": "287.1 us",
+        "warmMedian": "1.82 us",
+        "warmMin": "1.76 us",
+        "warmMax": "2.10 us"
+      },
+      "candidate": {
+        "firstCall": "322.1 us",
+        "warmMedian": "1.81 us",
+        "warmMin": "1.79 us",
+        "warmMax": "1.87 us"
+      }
+    },
+    {
+      "scenario": "MONTHLY last weekday next, COUNT 9k, UTC",
+      "baseline": {
+        "firstCall": "8.45 ms",
+        "warmMedian": "21.89 us",
+        "warmMin": "21.78 us",
+        "warmMax": "23.39 us"
+      },
+      "candidate": {
+        "firstCall": "8.71 ms",
+        "warmMedian": "22.03 us",
+        "warmMin": "21.61 us",
+        "warmMax": "22.29 us"
+      }
+    },
+    {
+      "scenario": "MONTHLY last weekday next, COUNT 128, rank 63",
+      "baseline": {
+        "firstCall": "233.1 us",
+        "warmMedian": "12.15 us",
+        "warmMin": "11.94 us",
+        "warmMax": "12.26 us"
+      },
+      "candidate": {
+        "firstCall": "231.5 us",
+        "warmMedian": "12.31 us",
+        "warmMin": "12.22 us",
+        "warmMax": "12.36 us"
+      }
+    },
+    {
+      "scenario": "SECONDLY occursOn, COUNT 100k, first day",
+      "baseline": {
+        "firstCall": "828.0 us",
+        "warmMedian": "7.95 us",
+        "warmMin": "7.65 us",
+        "warmMax": "8.80 us"
+      },
+      "candidate": {
+        "firstCall": "877.4 us",
+        "warmMedian": "8.26 us",
+        "warmMin": "7.61 us",
+        "warmMax": "9.13 us"
+      }
+    },
+    {
+      "scenario": "DAILY RDATE/EXDATE next, COUNT 9k, rank 8.5k",
+      "baseline": {
+        "firstCall": "183.0 us",
+        "warmMedian": "2.25 us",
+        "warmMin": "2.23 us",
+        "warmMax": "2.30 us"
+      },
+      "candidate": {
+        "firstCall": "196.4 us",
+        "warmMedian": "3.18 us",
+        "warmMin": "2.24 us",
+        "warmMax": "12.50 us"
+      }
+    },
+    {
+      "scenario": "YEARLY BYMONTH/BYMONTHDAY next, COUNT 9k, rank 8.5k",
+      "baseline": {
+        "firstCall": "1.72 ms",
+        "warmMedian": "8.02 us",
+        "warmMin": "7.88 us",
+        "warmMax": "8.10 us"
+      },
+      "candidate": {
+        "firstCall": "1.84 ms",
+        "warmMedian": "8.69 us",
+        "warmMin": "8.47 us",
+        "warmMax": "9.08 us"
+      }
+    },
+    {
+      "scenario": "SECONDLY all, COUNT 3.6k, explicit Temporal output",
+      "baseline": {
+        "firstCall": "23.9 ms",
+        "warmMedian": "19.6 ms",
+        "warmMin": "18.7 ms",
+        "warmMax": "20.1 ms"
+      },
+      "candidate": {
+        "firstCall": "25.8 ms",
+        "warmMedian": "20.3 ms",
+        "warmMin": "18.8 ms",
+        "warmMax": "24.5 ms"
+      }
+    }
+  ],
+  "queryBenchmarkNote": "Separate processes; first-call and warm measurements include noise. Both runs validated returned lengths and consumed epoch-nanosecond checksums."
+}

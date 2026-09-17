@@ -1,11 +1,14 @@
+import {Temporal, isNativeTemporal} from './temporal-impl';
+
 const MS_PER_SECOND = 1_000;
 const MS_PER_HOUR = 3_600_000;
 const MS_PER_DAY = 86_400_000;
 
-// Sampling step for discovering offset transitions. Real tzdb offset regimes
-// last multiple weeks at minimum (the shortest in practice are ~4-week
-// Ramadan DST suspensions), so 15-day sampling cannot skip over one.
-const SAMPLE_STEP_MS = 15 * MS_PER_DAY;
+// Probe daily: tzdb includes regimes lasting only a week (Brazil in 2000,
+// Palestine in 2040) and a twelve-day change in Argentina in 2004. Sampling
+// every fifteen days can see the same offset on both sides and miss both
+// transitions. The resulting table still serves integer-only hot lookups.
+const SAMPLE_STEP_MS = MS_PER_DAY;
 // Extra coverage built around requested instants so tables rarely rebuild.
 const COVERAGE_MARGIN_MS = 400 * MS_PER_DAY;
 // A UTC offset can never exceed ±18h (RFC 5545 / Temporal both cap at ±14h in
@@ -119,10 +122,35 @@ export class ZoneOffsetResolver {
       if (newStart < this.coverStart) newStart = Math.min(newStart, newEnd - grownSpan);
       if (newEnd > this.coverEnd) newEnd = Math.max(newEnd, newStart + grownSpan);
     }
-    this.rebuild(newStart, newEnd);
+    // Transition instants are second-aligned. Carrying the requesting
+    // occurrence's milliseconds into the binary search shifts every boundary.
+    this.rebuild(
+      Math.floor(newStart / MS_PER_SECOND) * MS_PER_SECOND,
+      Math.ceil(newEnd / MS_PER_SECOND) * MS_PER_SECOND,
+    );
   }
 
   private rebuild(startMs: number, endMs: number): void {
+    // Native Temporal exposes the timezone database's actual transitions,
+    // avoiding both sampling assumptions and Intl probes across long spans.
+    if (isNativeTemporal) {
+      let cursor = new Temporal.ZonedDateTime(BigInt(startMs) * 1_000_000n, this.tzid);
+      const transitions: number[] = [];
+      const offsets = [cursor.offsetNanoseconds / 1_000_000];
+      while (true) {
+        const next = cursor.getTimeZoneTransition('next');
+        if (!next || next.epochMilliseconds > endMs) break;
+        transitions.push(next.epochMilliseconds);
+        offsets.push(next.offsetNanoseconds / 1_000_000);
+        cursor = next;
+      }
+      this.transitions = transitions;
+      this.offsets = offsets;
+      this.coverStart = startMs;
+      this.coverEnd = endMs;
+      this.covered = true;
+      return;
+    }
     const transitions: number[] = [];
     const offsets: number[] = [this.exactOffsetMs(startMs)];
 

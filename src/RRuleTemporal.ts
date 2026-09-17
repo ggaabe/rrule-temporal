@@ -1088,9 +1088,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     notAfter?: Temporal.ZonedDateTime,
     work: CandidateWorkBudget = this.createCandidateWorkBudget(),
   ): boolean {
-    const hours = this.opts.byHour ?? [base.hour];
-    const minutes = this.opts.byMinute ?? [base.minute];
-    const seconds = this.opts.bySecond ?? [base.second];
+    const hours = this.opts.byHour ?? [this.originalDtstart.hour];
+    const minutes = this.opts.byMinute ?? [this.originalDtstart.minute];
+    const seconds = this.opts.bySecond ?? [this.originalDtstart.second];
 
     if (this.needsSortedTimeFallback(base)) {
       const candidates: Temporal.ZonedDateTime[] = [];
@@ -1099,9 +1099,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           for (const second of seconds) {
             this.recordCandidateEvaluation(work);
             const candidate =
-              hour === base.hour && minute === base.minute && second === base.second
+              base.epochNanoseconds === this.originalDtstart.epochNanoseconds &&
+              hour === base.hour &&
+              minute === base.minute &&
+              second === base.second
                 ? base
-                : base.with({hour, minute, second});
+                : base.with({hour, minute, second}, {offset: 'ignore'});
             if (notBefore && Temporal.ZonedDateTime.compare(candidate, notBefore) < 0) continue;
             if (notAfter && Temporal.ZonedDateTime.compare(candidate, notAfter) > 0) continue;
             candidates.push(candidate);
@@ -1161,8 +1164,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     work: CandidateWorkBudget = this.createCandidateWorkBudget(),
   ): boolean {
     const dates = this.sortedUniqueDateCandidates(dateCandidates);
-    const localNotBefore = notBefore?.withTimeZone(this.tzid);
-    const localNotAfter = notAfter?.withTimeZone(this.tzid);
+    if (!dates.length) return true;
+    // Bounds must use the candidate's local clock, even when an explicit
+    // TZID differs from the zone carried by a manual DTSTART.
+    const sample = dates[0]!;
+    const localNotBefore = notBefore?.withTimeZone(sample.timeZoneId).withCalendar(sample.calendarId);
+    const localNotAfter = notAfter?.withTimeZone(sample.timeZoneId).withCalendar(sample.calendarId);
     const notBeforeDate = localNotBefore?.toPlainDate();
     const notAfterDate = localNotAfter?.toPlainDate();
     const start = direction === 1 ? 0 : dates.length - 1;
@@ -1479,11 +1486,13 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
 
     if (byHour && byHour.length > 1) {
-      const idx = byHour.indexOf(zdt.hour);
-      if (idx !== -1 && idx < byHour.length - 1) {
+      // A gap can resolve a requested hour to one absent from BYHOUR.
+      // Continue with the next slot instead of wrapping the cursor backward.
+      const nextHour = byHour.find((hour) => hour > zdt.hour);
+      if (nextHour !== undefined) {
         // next hour on the same day
         return zdt.with({
-          hour: byHour[idx + 1],
+          hour: nextHour,
           minute: byMinute ? byMinute[0] : zdt.minute,
           second: bySecond ? bySecond[0] : zdt.second,
         });
@@ -1662,11 +1671,15 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         const weekdayTokens = this.opts.byDay
           .map((tok) => extractWeekdayToken(tok))
           .filter((tok): tok is Weekday => tok !== null);
-        if (
-          ['DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY'].includes(this.opts.freq) &&
-          weekdayTokens.length === this.opts.byDay.length
-        ) {
-          deltas = weekdayTokens.map((tok) => (dayMap[tok]! - zdt.dayOfWeek + 7) % 7);
+        if (this.opts.freq === 'DAILY' && weekdayTokens.length === this.opts.byDay.length) {
+          // BYDAY filters the DTSTART/INTERVAL cadence; it must not establish a
+          // new cadence at the next weekday, including on an aligned query clone.
+          const firstStep = this.findFirstMatchingDailyStep(
+            zdt.dayOfWeek,
+            this.opts.interval!,
+            weekdayTokens.map((token) => dayMap[token]!),
+          );
+          deltas = firstStep === null ? [] : [firstStep * this.opts.interval!];
         } else {
           deltas = weekdayTokens.map((wdTok) => (dayMap[wdTok]! - zdt.dayOfWeek + 7) % 7);
         }
@@ -2036,7 +2049,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   private canUseUtcLinearFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
-    if (iterator || this.tzid !== 'UTC' || this.opts.rscale) {
+    if (iterator || !this.canUseUtcCalendarFastPaths() || this.opts.rscale) {
       return false;
     }
     if (
@@ -2074,7 +2087,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private canUseUtcWeeklyFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
     return (
       !iterator &&
-      this.tzid === 'UTC' &&
+      this.canUseUtcCalendarFastPaths() &&
       this.opts.freq === 'WEEKLY' &&
       !this.opts.rscale &&
       !this.opts.rDate &&
@@ -2094,7 +2107,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private canUseUtcMonthlyFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
     return (
       !iterator &&
-      this.tzid === 'UTC' &&
+      this.canUseUtcCalendarFastPaths() &&
       this.opts.freq === 'MONTHLY' &&
       !this.opts.rscale &&
       !this.opts.rDate &&
@@ -2108,11 +2121,19 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   private utcZdtFromEpochNanoseconds(epochNanoseconds: bigint): Temporal.ZonedDateTime {
-    return new Temporal.ZonedDateTime(epochNanoseconds, 'UTC');
+    return new Temporal.ZonedDateTime(epochNanoseconds, 'UTC', this.originalDtstart.calendarId);
   }
 
   private utcZdtFromEpochMilliseconds(epochMilliseconds: number): Temporal.ZonedDateTime {
-    return new Temporal.ZonedDateTime(BigInt(epochMilliseconds) * NS_PER_MILLISECOND, 'UTC');
+    return this.utcZdtFromEpochNanoseconds(BigInt(epochMilliseconds) * NS_PER_MILLISECOND);
+  }
+
+  private canUseUtcCalendarFastPaths(): boolean {
+    return (
+      this.tzid === 'UTC' &&
+      this.originalDtstart.timeZoneId === this.tzid &&
+      ['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)
+    );
   }
 
   private canUseUtcEpochMillisecondsPrecision(): boolean {
@@ -2321,10 +2342,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const timeSlotOffsets = this.timeSlotOffsetsMs;
     if (!timeSlotOffsets?.length || !this.hasUniqueTimeSlotOffsets) return null;
 
-    const firstDayOffset = this.simpleByDayIsoDays?.length
-      ? this.findFirstMatchingDailyStep(startDayOfWeek, 1, this.simpleByDayIsoDays)
+    const firstStep = this.simpleByDayIsoDays?.length
+      ? this.findFirstMatchingDailyStep(startDayOfWeek, interval, this.simpleByDayIsoDays)
       : 0;
-    if (firstDayOffset === null) return null;
+    if (firstStep === null) return null;
+    const firstDayOffset = firstStep * interval;
     const firstEpochDay = startEpochDay + firstDayOffset;
     const firstDayOfWeek = addIsoDays(startDayOfWeek, firstDayOffset);
     const cyclePeriods = 7 / gcd(interval, 7);
@@ -2814,6 +2836,16 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
     try {
       this.numericQueryPlanCache = this.buildNumericQueryPlan();
+      // An explicit DTSTART may name the later side of a fold; wall-clock
+      // rank/select resolves ambiguities to the earlier instant.
+      if (
+        this.numericQueryPlanCache &&
+        this.tzid !== 'UTC' &&
+        this.resolveNumericWallMilliseconds(this.wallMsOf(this.originalDtstart)) !==
+          this.originalDtstart.epochMilliseconds
+      ) {
+        this.numericQueryPlanCache = null;
+      }
     } catch {
       // The optimized path is deliberately conservative. Unsupported Intl
       // ranges or numeric edge cases fall back to the existing engine.
@@ -3016,10 +3048,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let dayOfWeek = this.originalDtstart.dayOfWeek;
 
     if (allowedDays?.length) {
-      const firstMatchingDayOffset = this.findFirstMatchingDailyStep(dayOfWeek, 1, allowedDays);
-      if (firstMatchingDayOffset === null) {
+      const firstMatchingStep = this.findFirstMatchingDailyStep(dayOfWeek, stepDays, allowedDays);
+      if (firstMatchingStep === null) {
         return dates;
       }
+      const firstMatchingDayOffset = firstMatchingStep * stepDays;
       epochDay += firstMatchingDayOffset;
       dayOfWeek = addIsoDays(dayOfWeek, firstMatchingDayOffset);
     }
@@ -3453,11 +3486,19 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     // polyfill, deriving from an anchored instance via add() skips repeated
     // time-zone slot setup and is measurably faster for non-UTC zones.
     if (isNativeTemporal) {
-      return new Temporal.ZonedDateTime(BigInt(epochMs) * NS_PER_MILLISECOND, this.tzid);
+      return new Temporal.ZonedDateTime(
+        BigInt(epochMs) * NS_PER_MILLISECOND,
+        this.tzid,
+        this.originalDtstart.calendarId,
+      );
     }
     let anchor = this.emitAnchorZdt;
     if (!anchor) {
-      anchor = this.emitAnchorZdt = new Temporal.ZonedDateTime(BigInt(epochMs) * NS_PER_MILLISECOND, this.tzid);
+      anchor = this.emitAnchorZdt = new Temporal.ZonedDateTime(
+        BigInt(epochMs) * NS_PER_MILLISECOND,
+        this.tzid,
+        this.originalDtstart.calendarId,
+      );
       return anchor;
     }
     return anchor.add({milliseconds: epochMs - anchor.epochMilliseconds});
@@ -3469,14 +3510,28 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   private canUseTzEpochFastPaths(iterator?: InternalRRuleTemporalIterator): boolean {
-    if (iterator || this.tzid === 'UTC' || this.opts.rscale || this.opts.rDate || this.opts.exDate) {
+    if (
+      iterator ||
+      this.tzid === 'UTC' ||
+      this.originalDtstart.timeZoneId !== this.tzid ||
+      this.opts.freq === 'YEARLY' ||
+      this.opts.rscale ||
+      this.opts.rDate ||
+      this.opts.exDate ||
+      !['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)
+    ) {
       return false;
     }
     if (!this.canUseEpochMillisecondsPrecisionFlag) {
       return false;
     }
-    const calendar = this.originalDtstart.calendarId;
-    return calendar === 'iso8601' || calendar === 'gregory';
+    if (
+      this.resolveNumericWallMilliseconds(this.wallMsOf(this.originalDtstart)) !==
+      this.originalDtstart.epochMilliseconds
+    ) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -3646,10 +3701,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let dayOfWeek = isoDayOfWeekOfEpochDay(epochDay);
 
     if (allowedDays?.length) {
-      const firstMatchingDayOffset = this.findFirstMatchingDailyStep(dayOfWeek, 1, allowedDays);
-      if (firstMatchingDayOffset === null) {
+      const firstMatchingStep = this.findFirstMatchingDailyStep(dayOfWeek, stepDays, allowedDays);
+      if (firstMatchingStep === null) {
         return dates;
       }
+      const firstMatchingDayOffset = firstMatchingStep * stepDays;
       epochDay += firstMatchingDayOffset;
       dayOfWeek = addIsoDays(dayOfWeek, firstMatchingDayOffset);
     }
@@ -3962,7 +4018,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         break;
       }
       if (this.opts.until) {
-        const localUntil = this.opts.until.withTimeZone(this.tzid);
+        const localUntil = this.opts.until.withTimeZone(start.timeZoneId).withCalendar(start.calendarId);
         if (monthCursor.year * 12 + monthCursor.month > localUntil.year * 12 + localUntil.month) {
           break;
         }
@@ -4035,7 +4091,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         break;
       }
       if (this.opts.until) {
-        const localUntil = this.opts.until.withTimeZone(this.tzid);
+        const localUntil = this.opts.until.withTimeZone(start.timeZoneId).withCalendar(start.calendarId);
         if (Temporal.PlainDate.compare(weekCursor.toPlainDate(), localUntil.toPlainDate()) > 0) {
           break;
         }
@@ -4075,10 +4131,16 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       const targetMonth = months[monthIndex % months.length];
       const yearsToAdd = Math.floor(monthIndex / months.length);
 
-      const candidate = start.with({
-        year: start.year + yearsToAdd,
-        month: targetMonth,
-      });
+      const candidate =
+        yearsToAdd === 0 && targetMonth === start.month
+          ? start
+          : start.with(
+              {
+                year: start.year + yearsToAdd,
+                month: targetMonth,
+              },
+              {offset: 'ignore'},
+            );
 
       if (this.opts.until && Temporal.ZonedDateTime.compare(candidate, this.opts.until) > 0) {
         break;
@@ -4124,7 +4186,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       const year = start.year + yearOffset * this.opts.interval!;
 
       for (const month of months) {
-        let occ = start.with({year, month});
+        let occ = year === start.year && month === start.month ? start : start.with({year, month}, {offset: 'ignore'});
         occ = this.applyTimeOverride(occ);
 
         if (Temporal.ZonedDateTime.compare(occ, start) < 0) {
@@ -4166,7 +4228,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     let yearCursor = start.with({month: 1, day: 1});
     const lastGenerationYear = this.opts.until
-      ? this.opts.until.withTimeZone(this.tzid).year + (this.opts.byWeekNo ? 1 : 0)
+      ? this.opts.until.withTimeZone(start.timeZoneId).withCalendar(start.calendarId).year +
+        (this.opts.byWeekNo ? 1 : 0)
       : undefined;
 
     while (true) {
@@ -4255,6 +4318,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let current = start;
     const weekNos = [...this.opts.byWeekNo!].sort((a, b) => a - b);
     const interval = this.opts.interval!;
+    // Week 1 can start in December of the preceding calendar year. A query
+    // cap in that December still needs candidates from the next week-year.
+    const lastGenerationYear = this.opts.until
+      ? this.opts.until.withTimeZone(start.timeZoneId).withCalendar(start.calendarId).year + 1
+      : undefined;
     let monthsAdvanced = 0;
     let lastYearProcessed = -1;
 
@@ -4272,27 +4340,25 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       if (year !== lastYearProcessed && current.month >= start.month) {
         lastYearProcessed = year;
 
-        // Generate occurrences for each week number in this year
-        for (const weekNo of weekNos) {
-          const completed = this.visitDateTimeCandidates(
-            this.generateDateCandidatesForWeekInYear(year, weekNo),
-            1,
-            (candidate) => this.processOccurrence(candidate, dates, start, iterator, undefined, work),
-            queryLowerBound ?? start,
-            this.opts.until,
-            work,
-          );
-          if (!completed) break outer_loop;
-        }
+        // Numeric BYWEEKNO order is not date order: -1 follows 1 in time.
+        // Sort the combined date set before streaming or applying COUNT.
+        const dateCandidates = weekNos.flatMap((weekNo) => this.generateDateCandidatesForWeekInYear(year, weekNo));
+        const completed = this.visitDateTimeCandidates(
+          dateCandidates,
+          1,
+          (candidate) => this.processOccurrence(candidate, dates, start, iterator, undefined, work),
+          queryLowerBound ?? start,
+          this.opts.until,
+          work,
+        );
+        if (!completed) break outer_loop;
       }
 
       // Advance by the specified monthly interval
       monthsAdvanced += interval;
       current = start.add({months: monthsAdvanced});
 
-      if (this.opts.until && Temporal.ZonedDateTime.compare(current, this.opts.until) > 0) {
-        break;
-      }
+      if (lastGenerationYear !== undefined && current.year > lastGenerationYear) break;
     }
 
     return this.applyCountLimitAndMergeRDates(dates, iterator);
@@ -5140,8 +5206,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return this.toPublicDates(numericResult.value);
     }
 
-    const startZdt = new Temporal.ZonedDateTime(startEpochNanoseconds, this.tzid);
-    const beforeZdt = new Temporal.ZonedDateTime(endEpochNanoseconds, this.tzid);
+    const startZdt = new Temporal.ZonedDateTime(startEpochNanoseconds, this.tzid, this.originalDtstart.calendarId);
+    const beforeZdt = new Temporal.ZonedDateTime(endEpochNanoseconds, this.tzid, this.originalDtstart.calendarId);
 
     const tempOpts = {...this.opts};
 
@@ -5153,7 +5219,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     // phase and jumping forward in multiples of INTERVAL up to the window start.
     // This preserves cadence for INTERVAL > 1 and reduces iteration.
     if (tempOpts.count === undefined) {
-      tempOpts.dtstart = this.jumpAlignedDtstart(startZdt);
+      Object.assign(tempOpts, this.alignedQueryStart(startZdt));
     }
 
     const tempRule = new RRuleTemporal<TOutput>({
@@ -5189,6 +5255,34 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * where the occurrence set depends on the index from the true DTSTART.
    */
   private jumpAlignedDtstart(startZdt: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
+    startZdt = startZdt.withTimeZone(this.originalDtstart.timeZoneId).withCalendar(this.originalDtstart.calendarId);
+    if (startZdt.epochNanoseconds <= this.originalDtstart.epochNanoseconds) return this.originalDtstart;
+
+    // RSCALE and non-ISO month/year stepping own their period/skip semantics.
+    // BYWEEKNO's monthly engine visits whole years rather than monthly windows.
+    const expandsDates = Boolean(this.opts.byDay || this.opts.byMonthDay || this.opts.byYearDay || this.opts.byWeekNo);
+    if (
+      this.opts.rscale ||
+      this.originalDtstart.timeZoneId !== this.tzid ||
+      (this.opts.freq === 'MONTHLY' && this.opts.byWeekNo) ||
+      (['MONTHLY', 'YEARLY'].includes(this.opts.freq) &&
+        (!['iso8601', 'gregory'].includes(this.originalDtstart.calendarId) ||
+          (this.originalDtstart.day > 28 && this.opts.byMonth && !expandsDates)))
+    )
+      return this.originalDtstart;
+
+    // A gap crossing midnight can change the date of a chained calendar
+    // cursor (e.g. Samoa's skipped 2011-12-30), not just its wall time.
+    if (['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(this.opts.freq) && this.tzid !== 'UTC') {
+      const startMs = this.originalDtstart.epochMilliseconds;
+      const endMs = startZdt.epochMilliseconds;
+      if (
+        endMs - startMs > 150 * 366 * MS_PER_DAY ||
+        this.getZoneResolver().timeOfDayMayHitGap(0, startMs - MS_PER_DAY, endMs + MS_PER_DAY)
+      ) {
+        return this.originalDtstart;
+      }
+    }
     const interval = this.opts.interval ?? 1;
     const aligned = startZdt.withPlainTime(this.originalDtstart.toPlainTime());
 
@@ -5248,14 +5342,54 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       }
     };
 
-    let candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(durationForJump(steps * interval)));
+    const candidateAtStep = (step: number): Temporal.ZonedDateTime => {
+      let candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(durationForJump(step * interval)));
+      if (
+        step > 0 &&
+        this.originalDtstart.day > 28 &&
+        !expandsDates &&
+        !this.opts.byMonth &&
+        (unit === 'months' || unit === 'years')
+      ) {
+        // The fallback engine chains constrained additions (Jan 31 -> Feb 29
+        // -> Mar 29). A single large addition must retain every earlier clamp.
+        // Gregorian month lengths repeat after 400 years, so this seek has a
+        // fixed bound independent of the distance to the query.
+        const cycle = (unit === 'months' ? 4800 : 400) / gcd(interval, unit === 'months' ? 4800 : 400);
+        let day = this.originalDtstart.day;
+        for (let index = 1; index <= Math.min(step, cycle) && day > 28; index++) {
+          const {year, month} =
+            unit === 'months'
+              ? this.monthIndexToYearMonth(
+                  this.originalDtstart.year * 12 + this.originalDtstart.month - 1 + index * interval,
+                )
+              : {year: this.originalDtstart.year + index * interval, month: this.originalDtstart.month};
+          day = Math.min(day, this.daysInGregorianMonth(year, month));
+        }
+        if (candidate.day !== day) candidate = candidate.with({day});
+      }
+      return candidate;
+    };
+    let candidate = candidateAtStep(steps);
+
+    // rawAdvance deliberately skips the repeated HOURLY hour at a fall-back.
+    // Starting a clone inside that second hour would put it back in the set.
+    if (
+      this.opts.freq === 'HOURLY' &&
+      interval === 1 &&
+      steps > 0 &&
+      candidate.subtract({hours: 1}).hour === candidate.hour
+    ) {
+      steps -= 1;
+      candidate = candidateAtStep(steps);
+    }
 
     if (steps > 0 && ['years', 'months', 'weeks', 'days'].includes(unit)) {
       const sameDate = candidate.toPlainDate().equals(startZdtNormalized.toPlainDate());
       if (sameDate && Temporal.ZonedDateTime.compare(candidate, startZdtNormalized) > 0) {
         if (this.hasTimeOfDayBetween(startZdtNormalized.toPlainTime(), candidate.toPlainTime())) {
           steps -= 1;
-          candidate = RRuleTemporal.normalizeToPolyfill(this.opts.dtstart.add(durationForJump(steps * interval)));
+          candidate = candidateAtStep(steps);
         }
       }
     }
@@ -5271,9 +5405,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       let stepsBack = 0;
       while (steps - stepsBack > 0 && !candidate.toPlainTime().equals(canonicalTime)) {
         stepsBack += 1;
-        candidate = RRuleTemporal.normalizeToPolyfill(
-          this.opts.dtstart.add(durationForJump((steps - stepsBack) * interval)),
-        );
+        candidate = candidateAtStep(steps - stepsBack);
       }
     }
 
@@ -5356,20 +5488,26 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   /**
-   * Build a temporary rule identical to this one but starting at the
-   * phase-aligned DTSTART for the given window start. The synthetic DTSTART
-   * only keeps includeDtstart semantics when it coincides with the original.
+   * Share traversal-anchor semantics across all query methods. Only the real
+   * DTSTART can be forced into the occurrence set by includeDtstart.
    */
+  private alignedQueryStart(windowStart: Temporal.ZonedDateTime) {
+    const dtstart = this.jumpAlignedDtstart(windowStart);
+    return {
+      dtstart,
+      includeDtstart: this.includeDtstart && dtstart.epochNanoseconds === this.originalDtstart.epochNanoseconds,
+    };
+  }
+
   private ruleFromAlignedDtstart(windowStart: Temporal.ZonedDateTime): RRuleTemporal<TOutput> {
-    const aligned = this.jumpAlignedDtstart(windowStart);
-    if (aligned.epochNanoseconds === this.originalDtstart.epochNanoseconds) {
+    const aligned = this.alignedQueryStart(windowStart);
+    if (aligned.dtstart.epochNanoseconds === this.originalDtstart.epochNanoseconds) {
       return this;
     }
     return new RRuleTemporal<TOutput>({
       ...this.opts,
       temporal: this.outputTemporal,
-      dtstart: aligned,
-      includeDtstart: false,
+      ...aligned,
     } as RRuleOptions<TOutput>);
   }
 
@@ -5878,14 +6016,15 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private isoWeekByDay(sample: Temporal.ZonedDateTime) {
     const dayMap = weekdayToIsoDay;
     const wkst = dayMap[(this.opts.wkst || 'MO') as keyof typeof dayMap]!;
-    const jan1 = sample.with({month: 1, day: 1});
     const jan4 = sample.with({month: 1, day: 4});
     const delta = (jan4.dayOfWeek - wkst + 7) % 7;
     const firstWeekStart = jan4.subtract({days: delta});
 
-    // Calculate the number of weeks in the year using ISO 8601 rules
-    const isLeapYear = jan1.inLeapYear;
-    const lastWeek = jan1.dayOfWeek === 4 || (isLeapYear && jan1.dayOfWeek === 3) ? 53 : 52;
+    // Use the two week-year boundaries, respecting WKST and the calendar's
+    // actual year length. A non-ISO year need not contain 52 or 53 weeks.
+    const nextJan4 = jan4.add({years: 1}).with({month: 1, day: 4});
+    const nextWeekStart = nextJan4.subtract({days: (nextJan4.dayOfWeek - wkst + 7) % 7});
+    const lastWeek = firstWeekStart.toPlainDate().until(nextWeekStart.toPlainDate(), {largestUnit: 'days'}).days / 7;
 
     const tokens = this.opts.byDay?.length
       ? this.opts.byDay.map((tok) => extractWeekdayToken(tok)).filter((day): day is Weekday => day !== null)
