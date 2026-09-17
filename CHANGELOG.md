@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+- Fixed `between()` forcing an aligned query anchor into the recurrence set
+  when `includeDtstart` is enabled (#139). All query methods now share the
+  same rule for retaining inclusion of the real DTSTART.
+- Preserved DAILY `INTERVAL` cadence through weekday filters in both general
+  generation and optimized generation/queries.
+- Preserved calendars in query anchors and optimized output, and clipped
+  period bounds using the candidates' timezone and calendar.
+- Made month-end and leap-day seeking match chained calendar arithmetic
+  without replaying the rule's entire history. Unsafe RSCALE, calendar, and
+  skipped-date alignment shapes retain the general traversal.
+- Fixed DST wall-time drift in weekly/period generation, skipped time slots
+  after gaps, and phantom HOURLY occurrences during fall-back. Calendar fold
+  occurrences use the first instant while explicit later-fold DTSTART values
+  retain their meaning and bypass incompatible fast paths.
+- Ordered mixed positive/negative week numbers before streaming and applying
+  COUNT, included week-year spillover at query bounds, and respected WKST and
+  non-ISO year lengths when counting weeks.
+- Fixed cached timezone transitions shifted by input milliseconds or missed
+  by fifteen-day sampling. Native Temporal reads exact transitions; the
+  polyfill fallback probes daily.
+- Added repeatable query-window fuzzing, direct issue and boundary regressions,
+  and timezone tests covering thirteen short-lived offset regimes.
+
 ## 2.2.5 (2026-09-12)
 
 - Fixed `previous()` skipping RRULE occurrences when an earlier `RDATE` ended
