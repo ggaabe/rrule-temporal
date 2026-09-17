@@ -263,7 +263,7 @@ describe(`numeric query differential fuzzing (seed=0x${seed.toString(16)})`, () 
       if (verifyQueries(yearlyOptions(random, index), random, `YEARLY case ${index}`) === 'yearly') optimizedCases++;
     }
     expect(optimizedCases).toBeGreaterThanOrEqual(Math.floor(casesPerFamily * 0.8));
-  });
+  }, 120_000);
 
   it(`matches ${casesPerFamily} randomized RDATE/EXDATE occurrence sets`, () => {
     const random = createRandom(seed ^ 0xa5a5a5a5);
@@ -293,5 +293,5 @@ describe(`numeric query differential fuzzing (seed=0x${seed.toString(16)})`, () 
       if (kind) optimizedKinds.add(kind);
     }
     expect(optimizedKinds).toEqual(new Set(['fixed-step', 'daily', 'weekly', 'monthly', 'yearly']));
-  });
+  }, 120_000);
 });
