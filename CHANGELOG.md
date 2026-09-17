@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.6 (2026-09-17)
 
 - Fixed invalid inherited dates in MONTHLY and YEARLY rules (#140). Missing
   days are omitted without consuming COUNT or changing later occurrences;
@@ -38,6 +38,9 @@
   polyfill fallback probes daily.
 - Added repeatable query-window fuzzing, direct issue and boundary regressions,
   and timezone tests covering thirteen short-lived offset regimes.
+- Validated all 1,321 tests on Node 20, 24, and 26, plus 211,200 seeded
+  calendar/query comparisons and 600 numeric-query fuzz cases. Independent
+  calendar reference checks complement comparisons between library paths.
 
 ## 2.2.5 (2026-09-12)
 
