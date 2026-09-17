@@ -1,5 +1,10 @@
 # Recurrence optimization audit for #139
 
+This is the historical record of PR #142. The subsequent
+[audit for #140 and #141](optimization-audit-140-141.md) corrects the clamped
+month-end and shifted DST-gap behavior retained here, and adds an independent
+RFC oracle to detect errors shared by the optimized and general engines.
+
 This audit began with [issue #139](https://github.com/ggaabe/rrule-temporal/issues/139)
 on v2.2.5. `between()` copied `includeDtstart: true` after replacing the real
 DTSTART with a traversal anchor, creating an occurrence inside an empty window.

@@ -207,6 +207,19 @@ e.g. `TOTEXT_LANGS=en,es,ar`. When this environment variable is unavailable
 (such as in browser builds where `process` is undefined) all languages are
 included by default.
 
+### Invalid recurrence dates and times
+
+Following RFC 5545, generated dates that do not exist are omitted and do not
+consume `COUNT`. A monthly rule starting January 31 keeps the 31st, skipping
+shorter months; a yearly rule starting February 29 skips non-leap years.
+Generated local times inside a daylight-saving gap are also omitted before
+`BYSETPOS` selects occurrences. Later periods retain the original calendar
+fields, time, and `INTERVAL` phase.
+
+Explicit `DTSTART` and `RDATE` values follow the separate RFC date-time
+interpretation rules. `RSCALE` with `SKIP=BACKWARD` or `SKIP=FORWARD` can
+explicitly adjust invalid calendar dates as described below.
+
 ### RFC 7529 (RSCALE / SKIP)
 
 This library implements the iCalendar RSCALE and SKIP extensions described in RFC 7529 for defining recurrence rules in non‑Gregorian calendars and for controlling how invalid dates are handled.

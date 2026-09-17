@@ -184,6 +184,11 @@ describe('numeric COUNT query plans', () => {
     const rules = [
       new RRuleTemporal({
         freq: 'YEARLY',
+        count: 10,
+        dtstart: Temporal.ZonedDateTime.from('2024-02-29T09:00:00[UTC]'),
+      }),
+      new RRuleTemporal({
+        freq: 'YEARLY',
         interval: 3,
         count: 90,
         dtstart: Temporal.ZonedDateTime.from('1997-09-02T09:00:00[UTC]'),
@@ -199,7 +204,7 @@ describe('numeric COUNT query plans', () => {
       }),
       new RRuleTemporal({
         freq: 'YEARLY',
-        byMonth: [2, 6],
+        byMonth: [2, 3, 6], // February/June omit the inherited 31st.
         count: 90,
         dtstart: Temporal.ZonedDateTime.from('1997-01-31T09:00:00[UTC]'),
         cache: false,
@@ -438,11 +443,6 @@ describe('numeric COUNT query plans', () => {
         byMonthDay: [10],
         count: 30,
         dtstart: Temporal.ZonedDateTime.from('2023-01-10T02:30:00[America/Chicago]'),
-      }),
-      new RRuleTemporal({
-        freq: 'YEARLY',
-        count: 10,
-        dtstart: Temporal.ZonedDateTime.from('2024-02-29T09:00:00[UTC]'),
       }),
       new RRuleTemporal({
         freq: 'YEARLY',

@@ -541,27 +541,23 @@ describe('DST timezones and repeat', () => {
     ]);
   });
 
-  // Advancing across a spring-forward gap moves the wall time (02:30 does not exist on the day
-  // Europe/Berlin loses an hour, and `compatible` disambiguation resolves it to 03:30). The time of
-  // day comes from DTSTART when no BYHOUR/BYMINUTE is given (RFC 5545 3.3.10), so the occurrences
-  // after the transition go back to 02:30 rather than keeping the shifted time.
+  // RFC 5545 omits generated gap times and retains DTSTART time on later dates.
   it('should not carry a spring-forward shift into later occurrences (DAILY, time from DTSTART)', () => {
     const tz = 'Europe/Berlin';
     const rule = `DTSTART;TZID=${tz}:20260327T023000\nRRULE:FREQ=DAILY;COUNT=5`;
     assertDates({rule: parse(rule), print: format(tz)}, [
       '2026-03-27T02:30:00+01:00[Europe/Berlin]',
       '2026-03-28T02:30:00+01:00[Europe/Berlin]',
-      // 02:30 does not exist on the 29th, so this one occurrence shifts
-      '2026-03-29T03:30:00+02:00[Europe/Berlin]',
       '2026-03-30T02:30:00+02:00[Europe/Berlin]',
       '2026-03-31T02:30:00+02:00[Europe/Berlin]',
+      '2026-04-01T02:30:00+02:00[Europe/Berlin]',
     ]);
     assertDates({rule: parse(rule)}, [
       '2026-03-27T01:30:00.000Z',
       '2026-03-28T01:30:00.000Z',
-      '2026-03-29T01:30:00.000Z',
       '2026-03-30T00:30:00.000Z',
       '2026-03-31T00:30:00.000Z',
+      '2026-04-01T00:30:00.000Z',
     ]);
   });
 
@@ -577,9 +573,8 @@ describe('DST timezones and repeat', () => {
     const rule = `DTSTART;TZID=${tz}:20250329T023000\nRRULE:FREQ=YEARLY;COUNT=3`;
     assertDates({rule: parse(rule), print: format(tz)}, [
       '2025-03-29T02:30:00+01:00[Europe/Berlin]',
-      // 2026-03-29 is the transition day in Berlin, so this occurrence shifts
-      '2026-03-29T03:30:00+02:00[Europe/Berlin]',
       '2027-03-29T02:30:00+02:00[Europe/Berlin]',
+      '2028-03-29T02:30:00+02:00[Europe/Berlin]',
     ]);
   });
 
@@ -599,13 +594,12 @@ describe('DST timezones and repeat', () => {
     ]);
   });
 
-  it('should still report the shifted occurrence when the window covers the transition day', () => {
+  it('should omit the nonexistent occurrence when the window covers the transition day', () => {
     const tz = 'Europe/Berlin';
     const rule = `DTSTART;TZID=${tz}:20260327T023000\nRRULE:FREQ=DAILY`;
     const between: [Date, Date] = [new Date('2026-03-28T00:00:00.000Z'), new Date('2026-03-31T00:00:00.000Z')];
     assertDates({rule: parse(rule), between, print: format(tz)}, [
       '2026-03-28T02:30:00+01:00[Europe/Berlin]',
-      '2026-03-29T03:30:00+02:00[Europe/Berlin]',
       '2026-03-30T02:30:00+02:00[Europe/Berlin]',
     ]);
   });
@@ -1015,11 +1009,7 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
   it('should allow DATE UNTIL values when DTSTART is DATE', () => {
     const rruleString = 'DTSTART;VALUE=DATE:19970902\nRRULE:FREQ=DAILY;UNTIL=19970904';
     const rule = parse(rruleString);
-    assertDates({rule}, [
-      '1997-09-02T00:00:00.000Z',
-      '1997-09-03T00:00:00.000Z',
-      '1997-09-04T00:00:00.000Z',
-    ]);
+    assertDates({rule}, ['1997-09-02T00:00:00.000Z', '1997-09-03T00:00:00.000Z', '1997-09-04T00:00:00.000Z']);
   });
 });
 

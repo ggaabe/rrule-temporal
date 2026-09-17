@@ -223,9 +223,9 @@ describe('query alignment preserves recurrence identity', () => {
     );
   });
 
-  it('seeks clamped month ends without replaying decades of history', () => {
+  it('seeks valid month ends without replaying decades of history', () => {
     const rule = new RRuleTemporal({freq: 'MONTHLY', dtstart: zdt('1970-01-31T09:00[UTC]'), maxIterations: 20});
-    const target = zdt('2026-09-28T09:00[UTC]');
+    const target = zdt('2026-10-31T09:00[UTC]');
     expect(rule.next(target, true)?.epochNanoseconds).toBe(target.epochNanoseconds);
     expect(rule.previous(target, true)?.epochNanoseconds).toBe(target.epochNanoseconds);
   });
