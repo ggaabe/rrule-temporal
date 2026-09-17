@@ -678,18 +678,17 @@ RRULE:FREQ=DAILY;BYHOUR=2;BYMINUTE=0;COUNT=3`.trim();
     expect(first.toString()).toBe('2025-03-08T02:00:00-06:00[America/Chicago]');
 
     // DST starts Mar 9, 2 AM CST becomes 3 AM CDT
-    const second = ruleChicagoDST.next(new Date(first.toInstant().epochMilliseconds)); // Should be Mar 9, 2:00 -> jumps to 3:00 CDT (UTC-5)
+    const second = ruleChicagoDST.next(new Date(first.toInstant().epochMilliseconds)); // March 9 has no 02:00 occurrence.
     expect(second).not.toBeNull();
     if (!second) throw new Error('second is undefined');
-    // The local time remains 2:00 AM according to the rule, even though the UTC offset changes
-    // Correction: 2:00 AM CDT does not exist on Mar 9. Expect 3:00 AM CDT.
-    expect(second.toString()).toBe('2025-03-09T03:00:00-05:00[America/Chicago]');
-    expect(second.hour).toBe(3); // Hour will be 3 AM local time as 2 AM was skipped
+    // RFC 5545 omits the nonexistent March 9 start without consuming COUNT.
+    expect(second.toString()).toBe('2025-03-10T02:00:00-05:00[America/Chicago]');
+    expect(second.hour).toBe(2);
 
-    const third = ruleChicagoDST.next(new Date(second.toInstant().epochMilliseconds)); // Should be Mar 10, 2:00 CDT (UTC-5)
+    const third = ruleChicagoDST.next(new Date(second.toInstant().epochMilliseconds)); // March 11 at 02:00 CDT.
     expect(third).not.toBeNull();
     if (!third) throw new Error('third is undefined');
-    expect(third.toString()).toBe('2025-03-10T02:00:00-05:00[America/Chicago]');
+    expect(third.toString()).toBe('2025-03-11T02:00:00-05:00[America/Chicago]');
     expect(third.hour).toBe(2); // Hour remains 2 AM local time
   });
 });

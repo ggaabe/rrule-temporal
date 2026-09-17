@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Fixed invalid inherited dates in MONTHLY and YEARLY rules (#140). Missing
+  days are omitted without consuming COUNT or changing later occurrences;
+  January 31 stays on the 31st and February 29 stays on leap days. BYMONTH,
+  interval alignment, numeric queries, and RSCALE SKIP use the same policy.
+- Fixed generated starts in DST gaps being shifted and counted (#141).
+  Calendar dates remain nominal until time expansion, and nonexistent times
+  are omitted before BYSETPOS and COUNT. Explicit DTSTART/RDATE inputs and
+  the first occurrence of a repeated local time retain their interpretation.
+- Fixed weekly BYSETPOS ranking before date filters, backward-moving subdaily
+  cursors after time overrides in gaps, RSCALE partial-period termination,
+  and `occursOn()` boundaries on shortened or skipped calendar dates.
+- Stopped bounded monthly fast paths at UNTIL even when no candidates match.
+  Added direct RFC regressions and an independent seeded calendar oracle,
+  alongside the existing optimization/query differential fuzzing.
 - Fixed `between()` forcing an aligned query anchor into the recurrence set
   when `includeDtstart` is enabled (#139). All query methods now share the
   same rule for retaining inclusion of the real DTSTART.
@@ -9,9 +23,9 @@
   generation and optimized generation/queries.
 - Preserved calendars in query anchors and optimized output, and clipped
   period bounds using the candidates' timezone and calendar.
-- Made month-end and leap-day seeking match chained calendar arithmetic
-  without replaying the rule's entire history. Unsafe RSCALE, calendar, and
-  skipped-date alignment shapes retain the general traversal.
+- Preserved inherited fields when seeking month ends and leap days without
+  replaying the rule's entire history. RSCALE and unsupported calendar
+  alignment shapes retain the general traversal.
 - Fixed DST wall-time drift in weekly/period generation, skipped time slots
   after gaps, and phantom HOURLY occurrences during fall-back. Calendar fold
   occurrences use the first instant while explicit later-fold DTSTART values

@@ -13,10 +13,10 @@ describe('DTSTART time after a daylight-saving gap (issue #136)', () => {
     expect(dates).toHaveLength(13);
     expect(strings(dates.slice(8))).toEqual([
       '2026-03-28T02:30:00+01:00[Europe/Berlin]',
-      '2026-03-29T03:30:00+02:00[Europe/Berlin]',
       '2026-03-30T02:30:00+02:00[Europe/Berlin]',
       '2026-03-31T02:30:00+02:00[Europe/Berlin]',
       '2026-04-01T02:30:00+02:00[Europe/Berlin]',
+      '2026-04-02T02:30:00+02:00[Europe/Berlin]',
     ]);
     expect(strings(rule.all(() => true))).toEqual(strings(dates));
   });
@@ -30,8 +30,13 @@ describe('DTSTART time after a daylight-saving gap (issue #136)', () => {
     {freq: 'WEEKLY', interval: 1, start: '2026-03-22T02:30', unit: 'weeks'},
   ] as const)('$freq INTERVAL=$interval retains the original wall time', ({freq, interval, start, unit}) => {
     const dtstart = berlin(start);
-    // Resolve each calendar offset independently from the original DTSTART.
-    const expected = Array.from({length: 4}, (_, index) => dtstart.add({[unit]: index * interval}));
+    // Omit invalid local times without consuming COUNT or shifting the next period.
+    const expected: Temporal.ZonedDateTime[] = [];
+    for (let index = 0; expected.length < 4; index++) {
+      const nominal = dtstart.toPlainDateTime().add({[unit]: index * interval});
+      const resolved = nominal.toZonedDateTime(dtstart.timeZoneId);
+      if (resolved.toPlainDateTime().equals(nominal)) expected.push(resolved);
+    }
     const rule = new RRuleTemporal({freq, interval, dtstart, count: 4});
     expect(strings(rule.all())).toEqual(strings(expected));
     expect(strings(rule.all(() => true))).toEqual(strings(expected));
@@ -62,8 +67,8 @@ describe('DTSTART time after a daylight-saving gap (issue #136)', () => {
       });
       expect(strings(rule.all())).toEqual([
         '2026-03-28T02:30:45.123456789+01:00[Europe/Berlin]',
-        '2026-03-29T03:30:45.123456789+02:00[Europe/Berlin]',
         '2026-03-30T02:30:45.123456789+02:00[Europe/Berlin]',
+        '2026-03-31T02:30:45.123456789+02:00[Europe/Berlin]',
       ]);
     },
   );
@@ -77,8 +82,8 @@ describe('DTSTART time after a daylight-saving gap (issue #136)', () => {
     });
     expect(strings(rule.all())).toEqual([
       '2026-10-03T02:15:00+10:30[Australia/Lord_Howe]',
-      '2026-10-04T02:45:00+11:00[Australia/Lord_Howe]',
       '2026-10-05T02:15:00+11:00[Australia/Lord_Howe]',
+      '2026-10-06T02:15:00+11:00[Australia/Lord_Howe]',
     ]);
   });
 
@@ -121,7 +126,7 @@ describe('DTSTART time after a daylight-saving gap (issue #136)', () => {
     const rule = new RRuleTemporal({freq, interval, dtstart});
     expect(rule.next(gap)?.toString()).toBe(next.toString());
     expect(strings(rule.between(gap, berlin('2024-03-24T04:00')))).toEqual([next.toString()]);
-    expect(rule.previous(berlin('2024-03-24T02:00'))?.toString()).toBe(gap.toString());
+    expect(rule.previous(berlin('2024-03-24T02:00'))?.toString()).toBe(dtstart.toString());
   });
 
   it('applies inclusive UNTIL and recurrence exceptions to the restored occurrences', () => {
@@ -139,8 +144,9 @@ describe('DTSTART time after a daylight-saving gap (issue #136)', () => {
     expect(strings(rule.all())).toEqual(expected);
     expect(strings(rule.all(() => true))).toEqual(expected);
     const countRule = new RRuleTemporal({freq: 'DAILY', dtstart, count: 4, exDate: [gap], rDate: [extra]});
-    expect(strings(countRule.all())).toEqual(expected);
-    expect(strings(countRule.all(() => true))).toEqual(expected);
+    const countExpected = [...expected.slice(0, 3), '2026-04-01T02:30:00+02:00[Europe/Berlin]', extra.toString()];
+    expect(strings(countRule.all())).toEqual(countExpected);
+    expect(strings(countRule.all(() => true))).toEqual(countExpected);
   });
 
   it.each([

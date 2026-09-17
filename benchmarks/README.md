@@ -69,6 +69,16 @@ npm run profile:temporal -- --scenario monthly_last_weekday_240 --tzid UTC --ite
 
 ## Latest Results
 
+### Invalid-date and DST-gap audit (unreleased)
+
+The [#140/#141 audit](../docs/optimization-audit-140-141.md) validates RFC
+omission semantics with direct regressions and an independent calendar oracle.
+Its [measurements](results/issues-140-141-2026-09-17.json) compare 29 unchanged
+generation workloads with PR #142 on Node 25.2.1, using five alternating warm
+samples. The Chicago DAILY exception workload measured 3.813 ms before and
+1.354 ms after; other warm timings ranged from 1.43x faster to 1.13x slower.
+These are local measurements, not universal performance guarantees.
+
 ### UTC generation improvements (v2.2.4)
 
 Measured September 5, 2026 on an Apple M2 Max with Node 25.2.1 and the

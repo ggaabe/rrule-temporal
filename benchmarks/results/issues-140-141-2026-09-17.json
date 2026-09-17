@@ -1,0 +1,600 @@
+{
+  "date": "2026-09-17",
+  "issues": [
+    140,
+    141
+  ],
+  "baselineCommit": "fe7db5dea565da5ed1b286ae568d87daa5a3ffd4",
+  "sourceSha256": "b11eea8e326cf3c0ba1a1818a366dcc178eed7dc44b5ee5e6114f6a674daf103",
+  "validation": {
+    "fullSuite": {
+      "tests": 1321,
+      "files": 57,
+      "nodes": [
+        "20.20.2",
+        "24.20.0",
+        "26.7.0"
+      ],
+      "passed": true
+    },
+    "directRegressionTests": 57,
+    "buildAndPublicTypes": "passed",
+    "sourceTypeCheck": "tsc --noEmit --target es2022 --lib es2022,dom",
+    "formatAndDiffCheck": "passed"
+  },
+  "fuzz": {
+    "oracle-native": {
+      "seed": 140,
+      "rules": 2000,
+      "checks": 40000,
+      "failures": []
+    },
+    "oracle-polyfill": {
+      "seed": 141,
+      "rules": 1000,
+      "checks": 20000,
+      "failures": []
+    },
+    "window-native": {
+      "seed": 140,
+      "casesPerFrequency": 400,
+      "totalRules": 2800,
+      "checks": 100800,
+      "failures": []
+    },
+    "window-polyfill": {
+      "seed": 141,
+      "casesPerFrequency": 200,
+      "totalRules": 1400,
+      "checks": 50400,
+      "failures": []
+    }
+  },
+  "numericFuzz": {
+    "node": "26.7.0",
+    "seed": 140,
+    "casesPerFamily": 300,
+    "families": 2,
+    "cases": 600,
+    "passed": true
+  },
+  "fuzzSummary": {
+    "independentRfcRules": 3000,
+    "independentRfcComparisons": 60000,
+    "queryWindowRules": 4200,
+    "queryWindowComparisons": 151200,
+    "comparisons": 211200,
+    "mismatches": 0
+  },
+  "packageSmoke": {
+    "published": false,
+    "package": {
+      "filename": "rrule-temporal-2.2.5.tgz",
+      "integrity": "sha512-zhoFlYxUY+1AnehCztuaLL3hnBTgQpRbWEkjxbcyE2ZgT/DCc9Y5wvAicPDs7QcY55LQW5PtyQc/XcACiK4GIA==",
+      "shasum": "b68d0479ae5b225236398df4c3eab1ac8f837424"
+    },
+    "results": [
+      {
+        "node": "v20.20.2",
+        "esm": true,
+        "cjs": true,
+        "assertions": 10
+      },
+      {
+        "node": "v26.7.0",
+        "esm": true,
+        "cjs": true,
+        "assertions": 10
+      }
+    ]
+  },
+  "generationBenchmark": {
+    "node": "v25.2.1",
+    "hardware": "Apple M2 Max",
+    "baseline": "PR #142",
+    "backend": "bundled Temporal polyfill",
+    "config": {
+      "warmupMs": 100,
+      "sampleMs": 150,
+      "samples": 5
+    },
+    "scenarioCount": 29,
+    "identicalOutputs": true,
+    "scenarios": [
+      {
+        "id": "yearly_last_weekday_1000",
+        "count": 1000,
+        "baselineColdMs": 37.14766699999999,
+        "candidateColdMs": 32.193084,
+        "baseline": {
+          "medianMs": 23.50479771428572,
+          "minMs": 22.213011857142842,
+          "maxMs": 80.526792
+        },
+        "candidate": {
+          "medianMs": 20.070979125000008,
+          "minMs": 19.334390624999997,
+          "maxMs": 125.27139550000004
+        },
+        "speedup": 1.1710837606825377
+      },
+      {
+        "id": "yearly_dates_1000",
+        "count": 1000,
+        "baselineColdMs": 10.53449999999998,
+        "candidateColdMs": 16.468124999999873,
+        "baseline": {
+          "medianMs": 2.0922604166666665,
+          "minMs": 1.4435733173076921,
+          "maxMs": 2.26766853731343
+        },
+        "candidate": {
+          "medianMs": 1.807522096385539,
+          "minMs": 1.2244756097560958,
+          "maxMs": 2.657914542372887
+        },
+        "speedup": 1.157529648379133
+      },
+      {
+        "id": "monthly_slots_1000",
+        "count": 1000,
+        "baselineColdMs": 1.7077910000002703,
+        "candidateColdMs": 1.7734580000001188,
+        "baseline": {
+          "medianMs": 0.9386307312500037,
+          "minMs": 0.9117808121212103,
+          "maxMs": 1.0915172101449242
+        },
+        "candidate": {
+          "medianMs": 0.9616592356687876,
+          "minMs": 0.929259259259259,
+          "maxMs": 1.0241164965986431
+        },
+        "speedup": 0.9760533632240648
+      },
+      {
+        "id": "monthly_slot_positions_240",
+        "count": 240,
+        "baselineColdMs": 1.1642090000004828,
+        "candidateColdMs": 0.954584000000068,
+        "baseline": {
+          "medianMs": 0.7219811730769266,
+          "minMs": 0.7045518356807504,
+          "maxMs": 0.773538226804122
+        },
+        "candidate": {
+          "medianMs": 0.5057087542087566,
+          "minMs": 0.49464597039473657,
+          "maxMs": 0.5588715910780694
+        },
+        "speedup": 1.4276620032147844
+      },
+      {
+        "id": "yearly_dense_positions_2",
+        "count": 2,
+        "baselineColdMs": 0.2238339999994423,
+        "candidateColdMs": 0.1500419999993028,
+        "baseline": {
+          "medianMs": 0.02305221300138315,
+          "minMs": 0.02237203579418331,
+          "maxMs": 0.023587879874213694
+        },
+        "candidate": {
+          "medianMs": 0.02091522587841605,
+          "minMs": 0.020422163512593655,
+          "maxMs": 0.021131626567122145
+        },
+        "speedup": 1.1021737530060534
+      },
+      {
+        "id": "daily_exdate_1000",
+        "count": 999,
+        "baselineColdMs": 1.0944579999995767,
+        "candidateColdMs": 1.1503329999995913,
+        "baseline": {
+          "medianMs": 0.5759466845878164,
+          "minMs": 0.5461245454545464,
+          "maxMs": 1.8298158837209442
+        },
+        "candidate": {
+          "medianMs": 0.6192520223880617,
+          "minMs": 0.5798856177606183,
+          "maxMs": 0.7696412666666652
+        },
+        "speedup": 0.9300683142975552
+      },
+      {
+        "id": "secondly_exdate_3600",
+        "count": 3600,
+        "baselineColdMs": 2.529167000000598,
+        "candidateColdMs": 2.586833999999726,
+        "baseline": {
+          "medianMs": 2.9129567307692152,
+          "minMs": 2.5664604406779676,
+          "maxMs": 3.1385364583333435
+        },
+        "candidate": {
+          "medianMs": 2.8923237307692315,
+          "minMs": 2.7374772727272845,
+          "maxMs": 3.4269734042553224
+        },
+        "speedup": 1.0071337104420521
+      },
+      {
+        "id": "daily_exdate_chicago_1000",
+        "count": 999,
+        "baselineColdMs": 6.864041999999245,
+        "candidateColdMs": 31.795000000000073,
+        "baseline": {
+          "medianMs": 3.813105224999981,
+          "minMs": 3.539419581395334,
+          "maxMs": 3.958887820512805
+        },
+        "candidate": {
+          "medianMs": 1.3544598288288332,
+          "minMs": 1.2125668629032296,
+          "maxMs": 1.4801319411764566
+        },
+        "speedup": 2.8152220862076622
+      },
+      {
+        "id": "yearly_callback_first_3",
+        "count": 3,
+        "baselineColdMs": 0.4711670000015147,
+        "candidateColdMs": 0.30512500000077125,
+        "baseline": {
+          "medianMs": 0.08965113500597319,
+          "minMs": 0.08842211785503828,
+          "maxMs": 0.09186512553582393
+        },
+        "candidate": {
+          "medianMs": 0.07910881180811823,
+          "minMs": 0.0782765821596244,
+          "maxMs": 0.08028196896736248
+        },
+        "speedup": 1.1332635765460086
+      },
+      {
+        "id": "daily_30_UTC",
+        "count": 30,
+        "baselineColdMs": 0.07999999999992724,
+        "candidateColdMs": 0.04975000000013097,
+        "baseline": {
+          "medianMs": 0.01750998505894685,
+          "minMs": 0.016463088893766298,
+          "maxMs": 0.01828379449049256
+        },
+        "candidate": {
+          "medianMs": 0.015354153838280184,
+          "minMs": 0.014507616054158692,
+          "maxMs": 0.017569600609041832
+        },
+        "speedup": 1.1404070353451754
+      },
+      {
+        "id": "daily_30_America/Chicago",
+        "count": 30,
+        "baselineColdMs": 6.832249999999476,
+        "candidateColdMs": 0.12337500000285218,
+        "baseline": {
+          "medianMs": 0.04833793650793687,
+          "minMs": 0.035464419829768196,
+          "maxMs": 0.09382617187500046
+        },
+        "candidate": {
+          "medianMs": 0.04590083352941185,
+          "minMs": 0.03743618467681561,
+          "maxMs": 0.10471509009009057
+        },
+        "speedup": 1.0530949612704397
+      },
+      {
+        "id": "daily_weekdays_520_UTC",
+        "count": 520,
+        "baselineColdMs": 0.437792000000627,
+        "candidateColdMs": 0.37987499999871943,
+        "baseline": {
+          "medianMs": 0.32163115631691686,
+          "minMs": 0.28644274809160564,
+          "maxMs": 0.39097645572916423
+        },
+        "candidate": {
+          "medianMs": 0.3037898117408949,
+          "minMs": 0.27905645910780863,
+          "maxMs": 0.34370938215103186
+        },
+        "speedup": 1.058729239383574
+      },
+      {
+        "id": "daily_weekdays_520_America/Chicago",
+        "count": 520,
+        "baselineColdMs": 17.248459000002185,
+        "candidateColdMs": 0.8886249999995925,
+        "baseline": {
+          "medianMs": 0.6150531065573648,
+          "minMs": 0.588345752941178,
+          "maxMs": 0.640259931914888
+        },
+        "candidate": {
+          "medianMs": 0.6496724372294393,
+          "minMs": 0.6131469387755157,
+          "maxMs": 0.7318515388349589
+        },
+        "speedup": 0.9467126374951191
+      },
+      {
+        "id": "daily_time_slots_1000_UTC",
+        "count": 1000,
+        "baselineColdMs": 0.5984580000003916,
+        "candidateColdMs": 0.551500000001397,
+        "baseline": {
+          "medianMs": 0.5460283345454479,
+          "minMs": 0.54413873550725,
+          "maxMs": 0.5919883566176556
+        },
+        "candidate": {
+          "medianMs": 0.5289633204225334,
+          "minMs": 0.45077227027027506,
+          "maxMs": 0.5598456156716457
+        },
+        "speedup": 1.0322612428197915
+      },
+      {
+        "id": "daily_time_slots_1000_America/Chicago",
+        "count": 1000,
+        "baselineColdMs": 33.112207999998645,
+        "candidateColdMs": 1.4980839999989257,
+        "baseline": {
+          "medianMs": 1.2264800162601597,
+          "minMs": 1.1869543937007863,
+          "maxMs": 1.3181633771929595
+        },
+        "candidate": {
+          "medianMs": 1.215560822580653,
+          "minMs": 1.1673995426356478,
+          "maxMs": 1.3519516806722585
+        },
+        "speedup": 1.0089828443601243
+      },
+      {
+        "id": "hourly_720_UTC",
+        "count": 720,
+        "baselineColdMs": 0.3282499999986612,
+        "candidateColdMs": 0.4352919999982987,
+        "baseline": {
+          "medianMs": 0.8976961397379872,
+          "minMs": 0.559895089285705,
+          "maxMs": 1.456669902912624
+        },
+        "candidate": {
+          "medianMs": 0.9085810898203583,
+          "minMs": 0.46737279127726344,
+          "maxMs": 3.5172732558139828
+        },
+        "speedup": 0.9880198364193082
+      },
+      {
+        "id": "hourly_720_America/Chicago",
+        "count": 720,
+        "baselineColdMs": 1.51416700000118,
+        "candidateColdMs": 1.6107089999968593,
+        "baseline": {
+          "medianMs": 0.9915559210526466,
+          "minMs": 0.9304894567901135,
+          "maxMs": 1.3544041238937927
+        },
+        "candidate": {
+          "medianMs": 0.9768879870129736,
+          "minMs": 0.9154115853658457,
+          "maxMs": 1.2840170940170903
+        },
+        "speedup": 1.0150149599899605
+      },
+      {
+        "id": "minutely_1440_UTC",
+        "count": 1440,
+        "baselineColdMs": 0.5943330000009155,
+        "candidateColdMs": 0.7500419999996666,
+        "baseline": {
+          "medianMs": 0.79514373544974,
+          "minMs": 0.7733434278350464,
+          "maxMs": 0.8757780828729353
+        },
+        "candidate": {
+          "medianMs": 0.802782529411759,
+          "minMs": 0.7831239166666629,
+          "maxMs": 0.835941205555557
+        },
+        "speedup": 0.990484603635288
+      },
+      {
+        "id": "minutely_1440_America/Chicago",
+        "count": 1440,
+        "baselineColdMs": 1.3809160000018892,
+        "candidateColdMs": 1.4032500000030268,
+        "baseline": {
+          "medianMs": 1.654873626373616,
+          "minMs": 1.6229413118279445,
+          "maxMs": 1.7273933186813368
+        },
+        "candidate": {
+          "medianMs": 1.721279829545479,
+          "minMs": 1.6327595108695792,
+          "maxMs": 1.8069254941176898
+        },
+        "speedup": 0.9614204488822725
+      },
+      {
+        "id": "secondly_3600_UTC",
+        "count": 3600,
+        "baselineColdMs": 1.2438750000001164,
+        "candidateColdMs": 1.3977500000037253,
+        "baseline": {
+          "medianMs": 2.8521395833333374,
+          "minMs": 2.0311390675675725,
+          "maxMs": 2.8875584999999635
+        },
+        "candidate": {
+          "medianMs": 3.2207952127658808,
+          "minMs": 2.0078411199999393,
+          "maxMs": 4.41630638235288
+        },
+        "speedup": 0.8855389414479545
+      },
+      {
+        "id": "secondly_3600_America/Chicago",
+        "count": 3600,
+        "baselineColdMs": 3.5327089999991586,
+        "candidateColdMs": 3.599000000001979,
+        "baseline": {
+          "medianMs": 4.9460377499999595,
+          "minMs": 4.354859514285636,
+          "maxMs": 5.10526526666678
+        },
+        "candidate": {
+          "medianMs": 4.727946624999959,
+          "minMs": 4.085872756756765,
+          "maxMs": 5.341196625000066
+        },
+        "speedup": 1.046128085255193
+      },
+      {
+        "id": "weekly_mwf_780_UTC",
+        "count": 780,
+        "baselineColdMs": 0.6077500000028522,
+        "candidateColdMs": 0.5077910000036354,
+        "baseline": {
+          "medianMs": 0.4168294177545615,
+          "minMs": 0.3413288818181834,
+          "maxMs": 0.4871225661538595
+        },
+        "candidate": {
+          "medianMs": 0.349526539130428,
+          "minMs": 0.33624209381661924,
+          "maxMs": 0.3843883044554615
+        },
+        "speedup": 1.1925544160153716
+      },
+      {
+        "id": "weekly_mwf_780_America/Chicago",
+        "count": 780,
+        "baselineColdMs": 0.9484579999989364,
+        "candidateColdMs": 0.8802910000013071,
+        "baseline": {
+          "medianMs": 0.8232509125683052,
+          "minMs": 0.7746020154638957,
+          "maxMs": 0.8489677514124525
+        },
+        "candidate": {
+          "medianMs": 0.8342048611111144,
+          "minMs": 0.799163787234028,
+          "maxMs": 0.843814140449406
+        },
+        "speedup": 0.9868689945917851
+      },
+      {
+        "id": "weekly_time_slots_1000_UTC",
+        "count": 1000,
+        "baselineColdMs": 0.649874999995518,
+        "candidateColdMs": 0.5702080000046408,
+        "baseline": {
+          "medianMs": 0.4957255247524636,
+          "minMs": 0.48248298713826787,
+          "maxMs": 0.6081738858267745
+        },
+        "candidate": {
+          "medianMs": 0.479852370607023,
+          "minMs": 0.43434164450868357,
+          "maxMs": 0.5419154620938682
+        },
+        "speedup": 1.033079245029801
+      },
+      {
+        "id": "weekly_time_slots_1000_America/Chicago",
+        "count": 1000,
+        "baselineColdMs": 1.2870419999962905,
+        "candidateColdMs": 1.221333000001323,
+        "baseline": {
+          "medianMs": 1.340028651785685,
+          "minMs": 1.1513094809160698,
+          "maxMs": 10.146218749999662
+        },
+        "candidate": {
+          "medianMs": 1.4255334150943524,
+          "minMs": 1.1135432148148,
+          "maxMs": 3.8195487804877324
+        },
+        "speedup": 0.9400191097568849
+      },
+      {
+        "id": "monthly_last_weekday_240_UTC",
+        "count": 240,
+        "baselineColdMs": 1.1732499999998254,
+        "candidateColdMs": 0.8433329999970738,
+        "baseline": {
+          "medianMs": 0.49465282565789065,
+          "minMs": 0.4582026158536459,
+          "maxMs": 0.5699065166051773
+        },
+        "candidate": {
+          "medianMs": 0.4994130697674439,
+          "minMs": 0.4761031335403674,
+          "maxMs": 0.9158866890243744
+        },
+        "speedup": 0.9904683229220055
+      },
+      {
+        "id": "monthly_last_weekday_240_America/Chicago",
+        "count": 240,
+        "baselineColdMs": 63.38183299999946,
+        "candidateColdMs": 1.0864580000052229,
+        "baseline": {
+          "medianMs": 0.5814320077519397,
+          "minMs": 0.5705438821292745,
+          "maxMs": 0.6343886554621793
+        },
+        "candidate": {
+          "medianMs": 0.5872521171875178,
+          "minMs": 0.5831353372093082,
+          "maxMs": 0.6031119477911525
+        },
+        "speedup": 0.9900892491227585
+      },
+      {
+        "id": "monthly_first_last_weekday_480_UTC",
+        "count": 480,
+        "baselineColdMs": 0.7032919999983278,
+        "candidateColdMs": 0.7074170000050799,
+        "baseline": {
+          "medianMs": 0.5500943223443036,
+          "minMs": 0.5311420777385144,
+          "maxMs": 0.5671396226415143
+        },
+        "candidate": {
+          "medianMs": 0.5583141263940649,
+          "minMs": 0.5423808664260048,
+          "maxMs": 0.5692433712121067
+        },
+        "speedup": 0.985277456433263
+      },
+      {
+        "id": "monthly_first_last_weekday_480_America/Chicago",
+        "count": 480,
+        "baselineColdMs": 122.41812499999651,
+        "candidateColdMs": 53.084499999997206,
+        "baseline": {
+          "medianMs": 0.9298544259258904,
+          "minMs": 0.9083047168674659,
+          "maxMs": 0.9380864562499938
+        },
+        "candidate": {
+          "medianMs": 0.9159532560975427,
+          "minMs": 0.9152873696969684,
+          "maxMs": 0.9920202828947559
+        },
+        "speedup": 1.0151767240694947
+      }
+    ],
+    "limitations": "Local alternating warm measurements. Changed invalid-date and gap semantics are checked against RFC expectations instead of the old generator."
+  }
+}

@@ -142,8 +142,8 @@ describe('epoch fast path DST-gap handling', () => {
     const viaFast = rule.all().map((d) => d.toString());
     const viaGeneral = new RRuleTemporal({freq: 'DAILY', count: 5, dtstart}).all(() => true).map((d) => d.toString());
     expect(viaFast).toEqual(viaGeneral);
-    // The gap day itself resolves forward per 'compatible' disambiguation.
-    expect(viaFast[2]).toContain('2024-03-10T03:30:00-05:00');
+    // The nonexistent occurrence is omitted without consuming COUNT.
+    expect(viaFast[2]).toContain('2024-03-11T02:30:00-05:00');
   });
 
   it('emits both instants of a repeated MINUTELY wall time but skips repeated HOURLY hours', () => {
