@@ -15,7 +15,7 @@
     "@js-temporal/polyfill": "^0.5.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "rrule-temporal": "^1.5.1"
+    "rrule-temporal": "^2.2.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -187,7 +187,7 @@ export default function App() {
   useEffect(() => {
     if (mode !== 'visual') return;
     try {
-      const opts = new RRuleTemporal({rruleString: ics.trim()}).options();
+      const opts = new RRuleTemporal({rruleString: ics.trim(), temporal: Temporal}).options();
       startTransition(() => {
         setFreq(opts.freq);
         setInterval(opts.interval ?? 1);
