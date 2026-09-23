@@ -104,7 +104,7 @@ describe(`period query plans for rules without COUNT (seed=${seed})`, () => {
           const interval = 1 + random(4);
           const periods = freq === 'YEARLY' ? 12 : freq === 'MONTHLY' ? 30 : 80;
           const options: Options = {freq, dtstart, interval, cache: index % 2 === 0};
-          const shape = index % (freq === 'MONTHLY' || freq === 'YEARLY' ? 8 : 6);
+          const shape = index % (freq === 'MONTHLY' || freq === 'YEARLY' ? 9 : 6);
           if (freq === 'DAILY' || freq === 'WEEKLY') {
             if (shape > 0) options.byDay = shape === 1 ? ['MO'] : shape === 2 ? ['SA', 'SU'] : weekdays;
             if (shape > 3) {
@@ -131,6 +131,10 @@ describe(`period query plans for rules without COUNT (seed=${seed})`, () => {
               options.bySetPos = [-1];
             }
             if (shape === 7) options.byHour = [9, 21];
+            if (shape === 8) {
+              options.byMonthDay = [1, 2, 3];
+              options.bySetPos = [1, -3];
+            }
             if (freq === 'YEARLY' && shape === 1) options.byMonth = [2, 6, 11];
           } else if (index % 5 === 4) {
             options.byMinute = [0, 17, 45];

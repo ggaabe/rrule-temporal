@@ -3676,10 +3676,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const timeSlotOffsets = this.timeSlotOffsetsMs ?? [0];
 
     if (this.opts.bySetPos && this.opts.bySetPos.length > 0) {
+      // Positive and negative positions can select the same candidate; like
+      // the general engine, emit it once.
       if (timeSlotOffsets.length === 1) {
         const selectedDays = this.applyBySetPosToSortedList(days).sort((a, b) => a - b);
         const offset = timeSlotOffsets[0]!;
-        return selectedDays.map((day) => monthStartMs + (day - 1) * MS_PER_DAY + offset);
+        return selectedDays
+          .filter((day, index) => index === 0 || day !== selectedDays[index - 1])
+          .map((day) => monthStartMs + (day - 1) * MS_PER_DAY + offset);
       }
 
       const timestamps: number[] = [];
@@ -3689,7 +3693,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           timestamps.push(dayBase + offset);
         }
       }
-      return this.applyBySetPosToSortedList(timestamps).sort((a, b) => a - b);
+      const selected = this.applyBySetPosToSortedList(timestamps).sort((a, b) => a - b);
+      return selected.filter((wall, index) => index === 0 || wall !== selected[index - 1]);
     }
 
     const timestamps: number[] = [];

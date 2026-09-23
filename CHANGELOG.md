@@ -22,6 +22,9 @@
 - Bounded the DST-gap checks of named-zone DAILY/WEEKLY COUNT generation by
   the rule's actual span, so long rules no longer fall back to the general
   engine; rule clones reuse already-normalized dates.
+- Fixed monthly fast paths and COUNT query plans emitting (and counting) a
+  candidate twice when positive and negative BYSETPOS positions select it,
+  e.g. `BYMONTHDAY=1,2,3;BYSETPOS=1,-3`.
 
 ## 2.2.6 (2026-09-17)
 
