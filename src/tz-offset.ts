@@ -159,6 +159,22 @@ export class ZoneOffsetResolver {
     return this.offsets[lo]!;
   }
 
+  /** The first transition instant in (fromEpochMs, toEpochMs], if any. */
+  nextTransitionAfter(fromEpochMs: number, toEpochMs: number): number | undefined {
+    if (this.fixedOffsetMs !== null) return undefined;
+    this.ensureCoverage(fromEpochMs, toEpochMs);
+    const transitions = this.transitions;
+    let lo = 0;
+    let hi = transitions.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (transitions[mid]! <= fromEpochMs) lo = mid + 1;
+      else hi = mid;
+    }
+    const transition = transitions[lo];
+    return transition !== undefined && transition <= toEpochMs ? transition : undefined;
+  }
+
   /**
    * Resolve a local wall-clock time to an instant using RFC 5545 semantics
    * (Temporal's 'compatible' disambiguation): ambiguous times take the
