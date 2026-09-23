@@ -3838,9 +3838,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   /**
-   * The wall-clock span from DTSTART that the first `count` occurrences of a
-   * TZ fast path can reach, or undefined when none is known. DAILY and WEEKLY
-   * bounds allow a period of candidates before DTSTART.
+   * An upper bound on the wall-clock span from DTSTART to the last of the
+   * first `count` occurrences the DAILY and WEEKLY TZ fast paths emit, or
+   * undefined when none is known. Each allows a period of candidates before DTSTART.
    */
   private tzFastPathCountSpanMs(count: number): number | undefined {
     const interval = this.opts.interval!;
@@ -3866,11 +3866,6 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         const days = this.opts.byDay ? (this.allByDayIsoDays?.length ?? 0) : 1;
         if (days === 0) return 0;
         return (Math.ceil(count / (days * slots)) + 1) * interval * MS_PER_WEEK;
-      }
-      case 'MONTHLY': {
-        // Months select varying numbers of dates; keep the per-month estimate.
-        const monthFactor = this.numericByMonths?.length ? Math.ceil(12 / this.numericByMonths.length) : 1;
-        return count * interval * monthFactor * 31 * MS_PER_DAY;
       }
     }
     return undefined;
@@ -4200,11 +4195,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const resolver = this.getZoneResolver();
     const startEpochMs = this.originalDtstart.epochMilliseconds;
     const untilMs = this.opts.until?.epochMilliseconds;
-    const startWallMs = this.wallMsOf(this.originalDtstart);
-    const cursorTimeOfDayMs = ((startWallMs % MS_PER_DAY) + MS_PER_DAY) % MS_PER_DAY;
-    if (this.tzFastPathGapHazard(cursorTimeOfDayMs)) {
-      return null;
-    }
+    // A skipped wall time is omitted before BYSETPOS ranks a month's
+    // candidates, so even an unselected one changes the selection: defer any
+    // month in which a DST gap can skip the (single) time slot. Without
+    // BYSETPOS, the emitted walls checked below are the only ones that matter.
+    const rankedSlotTimeOfDayMs = this.opts.bySetPos ? this.timeSlotOffsetsMs![0]! : undefined;
 
     const localUntil = this.opts.until?.withTimeZone(this.tzid).withCalendar('iso8601');
     const lastMonthIndex = localUntil ? localUntil.year * 12 + localUntil.month - 1 : undefined;
@@ -4217,6 +4212,15 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       }
 
       const {year, month} = this.monthIndexToYearMonth(monthIndex);
+      if (rankedSlotTimeOfDayMs !== undefined) {
+        const monthStartWallMs = gregorianEpochDay(year, month, 1) * MS_PER_DAY;
+        const monthEndWallMs = monthStartWallMs + this.daysInGregorianMonth(year, month) * MS_PER_DAY;
+        if (
+          resolver.timeOfDayMayHitGap(rankedSlotTimeOfDayMs, monthStartWallMs - MS_PER_DAY, monthEndWallMs + MS_PER_DAY)
+        ) {
+          return null;
+        }
+      }
       // The "epochs" are wall-clock ms; resolve each through the zone table.
       for (const wallMs of this.generateMonthlyOccurrenceEpochsUtc(year, month)) {
         const resolution = resolver.epochMsForWall(wallMs);

@@ -25,6 +25,10 @@
 - Fixed monthly fast paths and COUNT query plans emitting (and counting) a
   candidate twice when positive and negative BYSETPOS positions select it,
   e.g. `BYMONTHDAY=1,2,3;BYSETPOS=1,-3`.
+- Fixed named-zone MONTHLY generation with BYSETPOS checking DST gaps at
+  DTSTART's time instead of a BYHOUR/BYMINUTE/BYSECOND time, which ranked a
+  nonexistent candidate. Months are now checked as they are generated, so
+  long MONTHLY COUNT rules also keep their fast path.
 
 ## 2.2.6 (2026-09-17)
 
