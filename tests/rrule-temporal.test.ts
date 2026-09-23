@@ -1022,9 +1022,10 @@ describe('BYDAY with SECONDLY frequency', () => {
   test('all() enumerates seconds only on the matching weekday', () => {
     const dates = rule.all();
     expect(dates).toHaveLength(30);
-    // first occurrence should be the following Monday at the same time
+    // BYDAY limits the secondly set, so the following Monday starts at its
+    // first second (as in dateutil, rrule.js, and rrule-rust).
     expect(dates[0]!.toPlainDate().toString()).toBe('2025-01-06');
-    expect(dates[0]!.hour).toBe(12);
+    expect(dates[0]!.hour).toBe(0);
     // every occurrence should be on Monday
     expect(dates.every((d) => d.dayOfWeek === 1)).toBe(true);
     // last one should be 29 seconds after the first
@@ -1040,11 +1041,11 @@ describe('Regression - SECONDLY freq with BYDAY', () => {
     expect(dates).toHaveLength(30);
     const first = dates[0];
     if (!first) throw new Error('first is undefined');
-    expect(first.toString()).toBe('2025-01-06T12:00:00+00:00[UTC]');
+    expect(first.toString()).toBe('2025-01-06T00:00:00+00:00[UTC]');
     // ensure every occurrence is on Monday and consecutive seconds
     dates.forEach((d, i) => {
       expect(d.dayOfWeek).toBe(1);
-      expect(d.toPlainTime().toString()).toBe(`12:00:${String(i).padStart(2, '0')}`);
+      expect(d.toPlainTime().toString()).toBe(`00:00:${String(i).padStart(2, '0')}`);
     });
   });
 });
@@ -1069,11 +1070,12 @@ describe('Regression - MINUTELY freq with BYDAY and single BYMINUTE', () => {
 
   test('all() advances to the next hour each time', () => {
     const dates = rule.all();
+    // Every Monday minute is in the set, so it begins with Monday's first hour.
     expect(dates.map((d) => d.toString())).toEqual([
-      '2025-01-06T12:15:00+00:00[UTC]',
-      '2025-01-06T13:15:00+00:00[UTC]',
-      '2025-01-06T14:15:00+00:00[UTC]',
-      '2025-01-06T15:15:00+00:00[UTC]',
+      '2025-01-06T00:15:00+00:00[UTC]',
+      '2025-01-06T01:15:00+00:00[UTC]',
+      '2025-01-06T02:15:00+00:00[UTC]',
+      '2025-01-06T03:15:00+00:00[UTC]',
     ]);
   });
 });

@@ -22,6 +22,25 @@
 - Bounded the DST-gap checks of named-zone DAILY/WEEKLY COUNT generation by
   the rule's actual span, so long rules no longer fall back to the general
   engine; rule clones reuse already-normalized dates.
+- Fixed monthly fast paths and COUNT query plans emitting (and counting) a
+  candidate twice when positive and negative BYSETPOS positions select it,
+  e.g. `BYMONTHDAY=1,2,3;BYSETPOS=1,-3`.
+- Fixed named-zone MONTHLY generation with BYSETPOS checking DST gaps at
+  DTSTART's time instead of a BYHOUR/BYMINUTE/BYSECOND time, which ranked a
+  nonexistent candidate. Months are now checked as they are generated, so
+  long MONTHLY COUNT rules also keep their fast path.
+- Fixed HOURLY, MINUTELY, and SECONDLY rules with BYxxx parts ignoring the
+  INTERVAL cadence. They jumped to the next BYxxx value instead of the next
+  `DTSTART + k * INTERVAL` instant, so `FREQ=MINUTELY;INTERVAL=3;BYMINUTE=0,17,45`
+  from 23:30 returned only 23:45 from `all()` while `previous()` returned an
+  off-cadence 01:17; other rules skipped weeks, emitted occurrences before
+  DTSTART, or never finished. Periods now start at `DTSTART + k * INTERVAL`
+  in exact time, limiting parts select them, finer BYMINUTE/BYSECOND expand
+  them, and BYSETPOS applies per period. Results match python-dateutil for
+  152 reference rules and an independent oracle across DST transitions, and
+  generation is faster for every measured shape. SECONDLY/MINUTELY rules
+  limited by BYDAY now begin at the matching day's first second or minute
+  rather than at DTSTART's time of day.
 
 ## 2.2.6 (2026-09-17)
 
