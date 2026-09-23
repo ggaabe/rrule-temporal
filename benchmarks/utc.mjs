@@ -48,6 +48,24 @@ const scenarios = [
   {id: 'daily_exdate_1000', options: {freq: 'DAILY', count: 1000}, exceptions: true},
   {id: 'secondly_exdate_3600', options: {freq: 'SECONDLY', count: 3600}, exceptions: true},
   {id: 'daily_exdate_chicago_1000', zone: 'America/Chicago', options: {freq: 'DAILY', count: 1000}, exceptions: true},
+  {id: 'weekly_exdate_1000', options: {freq: 'WEEKLY', count: 1000, byDay: ['MO', 'WE', 'FR']}, exceptions: true},
+  ...['UTC', 'America/Chicago'].flatMap((zone) => {
+    const suffix = zone === 'UTC' ? '' : '_chicago';
+    return [
+      {id: `hourly_weekdays${suffix}_1000`, zone, options: {freq: 'HOURLY', count: 1000, byDay: weekdays}},
+      {
+        id: `hourly_quarter_hours${suffix}_1000`,
+        zone,
+        options: {freq: 'HOURLY', count: 1000, byMinute: [0, 15, 30, 45]},
+      },
+      {
+        id: `minutely_business_quarter_hours${suffix}_1000`,
+        zone,
+        options: {freq: 'MINUTELY', count: 1000, byHour: [9, 10, 11, 12, 13, 14, 15, 16], byMinute: [0, 15, 30, 45]},
+      },
+      {id: `secondly_first_minute${suffix}_1000`, zone, options: {freq: 'SECONDLY', count: 1000, byMinute: [0]}},
+    ];
+  }),
   {
     id: 'yearly_callback_first_3',
     options: {freq: 'YEARLY', count: 1000, byDay: weekdays, bySetPos: [-1]},

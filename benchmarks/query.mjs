@@ -279,6 +279,95 @@ const SCENARIOS = [
       return {run: () => rule.all(), expectedLength: 3_600};
     },
   },
+  {
+    id: 'weekly_next_unbounded_utc',
+    label: 'WEEKLY M/W/F next, no end, UTC',
+    build: (RRuleTemporal) => {
+      const dtstart = utc('2020-01-06T09:00:00');
+      const target = utc('2026-09-23T12:34:56');
+      const rule = new RRuleTemporal({freq: 'WEEKLY', byDay: ['MO', 'WE', 'FR'], dtstart, cache: false});
+      return {run: () => rule.next(target), expectedLength: 1};
+    },
+  },
+  {
+    id: 'weekly_exdates_next_unbounded_chicago',
+    label: 'WEEKLY M/W/F next, 40 EXDATEs, no end, Chicago',
+    build: (RRuleTemporal) => {
+      const dtstart = chicago('2020-01-06T09:00:00');
+      const target = chicago('2026-09-23T12:34:56');
+      const exDate = Array.from({length: 40}, (_, index) => dtstart.add({weeks: 1 + 2 * index}));
+      const rule = new RRuleTemporal({freq: 'WEEKLY', byDay: ['MO', 'WE', 'FR'], dtstart, exDate, cache: false});
+      return {run: () => rule.next(target), expectedLength: 1};
+    },
+  },
+  {
+    id: 'weekly_between_month_unbounded_utc',
+    label: 'WEEKLY M/W/F between one month, no end, UTC',
+    build: (RRuleTemporal) => {
+      const dtstart = utc('2020-01-06T09:00:00');
+      const start = utc('2026-09-01T00:00:00');
+      const end = utc('2026-10-01T00:00:00');
+      const rule = new RRuleTemporal({freq: 'WEEKLY', byDay: ['MO', 'WE', 'FR'], dtstart, cache: false});
+      return {run: () => rule.between(start, end), expectedLength: 13};
+    },
+  },
+  {
+    id: 'weekly_next_until_utc',
+    label: 'WEEKLY M/W/F next, UNTIL 2030, UTC',
+    build: (RRuleTemporal) => {
+      const dtstart = utc('2020-01-06T09:00:00');
+      const target = utc('2026-09-23T12:34:56');
+      const rule = new RRuleTemporal({
+        freq: 'WEEKLY',
+        byDay: ['MO', 'WE', 'FR'],
+        until: utc('2030-12-31T23:59:59'),
+        dtstart,
+        cache: false,
+      });
+      return {run: () => rule.next(target), expectedLength: 1};
+    },
+  },
+  {
+    id: 'daily_between_month_unbounded_chicago',
+    label: 'DAILY between one month, no end, Chicago',
+    build: (RRuleTemporal) => {
+      const dtstart = chicago('2020-01-01T08:30:00');
+      const start = chicago('2026-09-01T00:00:00');
+      const end = chicago('2026-10-01T00:00:00');
+      const rule = new RRuleTemporal({freq: 'DAILY', dtstart, cache: false});
+      return {run: () => rule.between(start, end), expectedLength: 30};
+    },
+  },
+  {
+    id: 'monthly_last_friday_next_unbounded_chicago',
+    label: 'MONTHLY last Friday next, no end, Chicago',
+    build: (RRuleTemporal) => {
+      const dtstart = chicago('2020-01-31T16:00:00');
+      const target = chicago('2026-09-23T12:34:56');
+      const rule = new RRuleTemporal({freq: 'MONTHLY', byDay: ['-1FR'], dtstart, cache: false});
+      return {run: () => rule.next(target), expectedLength: 1};
+    },
+  },
+  {
+    id: 'yearly_previous_unbounded_chicago',
+    label: 'YEARLY previous, no end, Chicago',
+    build: (RRuleTemporal) => {
+      const dtstart = chicago('1990-07-04T00:00:00');
+      const target = chicago('2026-09-23T12:34:56');
+      const rule = new RRuleTemporal({freq: 'YEARLY', dtstart, cache: false});
+      return {run: () => rule.previous(target), expectedLength: 1};
+    },
+  },
+  {
+    id: 'hourly_interval_next_unbounded_utc',
+    label: 'HOURLY every 4 hours next, no end, UTC',
+    build: (RRuleTemporal) => {
+      const dtstart = utc('2026-01-01T00:00:00');
+      const target = utc('2026-09-23T12:34:56');
+      const rule = new RRuleTemporal({freq: 'HOURLY', interval: 4, dtstart, cache: false});
+      return {run: () => rule.next(target), expectedLength: 1};
+    },
+  },
 ];
 
 function formatMicroseconds(value) {
@@ -293,7 +382,7 @@ async function main() {
   const scenarios = config.scenario ? SCENARIOS.filter((scenario) => scenario.id === config.scenario) : SCENARIOS;
   if (scenarios.length === 0) throw new Error(`Unknown scenario: ${config.scenario}`);
 
-  console.log('# COUNT-bound query benchmark');
+  console.log('# Query benchmark');
   console.log('');
   console.log(`Package: ${config.packageRoot}`);
   console.log(`Node: ${process.version}`);
