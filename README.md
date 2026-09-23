@@ -318,6 +318,38 @@ Notes
 
 ## Benchmarks
 
+### Queries without COUNT and sub-daily rules (v2.2.7)
+
+Measured September 23, 2026 on an Apple M2 Max with Node 25.2.1 and the
+bundled Temporal polyfill, comparing builds of `v2.2.6` and v2.2.7. Every
+scenario returned identical results from both builds before timing. Query rows
+are warm medians per call, generation rows are uncached `all()` calls with the
+builds alternating each sample, and the last row is the first `all()` in a
+fresh process (median of 15).
+
+| Scenario | v2.2.6 | v2.2.7 | Speedup |
+| --- | ---: | ---: | ---: |
+| WEEKLY M/W/F `next()`, no end, UTC | 61.25 us | 0.69 us | 88.77x |
+| WEEKLY M/W/F `next()`, 40 EXDATEs, no end, Chicago | 157.5 us | 1.33 us | 118x |
+| WEEKLY M/W/F `between()` one month, no end, UTC | 36.22 us | 6.40 us | 5.66x |
+| MONTHLY last Friday `next()`, no end, Chicago | 68.79 us | 1.39 us | 49.49x |
+| YEARLY `previous()`, no end, Chicago | 79.11 us | 2.23 us | 35.48x |
+| UTC WEEKLY M/W/F with RDATE/EXDATE, `all()`, COUNT 1,000 | 12.555 ms | 0.697 ms | 18.02x |
+| HOURLY quarter hours, `all()`, COUNT 1,000, UTC | 3.967 ms | 1.073 ms | 3.70x |
+| MINUTELY 9:00-16:45 quarter hours, `all()`, COUNT 1,000, Chicago | 4.516 ms | 2.034 ms | 2.22x |
+| Chicago weekdays, first `all()` in a fresh process | 23.282 ms | 4.593 ms | 5.07x |
+
+Queries on unbounded and UNTIL-bound rules, the usual calendar case, now visit
+only the recurrence periods around the target instead of replaying the rule
+through Temporal. Sub-daily rules with BYxxx parts run on a new integer engine,
+which also fixes their INTERVAL cadence, and timezone tables are built from
+Temporal's own transitions. In the same runs, the 13 COUNT-bound query
+scenarios measured 0.93-2.81x and the 29 existing generation scenarios
+0.93-1.18x; isolated re-runs of the lowest cases were within 2% of v2.2.6.
+
+See [`benchmarks/README.md`](benchmarks/README.md) for every scenario, raw
+measurements, and the reproduction commands.
+
 ### UTC generation improvements (v2.2.4)
 
 Measured September 5, 2026 on an Apple M2 Max with Node 25.2.1 and the
@@ -355,68 +387,70 @@ measurements, and the reproduction command.
 
 ### COUNT-bound queries
 
-Measured September 3, 2026 on a MacBook Pro M2 Max with Node 25.2.1,
-comparing the exact `v2.2.2` tag (`6be2251`) with `v2.2.3`. The table reports
-warmed median time per call from seven 300 ms samples after a 250 ms warmup;
-lower is better. Version 2.2.3 uses the production-minified bundle described
-below.
+Measured September 24, 2026 on an Apple M2 Max with Node 25.2.1, comparing
+the exact `v2.2.2` tag (`6be2251`) with v2.2.7. The table reports warmed median
+time per call from seven 300 ms samples after a 250 ms warmup; lower is better.
+Each build ran three times in alternating processes, and the table shows the
+median run. Both builds returned identical results, and v2.2.7 uses the
+production-minified bundle described below.
 
-| Scenario | v2.2.2 | v2.2.3 | Speedup |
+| Scenario | v2.2.2 | v2.2.7 | Speedup |
 | --- | ---: | ---: | ---: |
-| SECONDLY next, COUNT 128, rank 63 | 9.53 us | 1.10 us | 8.66x |
-| SECONDLY next, COUNT 250k, rank 200k | 9.53 us | 1.15 us | 8.29x |
-| DAILY next, COUNT 9k, rank 8.5k, UTC | 10.36 us | 1.68 us | 6.17x |
-| DAILY previous, COUNT 9k, rank 8.5k, Chicago | 13.08 us | 2.25 us | 5.81x |
-| DAILY weekdays next, COUNT 9k, distant, UTC | 11.01 us | 1.93 us | 5.70x |
-| DAILY slots narrow between, COUNT 9k, UTC | 34.82 us | 9.70 us | 3.59x |
-| WEEKLY M/W/F slots next, COUNT 9k, UTC | 10.58 us | 1.78 us | 5.94x |
-| MONTHLY last weekday next, COUNT 9k, UTC | 31.34 us | 22.88 us | 1.37x |
-| MONTHLY last weekday next, COUNT 128, rank 63 | 21.32 us | 12.14 us | 1.76x |
-| SECONDLY `occursOn()`, COUNT 100k | 254.4 ms | 7.84 us | 32,449x |
-| DAILY RDATE/EXDATE next, COUNT 9k, rank 8.5k | 52.4 ms | 2.20 us | 23,818x |
-| YEARLY BYMONTH/BYMONTHDAY next, COUNT 9k, rank 8.5k | 382.2 ms | 7.94 us | 48,136x |
-| SECONDLY `all()`, COUNT 3.6k, explicit Temporal output | 41.4 ms | 19.6 ms | 2.11x |
+| SECONDLY next, COUNT 128, rank 63 | 9.44 us | 0.49 us | 19.27x |
+| SECONDLY next, COUNT 250k, rank 200k | 9.38 us | 0.52 us | 18.04x |
+| DAILY next, COUNT 9k, rank 8.5k, UTC | 9.80 us | 1.11 us | 8.83x |
+| DAILY previous, COUNT 9k, rank 8.5k, Chicago | 12.64 us | 2.39 us | 5.29x |
+| DAILY weekdays next, COUNT 9k, distant, UTC | 10.00 us | 1.22 us | 8.20x |
+| DAILY slots narrow between, COUNT 9k, UTC | 32.88 us | 5.86 us | 5.61x |
+| WEEKLY M/W/F slots next, COUNT 9k, UTC | 10.58 us | 1.27 us | 8.33x |
+| MONTHLY last weekday next, COUNT 9k, UTC | 31.55 us | 21.28 us | 1.48x |
+| MONTHLY last weekday next, COUNT 128, rank 63 | 21.99 us | 11.70 us | 1.88x |
+| SECONDLY `occursOn()`, COUNT 100k | 254.7 ms | 9.35 us | 27,241x |
+| DAILY RDATE/EXDATE next, COUNT 9k, rank 8.5k | 53.0 ms | 1.61 us | 32,919x |
+| YEARLY BYMONTH/BYMONTHDAY next, COUNT 9k, rank 8.5k | 388.9 ms | 7.41 us | 52,483x |
+| SECONDLY `all()`, COUNT 3.6k, explicit Temporal output | 42.9 ms | 18.7 ms | 2.29x |
 
 The named-zone cold call still includes lazy transition-table construction;
 the query harness prints cold timings and each sample's warm range.
 
 ### Full recurrence generation
 
-Uncached median ops/s from the same MacBook Pro M2 Max with Node 25.2.1 using
-the polyfill backend and `rrule` 2.8.1. Each result is the median of five 200 ms
-samples after a 200 ms warmup. The production bundle is minified, which
-disables `temporal-polyfill`'s development-only per-instance debug strings. The
-three-library comparison, query methodology, and cached-mode summary live in
+Uncached median ops/s for v2.2.7, measured September 23, 2026 on the same
+Apple M2 Max with Node 25.2.1 using the polyfill backend and `rrule` 2.8.1.
+Each result is the median of five 200 ms samples after a 200 ms warmup. The
+production bundle is minified, which disables `temporal-polyfill`'s
+development-only per-instance debug strings. The three-library comparison,
+query methodology, and cached-mode summary live in
 [`benchmarks/README.md`](benchmarks/README.md).
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
 | --- | --- | ---: | ---: | ---: |
-| 30 daily occurrences | UTC | 75,108 | 15,200 | 4.94x |
-| 30 daily occurrences | America/Chicago | 32,314 | 342 | 94.49x |
-| Daily weekdays across many cycles | UTC | 3,889 | 739 | 5.26x |
-| Daily weekdays across many cycles | America/Chicago | 1,784 | 18.5 | 96.43x |
-| Daily time-slot expansion | UTC | 2,159 | 1,152 | 1.87x |
-| Daily time-slot expansion | America/Chicago | 949 | 11.0 | 86.27x |
-| 720 hourly occurrences | UTC | 2,862 | 729 | 3.93x |
-| 720 hourly occurrences | America/Chicago | 1,207 | 14.1 | 85.60x |
-| 1,440 minutely occurrences | UTC | 1,351 | 337 | 4.01x |
-| 1,440 minutely occurrences | America/Chicago | 639 | 6.0 | 106.50x |
-| 3,600 secondly occurrences | UTC | 534 | 126 | 4.24x |
-| 3,600 secondly occurrences | America/Chicago | 245 | 2.6 | 94.23x |
-| Weekly MO/WE/FR across many cycles | UTC | 2,193 | 1,095 | 2.00x |
-| Weekly MO/WE/FR across many cycles | America/Chicago | 979 | 14.6 | 67.05x |
-| Weekly day and time-slot expansion | UTC | 1,698 | 1,201 | 1.41x |
-| Weekly day and time-slot expansion | America/Chicago | 834 | 11.0 | 75.82x |
-| Monthly last weekday across 20 years | UTC | 2,042 | 1,023 | 2.00x |
-| Monthly last weekday across 20 years | America/Chicago | 1,549 | 36.7 | 42.21x |
-| Monthly first and last weekday across 20 years | UTC | 1,499 | 1,179 | 1.27x |
-| Monthly first and last weekday across 20 years | America/Chicago | 1,015 | 22.0 | 46.14x |
+| 30 daily occurrences | UTC | 80,644 | 15,625 | 5.16x |
+| 30 daily occurrences | America/Chicago | 34,793 | 288 | 120.81x |
+| Daily weekdays across many cycles | UTC | 4,015 | 747 | 5.37x |
+| Daily weekdays across many cycles | America/Chicago | 2,021 | 19.4 | 104.18x |
+| Daily time-slot expansion | UTC | 2,365 | 1,045 | 2.26x |
+| Daily time-slot expansion | America/Chicago | 1,076 | 11.5 | 93.57x |
+| 720 hourly occurrences | UTC | 2,744 | 705 | 3.89x |
+| 720 hourly occurrences | America/Chicago | 1,382 | 13.4 | 103.13x |
+| 1,440 minutely occurrences | UTC | 1,740 | 337 | 5.16x |
+| 1,440 minutely occurrences | America/Chicago | 771 | 7.1 | 108.59x |
+| 3,600 secondly occurrences | UTC | 532 | 129 | 4.12x |
+| 3,600 secondly occurrences | America/Chicago | 296 | 2.9 | 102.07x |
+| Weekly MO/WE/FR across many cycles | UTC | 2,842 | 1,116 | 2.55x |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 1,235 | 14.5 | 85.17x |
+| Weekly day and time-slot expansion | UTC | 1,784 | 1,174 | 1.52x |
+| Weekly day and time-slot expansion | America/Chicago | 987 | 11.2 | 88.12x |
+| Monthly last weekday across 20 years | UTC | 2,252 | 1,027 | 2.19x |
+| Monthly last weekday across 20 years | America/Chicago | 1,681 | 44.2 | 38.03x |
+| Monthly first and last weekday across 20 years | UTC | 1,757 | 1,042 | 1.69x |
+| Monthly first and last weekday across 20 years | America/Chicago | 1,068 | 23.1 | 46.23x |
 
 Time-zone-aware rules iterate through an epoch-integer engine with a cached
-per-zone offset table, so named-zone scenarios ran 42-107x faster than `rrule`
+per-zone offset table, so named-zone scenarios ran 38-121x faster than `rrule`
 in this pass. Minifying the production bundle removes polyfill debug
 instrumentation from occurrence materialization, making UTC generation
-1.27-5.26x faster than `rrule` across every scenario. Earlier native-Temporal
+1.52-5.37x faster than `rrule` across every scenario. Earlier native-Temporal
 measurements are retained in the detailed benchmark README but were not rerun
 in this Node 25/polyfill pass. Repeated `all()` calls on the same rule instance
 are served from an internal cache (opt out per rule with `cache: false`).

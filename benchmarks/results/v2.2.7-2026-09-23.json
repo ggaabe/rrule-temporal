@@ -1,0 +1,3118 @@
+{
+  "date": "2026-09-23",
+  "hardware": "Apple M2 Max",
+  "node": "v25.2.1",
+  "backend": "bundled temporal-polyfill",
+  "baselineVersion": "2.2.6",
+  "baselineCommit": "476c0092690ff46dfe855650b5592e1c3d92c017",
+  "candidateVersion": "2.2.7",
+  "candidateCommit": "29a1369f08e2d77a066ab471126f7c5dcffc73f9",
+  "candidateSourceSha256": "b539da449811e8e3a748be4407311ec5f698170b4d1365bd7277b944ae2dfbe0",
+  "candidateTzOffsetSourceSha256": "0012b6ae306ef3230c5e2ebf160cd58c1b7dcc8871df1d2f7033e0a1069f6764",
+  "identicalOutputs": true,
+  "validation": {
+    "fullSuite": {
+      "tests": 1511,
+      "files": 61,
+      "ci": [
+        "Node 20",
+        "Node 24",
+        "Node 26 (native Temporal)"
+      ],
+      "passed": true
+    },
+    "extendedFuzz": {
+      "subdailyOracleExhaustive": {
+        "seeds": [
+          1,
+          2,
+          3
+        ],
+        "casesPerSeed": 120,
+        "checks": 12372,
+        "failures": 0
+      },
+      "queryWindowInvariants": {
+        "seeds": [
+          139,
+          99139
+        ],
+        "casesPerFrequency": 300,
+        "checks": 151168,
+        "failures": 0
+      },
+      "periodQueryPlan": {
+        "seeds": [
+          31,
+          32
+        ],
+        "casesPerFrequency": 150,
+        "checks": 189624,
+        "failures": 0
+      },
+      "calendarRfcOracle": {
+        "seed": 140,
+        "rules": 1200,
+        "checks": 24000,
+        "failures": 0
+      },
+      "numericQueryPlan": {
+        "seed": 140,
+        "casesPerFamily": 200,
+        "passed": true
+      },
+      "runtime": "Node 25.2.1 / bundled polyfill"
+    }
+  },
+  "queries": {
+    "harness": "benchmarks/query.mjs",
+    "config": {
+      "warmupMs": 250,
+      "sampleMs": 300,
+      "samples": 7
+    },
+    "method": "Three runs per build in separate processes, alternating baseline and candidate; each run reports a warm median per call. The summary is the median of the three run medians.",
+    "results": [
+      {
+        "scenario": "SECONDLY next, COUNT 128, rank 63",
+        "baselineRunMediansUs": [
+          1.18,
+          1.32,
+          0.98
+        ],
+        "candidateRunMediansUs": [
+          0.44,
+          0.42,
+          0.42
+        ],
+        "baselineMedianUs": 1.18,
+        "candidateMedianUs": 0.42,
+        "baselineFirstCallUs": [
+          312.7,
+          812.7,
+          363.8
+        ],
+        "candidateFirstCallUs": [
+          347.4,
+          315.7,
+          304.5
+        ],
+        "speedup": 2.809524
+      },
+      {
+        "scenario": "SECONDLY next, COUNT 250k, rank 200k",
+        "baselineRunMediansUs": [
+          1.15,
+          1.13,
+          1.03
+        ],
+        "candidateRunMediansUs": [
+          0.49,
+          0.52,
+          0.45
+        ],
+        "baselineMedianUs": 1.13,
+        "candidateMedianUs": 0.49,
+        "baselineFirstCallUs": [
+          88.04,
+          97.58,
+          78.0
+        ],
+        "candidateFirstCallUs": [
+          163.1,
+          156.5,
+          143.7
+        ],
+        "speedup": 2.306122
+      },
+      {
+        "scenario": "DAILY next, COUNT 9k, rank 8.5k, UTC",
+        "baselineRunMediansUs": [
+          1.79,
+          1.59,
+          1.57
+        ],
+        "candidateRunMediansUs": [
+          0.95,
+          1.02,
+          1.06
+        ],
+        "baselineMedianUs": 1.59,
+        "candidateMedianUs": 1.02,
+        "baselineFirstCallUs": [
+          285.4,
+          256.2,
+          248.5
+        ],
+        "candidateFirstCallUs": [
+          291.6,
+          251.6,
+          269.4
+        ],
+        "speedup": 1.558824
+      },
+      {
+        "scenario": "DAILY previous, COUNT 9k, rank 8.5k, Chicago",
+        "baselineRunMediansUs": [
+          2.17,
+          2.03,
+          2.07
+        ],
+        "candidateRunMediansUs": [
+          2.22,
+          2.23,
+          2.61
+        ],
+        "baselineMedianUs": 2.07,
+        "candidateMedianUs": 2.23,
+        "baselineFirstCallUs": [
+          38000.0,
+          36700.0,
+          38000.0
+        ],
+        "candidateFirstCallUs": [
+          5700.0,
+          5530.0,
+          5430.0
+        ],
+        "speedup": 0.928251
+      },
+      {
+        "scenario": "DAILY weekdays next, COUNT 9k, distant, UTC",
+        "baselineRunMediansUs": [
+          1.74,
+          1.86,
+          1.61
+        ],
+        "candidateRunMediansUs": [
+          1.12,
+          1.18,
+          1.22
+        ],
+        "baselineMedianUs": 1.74,
+        "candidateMedianUs": 1.18,
+        "baselineFirstCallUs": [
+          62.54,
+          59.58,
+          61.29
+        ],
+        "candidateFirstCallUs": [
+          48.58,
+          45.0,
+          48.5
+        ],
+        "speedup": 1.474576
+      },
+      {
+        "scenario": "DAILY slots narrow between, COUNT 9k, UTC",
+        "baselineRunMediansUs": [
+          8.66,
+          8.7,
+          8.71
+        ],
+        "candidateRunMediansUs": [
+          4.98,
+          6.56,
+          5.14
+        ],
+        "baselineMedianUs": 8.7,
+        "candidateMedianUs": 5.14,
+        "baselineFirstCallUs": [
+          313.8,
+          324.3,
+          274.5
+        ],
+        "candidateFirstCallUs": [
+          277.1,
+          299.2,
+          297.3
+        ],
+        "speedup": 1.692607
+      },
+      {
+        "scenario": "WEEKLY M/W/F slots next, COUNT 9k, UTC",
+        "baselineRunMediansUs": [
+          1.62,
+          1.63,
+          1.59
+        ],
+        "candidateRunMediansUs": [
+          1.09,
+          1.22,
+          1.1
+        ],
+        "baselineMedianUs": 1.62,
+        "candidateMedianUs": 1.1,
+        "baselineFirstCallUs": [
+          286.3,
+          311.3,
+          302.8
+        ],
+        "candidateFirstCallUs": [
+          270.2,
+          284.0,
+          300.7
+        ],
+        "speedup": 1.472727
+      },
+      {
+        "scenario": "MONTHLY last weekday next, COUNT 9k, UTC",
+        "baselineRunMediansUs": [
+          20.69,
+          21.38,
+          20.78
+        ],
+        "candidateRunMediansUs": [
+          21.42,
+          21.01,
+          20.15
+        ],
+        "baselineMedianUs": 20.78,
+        "candidateMedianUs": 21.01,
+        "baselineFirstCallUs": [
+          8270.0,
+          10500.0,
+          8340.0
+        ],
+        "candidateFirstCallUs": [
+          8380.0,
+          11800.0,
+          7970.0
+        ],
+        "speedup": 0.989053
+      },
+      {
+        "scenario": "MONTHLY last weekday next, COUNT 128, rank 63",
+        "baselineRunMediansUs": [
+          11.53,
+          11.42,
+          11.53
+        ],
+        "candidateRunMediansUs": [
+          11.9,
+          11.08,
+          11.31
+        ],
+        "baselineMedianUs": 11.53,
+        "candidateMedianUs": 11.31,
+        "baselineFirstCallUs": [
+          246.3,
+          220.3,
+          230.5
+        ],
+        "candidateFirstCallUs": [
+          254.8,
+          228.5,
+          236.6
+        ],
+        "speedup": 1.019452
+      },
+      {
+        "scenario": "SECONDLY occursOn, COUNT 100k, first day",
+        "baselineRunMediansUs": [
+          10.58,
+          8.54,
+          8.76
+        ],
+        "candidateRunMediansUs": [
+          8.77,
+          8.13,
+          8.25
+        ],
+        "baselineMedianUs": 8.76,
+        "candidateMedianUs": 8.25,
+        "baselineFirstCallUs": [
+          1130.0,
+          1070.0,
+          1300.0
+        ],
+        "candidateFirstCallUs": [
+          1060.0,
+          995.6,
+          1060.0
+        ],
+        "speedup": 1.061818
+      },
+      {
+        "scenario": "DAILY RDATE/EXDATE next, COUNT 9k, rank 8.5k",
+        "baselineRunMediansUs": [
+          2.07,
+          2.0,
+          2.07
+        ],
+        "candidateRunMediansUs": [
+          1.49,
+          1.48,
+          1.47
+        ],
+        "baselineMedianUs": 2.07,
+        "candidateMedianUs": 1.48,
+        "baselineFirstCallUs": [
+          181.8,
+          187.3,
+          181.7
+        ],
+        "candidateFirstCallUs": [
+          196.9,
+          162.7,
+          215.5
+        ],
+        "speedup": 1.398649
+      },
+      {
+        "scenario": "YEARLY BYMONTH/BYMONTHDAY next, COUNT 9k, rank 8.5k",
+        "baselineRunMediansUs": [
+          7.78,
+          7.36,
+          8.11
+        ],
+        "candidateRunMediansUs": [
+          6.53,
+          7.04,
+          6.52
+        ],
+        "baselineMedianUs": 7.78,
+        "candidateMedianUs": 6.53,
+        "baselineFirstCallUs": [
+          1770.0,
+          4140.0,
+          2780.0
+        ],
+        "candidateFirstCallUs": [
+          1700.0,
+          1700.0,
+          1870.0
+        ],
+        "speedup": 1.191424
+      },
+      {
+        "scenario": "SECONDLY all, COUNT 3.6k, explicit Temporal output",
+        "baselineRunMediansUs": [
+          17400.0,
+          18400.0,
+          18100.0
+        ],
+        "candidateRunMediansUs": [
+          17300.0,
+          17400.0,
+          17600.0
+        ],
+        "baselineMedianUs": 18100.0,
+        "candidateMedianUs": 17400.0,
+        "baselineFirstCallUs": [
+          21900.0,
+          21900.0,
+          22200.0
+        ],
+        "candidateFirstCallUs": [
+          20700.0,
+          21700.0,
+          21100.0
+        ],
+        "speedup": 1.04023
+      },
+      {
+        "scenario": "WEEKLY M/W/F next, no end, UTC",
+        "baselineRunMediansUs": [
+          59.54,
+          73.66,
+          61.25
+        ],
+        "candidateRunMediansUs": [
+          0.69,
+          0.7,
+          0.68
+        ],
+        "baselineMedianUs": 61.25,
+        "candidateMedianUs": 0.69,
+        "baselineFirstCallUs": [
+          2640.0,
+          2480.0,
+          2490.0
+        ],
+        "candidateFirstCallUs": [
+          434.6,
+          410.6,
+          402.3
+        ],
+        "speedup": 88.768116
+      },
+      {
+        "scenario": "WEEKLY M/W/F next, 40 EXDATEs, no end, Chicago",
+        "baselineRunMediansUs": [
+          157.5,
+          168.2,
+          154.4
+        ],
+        "candidateRunMediansUs": [
+          1.33,
+          1.35,
+          1.3
+        ],
+        "baselineMedianUs": 157.5,
+        "candidateMedianUs": 1.33,
+        "baselineFirstCallUs": [
+          666.8,
+          739.9,
+          639.0
+        ],
+        "candidateFirstCallUs": [
+          495.6,
+          498.6,
+          495.5
+        ],
+        "speedup": 118.421053
+      },
+      {
+        "scenario": "WEEKLY M/W/F between one month, no end, UTC",
+        "baselineRunMediansUs": [
+          43.92,
+          36.22,
+          34.1
+        ],
+        "candidateRunMediansUs": [
+          6.52,
+          6.35,
+          6.4
+        ],
+        "baselineMedianUs": 36.22,
+        "candidateMedianUs": 6.4,
+        "baselineFirstCallUs": [
+          356.0,
+          322.4,
+          311.9
+        ],
+        "candidateFirstCallUs": [
+          222.8,
+          217.8,
+          208.5
+        ],
+        "speedup": 5.659375
+      },
+      {
+        "scenario": "WEEKLY M/W/F next, UNTIL 2030, UTC",
+        "baselineRunMediansUs": [
+          69.68,
+          62.13,
+          64.59
+        ],
+        "candidateRunMediansUs": [
+          0.89,
+          0.75,
+          0.94
+        ],
+        "baselineMedianUs": 64.59,
+        "candidateMedianUs": 0.89,
+        "baselineFirstCallUs": [
+          315.5,
+          269.3,
+          304.8
+        ],
+        "candidateFirstCallUs": [
+          89.0,
+          91.92,
+          96.96
+        ],
+        "speedup": 72.573034
+      },
+      {
+        "scenario": "DAILY between one month, no end, Chicago",
+        "baselineRunMediansUs": [
+          87.71,
+          77.88,
+          82.59
+        ],
+        "candidateRunMediansUs": [
+          37.79,
+          33.65,
+          35.89
+        ],
+        "baselineMedianUs": 82.59,
+        "candidateMedianUs": 35.89,
+        "baselineFirstCallUs": [
+          68400.0,
+          65900.0,
+          68300.0
+        ],
+        "candidateFirstCallUs": [
+          282.9,
+          244.9,
+          252.6
+        ],
+        "speedup": 2.301198
+      },
+      {
+        "scenario": "MONTHLY last Friday next, no end, Chicago",
+        "baselineRunMediansUs": [
+          67.89,
+          69.96,
+          68.79
+        ],
+        "candidateRunMediansUs": [
+          1.39,
+          1.61,
+          1.37
+        ],
+        "baselineMedianUs": 68.79,
+        "candidateMedianUs": 1.39,
+        "baselineFirstCallUs": [
+          632.1,
+          618.0,
+          615.2
+        ],
+        "candidateFirstCallUs": [
+          203.2,
+          195.5,
+          228.3
+        ],
+        "speedup": 49.489209
+      },
+      {
+        "scenario": "YEARLY previous, no end, Chicago",
+        "baselineRunMediansUs": [
+          78.95,
+          82.65,
+          79.11
+        ],
+        "candidateRunMediansUs": [
+          2.23,
+          2.3,
+          2.13
+        ],
+        "baselineMedianUs": 79.11,
+        "candidateMedianUs": 2.23,
+        "baselineFirstCallUs": [
+          626.8,
+          749.4,
+          604.9
+        ],
+        "candidateFirstCallUs": [
+          1730.0,
+          1990.0,
+          1720.0
+        ],
+        "speedup": 35.475336
+      },
+      {
+        "scenario": "HOURLY every 4 hours next, no end, UTC",
+        "baselineRunMediansUs": [
+          18.72,
+          19.76,
+          19.32
+        ],
+        "candidateRunMediansUs": [
+          0.66,
+          0.61,
+          0.61
+        ],
+        "baselineMedianUs": 19.32,
+        "candidateMedianUs": 0.61,
+        "baselineFirstCallUs": [
+          732.2,
+          741.6,
+          740.2
+        ],
+        "candidateFirstCallUs": [
+          70.54,
+          63.42,
+          76.42
+        ],
+        "speedup": 31.672131
+      }
+    ]
+  },
+  "generation": {
+    "harness": "benchmarks/utc.mjs",
+    "config": {
+      "warmupMs": 200,
+      "sampleMs": 300,
+      "samples": 7
+    },
+    "method": "Uncached all() in one process, alternating baseline/candidate order each sample; complete results compared before timing. Rule construction is outside the timings.",
+    "results": [
+      {
+        "id": "yearly_last_weekday_1000",
+        "count": 1000,
+        "baselineColdMs": 32.796208,
+        "candidateColdMs": 31.33525,
+        "baseline": {
+          "medianMs": 18.64713,
+          "minMs": 18.334333,
+          "maxMs": 20.166172
+        },
+        "candidate": {
+          "medianMs": 18.888823,
+          "minMs": 18.425091,
+          "maxMs": 21.895414
+        },
+        "speedup": 0.987204
+      },
+      {
+        "id": "yearly_dates_1000",
+        "count": 1000,
+        "baselineColdMs": 2.108708,
+        "candidateColdMs": 2.136709,
+        "baseline": {
+          "medianMs": 1.143099,
+          "minMs": 1.127811,
+          "maxMs": 1.169762
+        },
+        "candidate": {
+          "medianMs": 1.231748,
+          "minMs": 1.173405,
+          "maxMs": 1.348905
+        },
+        "speedup": 0.92803
+      },
+      {
+        "id": "monthly_slots_1000",
+        "count": 1000,
+        "baselineColdMs": 1.698791,
+        "candidateColdMs": 2.020792,
+        "baseline": {
+          "medianMs": 0.928348,
+          "minMs": 0.89025,
+          "maxMs": 0.936839
+        },
+        "candidate": {
+          "medianMs": 0.963969,
+          "minMs": 0.951679,
+          "maxMs": 0.992103
+        },
+        "speedup": 0.963047
+      },
+      {
+        "id": "monthly_slot_positions_240",
+        "count": 240,
+        "baselineColdMs": 1.237458,
+        "candidateColdMs": 1.092584,
+        "baseline": {
+          "medianMs": 0.534537,
+          "minMs": 0.524564,
+          "maxMs": 0.54701
+        },
+        "candidate": {
+          "medianMs": 0.540212,
+          "minMs": 0.530689,
+          "maxMs": 0.546279
+        },
+        "speedup": 0.989495
+      },
+      {
+        "id": "yearly_dense_positions_2",
+        "count": 2,
+        "baselineColdMs": 0.318417,
+        "candidateColdMs": 0.684792,
+        "baseline": {
+          "medianMs": 0.02085,
+          "minMs": 0.02043,
+          "maxMs": 0.021297
+        },
+        "candidate": {
+          "medianMs": 0.020759,
+          "minMs": 0.020465,
+          "maxMs": 0.021351
+        },
+        "speedup": 1.004376
+      },
+      {
+        "id": "daily_exdate_1000",
+        "count": 999,
+        "baselineColdMs": 1.123541,
+        "candidateColdMs": 1.278834,
+        "baseline": {
+          "medianMs": 0.64173,
+          "minMs": 0.551285,
+          "maxMs": 1.005329
+        },
+        "candidate": {
+          "medianMs": 0.594723,
+          "minMs": 0.568528,
+          "maxMs": 0.947363
+        },
+        "speedup": 1.07904
+      },
+      {
+        "id": "secondly_exdate_3600",
+        "count": 3600,
+        "baselineColdMs": 1.8935,
+        "candidateColdMs": 2.299583,
+        "baseline": {
+          "medianMs": 2.297426,
+          "minMs": 2.102299,
+          "maxMs": 2.42705
+        },
+        "candidate": {
+          "medianMs": 2.273665,
+          "minMs": 1.954127,
+          "maxMs": 2.459922
+        },
+        "speedup": 1.01045
+      },
+      {
+        "id": "daily_exdate_chicago_1000",
+        "count": 999,
+        "baselineColdMs": 28.612459,
+        "candidateColdMs": 2.83525,
+        "baseline": {
+          "medianMs": 1.317385,
+          "minMs": 1.301155,
+          "maxMs": 1.337301
+        },
+        "candidate": {
+          "medianMs": 1.306897,
+          "minMs": 1.278204,
+          "maxMs": 1.346707
+        },
+        "speedup": 1.008025
+      },
+      {
+        "id": "weekly_exdate_1000",
+        "count": 1000,
+        "baselineColdMs": 16.99375,
+        "candidateColdMs": 1.425208,
+        "baseline": {
+          "medianMs": 12.555144,
+          "minMs": 11.647268,
+          "maxMs": 12.751403
+        },
+        "candidate": {
+          "medianMs": 0.69671,
+          "minMs": 0.651625,
+          "maxMs": 0.754361
+        },
+        "speedup": 18.020625
+      },
+      {
+        "id": "hourly_weekdays_1000",
+        "count": 1000,
+        "baselineColdMs": 3.910125,
+        "candidateColdMs": 2.630834,
+        "baseline": {
+          "medianMs": 3.252393,
+          "minMs": 3.209053,
+          "maxMs": 3.54154
+        },
+        "candidate": {
+          "medianMs": 1.146938,
+          "minMs": 1.113892,
+          "maxMs": 1.169785
+        },
+        "speedup": 2.835719
+      },
+      {
+        "id": "hourly_quarter_hours_1000",
+        "count": 1000,
+        "baselineColdMs": 4.574542,
+        "candidateColdMs": 1.541167,
+        "baseline": {
+          "medianMs": 3.967498,
+          "minMs": 3.860125,
+          "maxMs": 5.826582
+        },
+        "candidate": {
+          "medianMs": 1.073489,
+          "minMs": 1.051249,
+          "maxMs": 1.124825
+        },
+        "speedup": 3.695892
+      },
+      {
+        "id": "minutely_business_quarter_hours_1000",
+        "count": 1000,
+        "baselineColdMs": 4.157375,
+        "candidateColdMs": 2.729541,
+        "baseline": {
+          "medianMs": 3.963788,
+          "minMs": 3.906662,
+          "maxMs": 6.724754
+        },
+        "candidate": {
+          "medianMs": 1.298929,
+          "minMs": 1.233325,
+          "maxMs": 2.2873
+        },
+        "speedup": 3.051583
+      },
+      {
+        "id": "secondly_first_minute_1000",
+        "count": 1000,
+        "baselineColdMs": 3.052291,
+        "candidateColdMs": 0.953334,
+        "baseline": {
+          "medianMs": 2.845025,
+          "minMs": 2.678744,
+          "maxMs": 3.493337
+        },
+        "candidate": {
+          "medianMs": 1.081698,
+          "minMs": 1.020408,
+          "maxMs": 1.27722
+        },
+        "speedup": 2.630146
+      },
+      {
+        "id": "hourly_weekdays_chicago_1000",
+        "count": 1000,
+        "baselineColdMs": 4.02925,
+        "candidateColdMs": 3.579208,
+        "baseline": {
+          "medianMs": 3.81797,
+          "minMs": 3.516102,
+          "maxMs": 3.853396
+        },
+        "candidate": {
+          "medianMs": 1.917862,
+          "minMs": 1.87591,
+          "maxMs": 2.101167
+        },
+        "speedup": 1.990743
+      },
+      {
+        "id": "hourly_quarter_hours_chicago_1000",
+        "count": 1000,
+        "baselineColdMs": 4.770708,
+        "candidateColdMs": 1.681459,
+        "baseline": {
+          "medianMs": 4.261658,
+          "minMs": 4.135362,
+          "maxMs": 8.596287
+        },
+        "candidate": {
+          "medianMs": 1.804856,
+          "minMs": 1.783742,
+          "maxMs": 1.849959
+        },
+        "speedup": 2.361218
+      },
+      {
+        "id": "minutely_business_quarter_hours_chicago_1000",
+        "count": 1000,
+        "baselineColdMs": 4.378833,
+        "candidateColdMs": 1.93525,
+        "baseline": {
+          "medianMs": 4.516039,
+          "minMs": 4.199541,
+          "maxMs": 16.055904
+        },
+        "candidate": {
+          "medianMs": 2.03391,
+          "minMs": 2.021524,
+          "maxMs": 4.330482
+        },
+        "speedup": 2.220374
+      },
+      {
+        "id": "secondly_first_minute_chicago_1000",
+        "count": 1000,
+        "baselineColdMs": 2.224958,
+        "candidateColdMs": 1.639167,
+        "baseline": {
+          "medianMs": 3.249899,
+          "minMs": 2.78372,
+          "maxMs": 4.765529
+        },
+        "candidate": {
+          "medianMs": 1.798016,
+          "minMs": 1.766142,
+          "maxMs": 1.832828
+        },
+        "speedup": 1.807491
+      },
+      {
+        "id": "yearly_callback_first_3",
+        "count": 3,
+        "baselineColdMs": 0.326583,
+        "candidateColdMs": 0.235959,
+        "baseline": {
+          "medianMs": 0.096407,
+          "minMs": 0.079427,
+          "maxMs": 0.144237
+        },
+        "candidate": {
+          "medianMs": 0.081732,
+          "minMs": 0.08026,
+          "maxMs": 0.152853
+        },
+        "speedup": 1.179545
+      },
+      {
+        "id": "daily_30_UTC",
+        "count": 30,
+        "baselineColdMs": 0.071583,
+        "candidateColdMs": 0.036875,
+        "baseline": {
+          "medianMs": 0.016031,
+          "minMs": 0.014885,
+          "maxMs": 0.02528
+        },
+        "candidate": {
+          "medianMs": 0.016462,
+          "minMs": 0.015052,
+          "maxMs": 0.030691
+        },
+        "speedup": 0.973821
+      },
+      {
+        "id": "daily_30_America/Chicago",
+        "count": 30,
+        "baselineColdMs": 0.096666,
+        "candidateColdMs": 0.480834,
+        "baseline": {
+          "medianMs": 0.032987,
+          "minMs": 0.031889,
+          "maxMs": 0.034739
+        },
+        "candidate": {
+          "medianMs": 0.033417,
+          "minMs": 0.03195,
+          "maxMs": 0.036784
+        },
+        "speedup": 0.987127
+      },
+      {
+        "id": "daily_weekdays_520_UTC",
+        "count": 520,
+        "baselineColdMs": 0.30325,
+        "candidateColdMs": 0.272125,
+        "baseline": {
+          "medianMs": 0.249939,
+          "minMs": 0.228713,
+          "maxMs": 0.279431
+        },
+        "candidate": {
+          "medianMs": 0.238315,
+          "minMs": 0.223873,
+          "maxMs": 0.301322
+        },
+        "speedup": 1.048776
+      },
+      {
+        "id": "daily_weekdays_520_America/Chicago",
+        "count": 520,
+        "baselineColdMs": 0.715166,
+        "candidateColdMs": 0.720667,
+        "baseline": {
+          "medianMs": 0.564996,
+          "minMs": 0.537776,
+          "maxMs": 0.589875
+        },
+        "candidate": {
+          "medianMs": 0.579416,
+          "minMs": 0.541086,
+          "maxMs": 0.592529
+        },
+        "speedup": 0.975113
+      },
+      {
+        "id": "daily_time_slots_1000_UTC",
+        "count": 1000,
+        "baselineColdMs": 0.560209,
+        "candidateColdMs": 0.471875,
+        "baseline": {
+          "medianMs": 0.419758,
+          "minMs": 0.404871,
+          "maxMs": 0.526349
+        },
+        "candidate": {
+          "medianMs": 0.430396,
+          "minMs": 0.422007,
+          "maxMs": 0.494602
+        },
+        "speedup": 0.975283
+      },
+      {
+        "id": "daily_time_slots_1000_America/Chicago",
+        "count": 1000,
+        "baselineColdMs": 1.330042,
+        "candidateColdMs": 1.244958,
+        "baseline": {
+          "medianMs": 1.056665,
+          "minMs": 1.009225,
+          "maxMs": 1.080555
+        },
+        "candidate": {
+          "medianMs": 1.069637,
+          "minMs": 1.06123,
+          "maxMs": 1.11542
+        },
+        "speedup": 0.987873
+      },
+      {
+        "id": "hourly_720_UTC",
+        "count": 720,
+        "baselineColdMs": 0.326084,
+        "candidateColdMs": 0.315791,
+        "baseline": {
+          "medianMs": 0.288005,
+          "minMs": 0.279627,
+          "maxMs": 0.32886
+        },
+        "candidate": {
+          "medianMs": 0.294467,
+          "minMs": 0.275325,
+          "maxMs": 0.319675
+        },
+        "speedup": 0.978057
+      },
+      {
+        "id": "hourly_720_America/Chicago",
+        "count": 720,
+        "baselineColdMs": 1.066208,
+        "candidateColdMs": 0.950542,
+        "baseline": {
+          "medianMs": 0.969987,
+          "minMs": 0.807558,
+          "maxMs": 1.617232
+        },
+        "candidate": {
+          "medianMs": 0.944591,
+          "minMs": 0.815305,
+          "maxMs": 1.080555
+        },
+        "speedup": 1.026886
+      },
+      {
+        "id": "minutely_1440_UTC",
+        "count": 1440,
+        "baselineColdMs": 0.480167,
+        "candidateColdMs": 0.696791,
+        "baseline": {
+          "medianMs": 0.688503,
+          "minMs": 0.648528,
+          "maxMs": 0.760274
+        },
+        "candidate": {
+          "medianMs": 0.649941,
+          "minMs": 0.601798,
+          "maxMs": 0.774403
+        },
+        "speedup": 1.059332
+      },
+      {
+        "id": "minutely_1440_America/Chicago",
+        "count": 1440,
+        "baselineColdMs": 1.579833,
+        "candidateColdMs": 1.479583,
+        "baseline": {
+          "medianMs": 1.560437,
+          "minMs": 1.51748,
+          "maxMs": 1.712037
+        },
+        "candidate": {
+          "medianMs": 1.500604,
+          "minMs": 1.439478,
+          "maxMs": 1.747389
+        },
+        "speedup": 1.039873
+      },
+      {
+        "id": "secondly_3600_UTC",
+        "count": 3600,
+        "baselineColdMs": 1.105542,
+        "candidateColdMs": 1.353791,
+        "baseline": {
+          "medianMs": 1.547882,
+          "minMs": 1.435928,
+          "maxMs": 1.908059
+        },
+        "candidate": {
+          "medianMs": 1.547841,
+          "minMs": 1.407615,
+          "maxMs": 1.607481
+        },
+        "speedup": 1.000026
+      },
+      {
+        "id": "secondly_3600_America/Chicago",
+        "count": 3600,
+        "baselineColdMs": 3.278625,
+        "candidateColdMs": 3.239875,
+        "baseline": {
+          "medianMs": 3.811239,
+          "minMs": 3.763489,
+          "maxMs": 4.368618
+        },
+        "candidate": {
+          "medianMs": 3.764055,
+          "minMs": 3.59662,
+          "maxMs": 3.779366
+        },
+        "speedup": 1.012536
+      },
+      {
+        "id": "weekly_mwf_780_UTC",
+        "count": 780,
+        "baselineColdMs": 0.557958,
+        "candidateColdMs": 0.4125,
+        "baseline": {
+          "medianMs": 0.322691,
+          "minMs": 0.30558,
+          "maxMs": 0.394939
+        },
+        "candidate": {
+          "medianMs": 0.324544,
+          "minMs": 0.311971,
+          "maxMs": 0.369088
+        },
+        "speedup": 0.994291
+      },
+      {
+        "id": "weekly_mwf_780_America/Chicago",
+        "count": 780,
+        "baselineColdMs": 1.048708,
+        "candidateColdMs": 1.010458,
+        "baseline": {
+          "medianMs": 0.832147,
+          "minMs": 0.795025,
+          "maxMs": 0.948437
+        },
+        "candidate": {
+          "medianMs": 0.878723,
+          "minMs": 0.851629,
+          "maxMs": 0.943877
+        },
+        "speedup": 0.946996
+      },
+      {
+        "id": "weekly_time_slots_1000_UTC",
+        "count": 1000,
+        "baselineColdMs": 0.564917,
+        "candidateColdMs": 0.563625,
+        "baseline": {
+          "medianMs": 0.546468,
+          "minMs": 0.42617,
+          "maxMs": 0.714687
+        },
+        "candidate": {
+          "medianMs": 0.585163,
+          "minMs": 0.445143,
+          "maxMs": 1.021529
+        },
+        "speedup": 0.933874
+      },
+      {
+        "id": "weekly_time_slots_1000_America/Chicago",
+        "count": 1000,
+        "baselineColdMs": 1.470417,
+        "candidateColdMs": 1.351875,
+        "baseline": {
+          "medianMs": 1.279136,
+          "minMs": 1.179645,
+          "maxMs": 1.443005
+        },
+        "candidate": {
+          "medianMs": 1.241906,
+          "minMs": 1.209678,
+          "maxMs": 1.343465
+        },
+        "speedup": 1.029978
+      },
+      {
+        "id": "monthly_last_weekday_240_UTC",
+        "count": 240,
+        "baselineColdMs": 0.825083,
+        "candidateColdMs": 0.880792,
+        "baseline": {
+          "medianMs": 0.457207,
+          "minMs": 0.440291,
+          "maxMs": 0.480528
+        },
+        "candidate": {
+          "medianMs": 0.459137,
+          "minMs": 0.444238,
+          "maxMs": 0.474068
+        },
+        "speedup": 0.995796
+      },
+      {
+        "id": "monthly_last_weekday_240_America/Chicago",
+        "count": 240,
+        "baselineColdMs": 1.210208,
+        "candidateColdMs": 3.826375,
+        "baseline": {
+          "medianMs": 0.623177,
+          "minMs": 0.604081,
+          "maxMs": 0.649766
+        },
+        "candidate": {
+          "medianMs": 0.636917,
+          "minMs": 0.605268,
+          "maxMs": 0.658984
+        },
+        "speedup": 0.978428
+      },
+      {
+        "id": "monthly_first_last_weekday_480_UTC",
+        "count": 480,
+        "baselineColdMs": 0.721208,
+        "candidateColdMs": 1.056333,
+        "baseline": {
+          "medianMs": 0.580012,
+          "minMs": 0.497591,
+          "maxMs": 0.657993
+        },
+        "candidate": {
+          "medianMs": 0.585764,
+          "minMs": 0.531095,
+          "maxMs": 0.625144
+        },
+        "speedup": 0.99018
+      },
+      {
+        "id": "monthly_first_last_weekday_480_America/Chicago",
+        "count": 480,
+        "baselineColdMs": 53.736291,
+        "candidateColdMs": 0.889167,
+        "baseline": {
+          "medianMs": 0.850696,
+          "minMs": 0.815018,
+          "maxMs": 0.91048
+        },
+        "candidate": {
+          "medianMs": 0.873103,
+          "minMs": 0.849457,
+          "maxMs": 0.925327
+        },
+        "speedup": 0.974337
+      }
+    ]
+  },
+  "firstCall": {
+    "harness": "benchmarks/cold.mjs",
+    "trials": 15,
+    "method": "A fresh process per observation, alternating builds; complete results compared on every trial.",
+    "results": [
+      {
+        "id": "daily30_chicago",
+        "baseline": {
+          "constructionMs": {
+            "median": 13.289333,
+            "min": 12.802292,
+            "max": 14.736667
+          },
+          "allMs": {
+            "median": 4.684041,
+            "min": 4.568208,
+            "max": 5.27225
+          },
+          "totalMs": {
+            "median": 17.959875,
+            "min": 17.474875,
+            "max": 19.793584
+          }
+        },
+        "candidate": {
+          "constructionMs": {
+            "median": 13.540667,
+            "min": 12.833583,
+            "max": 14.671208
+          },
+          "allMs": {
+            "median": 1.843125,
+            "min": 1.72675,
+            "max": 2.315292
+          },
+          "totalMs": {
+            "median": 15.374459,
+            "min": 14.60975,
+            "max": 16.585541
+          }
+        },
+        "samples": {
+          "baseline": [
+            {
+              "constructionMs": 13.23375,
+              "allMs": 4.5715,
+              "totalMs": 17.80525
+            },
+            {
+              "constructionMs": 12.999209,
+              "allMs": 4.684041,
+              "totalMs": 17.68325
+            },
+            {
+              "constructionMs": 12.802292,
+              "allMs": 4.672583,
+              "totalMs": 17.474875
+            },
+            {
+              "constructionMs": 13.462792,
+              "allMs": 5.208375,
+              "totalMs": 18.671167
+            },
+            {
+              "constructionMs": 13.758166,
+              "allMs": 5.059292,
+              "totalMs": 18.817458
+            },
+            {
+              "constructionMs": 14.736667,
+              "allMs": 5.056917,
+              "totalMs": 19.793584
+            },
+            {
+              "constructionMs": 13.298375,
+              "allMs": 5.103291,
+              "totalMs": 18.401666
+            },
+            {
+              "constructionMs": 13.927625,
+              "allMs": 4.939041,
+              "totalMs": 18.866666
+            },
+            {
+              "constructionMs": 13.682125,
+              "allMs": 4.674792,
+              "totalMs": 18.356917
+            },
+            {
+              "constructionMs": 13.289333,
+              "allMs": 4.670542,
+              "totalMs": 17.959875
+            },
+            {
+              "constructionMs": 13.164834,
+              "allMs": 4.625958,
+              "totalMs": 17.790792
+            },
+            {
+              "constructionMs": 13.032417,
+              "allMs": 4.568208,
+              "totalMs": 17.600625
+            },
+            {
+              "constructionMs": 13.965917,
+              "allMs": 5.27225,
+              "totalMs": 19.238167
+            },
+            {
+              "constructionMs": 12.86475,
+              "allMs": 4.731666,
+              "totalMs": 17.596416
+            },
+            {
+              "constructionMs": 13.131541,
+              "allMs": 4.652792,
+              "totalMs": 17.784333
+            }
+          ],
+          "candidate": [
+            {
+              "constructionMs": 12.833583,
+              "allMs": 1.776167,
+              "totalMs": 14.60975
+            },
+            {
+              "constructionMs": 12.878333,
+              "allMs": 1.812167,
+              "totalMs": 14.6905
+            },
+            {
+              "constructionMs": 13.20575,
+              "allMs": 1.843125,
+              "totalMs": 15.048875
+            },
+            {
+              "constructionMs": 14.3435,
+              "allMs": 1.878333,
+              "totalMs": 16.221833
+            },
+            {
+              "constructionMs": 14.120291,
+              "allMs": 2.122459,
+              "totalMs": 16.24275
+            },
+            {
+              "constructionMs": 13.66325,
+              "allMs": 1.947208,
+              "totalMs": 15.610458
+            },
+            {
+              "constructionMs": 14.671208,
+              "allMs": 1.914333,
+              "totalMs": 16.585541
+            },
+            {
+              "constructionMs": 13.78925,
+              "allMs": 1.72675,
+              "totalMs": 15.516
+            },
+            {
+              "constructionMs": 13.540667,
+              "allMs": 1.833792,
+              "totalMs": 15.374459
+            },
+            {
+              "constructionMs": 14.095959,
+              "allMs": 1.887708,
+              "totalMs": 15.983667
+            },
+            {
+              "constructionMs": 12.923333,
+              "allMs": 1.820375,
+              "totalMs": 14.743708
+            },
+            {
+              "constructionMs": 13.219042,
+              "allMs": 1.819292,
+              "totalMs": 15.038334
+            },
+            {
+              "constructionMs": 13.15875,
+              "allMs": 1.876833,
+              "totalMs": 15.035583
+            },
+            {
+              "constructionMs": 12.89925,
+              "allMs": 1.795125,
+              "totalMs": 14.694375
+            },
+            {
+              "constructionMs": 13.588792,
+              "allMs": 2.315292,
+              "totalMs": 15.904084
+            }
+          ]
+        }
+      },
+      {
+        "id": "daily520_chicago",
+        "baseline": {
+          "constructionMs": {
+            "median": 13.73875,
+            "min": 12.993417,
+            "max": 14.86275
+          },
+          "allMs": {
+            "median": 23.281667,
+            "min": 22.626166,
+            "max": 24.086667
+          },
+          "totalMs": {
+            "median": 36.99025,
+            "min": 35.735333,
+            "max": 38.912875
+          }
+        },
+        "candidate": {
+          "constructionMs": {
+            "median": 13.701917,
+            "min": 12.843333,
+            "max": 14.98375
+          },
+          "allMs": {
+            "median": 4.592958,
+            "min": 4.162084,
+            "max": 8.692834
+          },
+          "totalMs": {
+            "median": 18.297667,
+            "min": 17.234333,
+            "max": 22.993625
+          }
+        },
+        "samples": {
+          "baseline": [
+            {
+              "constructionMs": 13.733166,
+              "allMs": 23.136542,
+              "totalMs": 36.869708
+            },
+            {
+              "constructionMs": 14.653833,
+              "allMs": 24.086667,
+              "totalMs": 38.7405
+            },
+            {
+              "constructionMs": 14.86275,
+              "allMs": 24.050125,
+              "totalMs": 38.912875
+            },
+            {
+              "constructionMs": 14.343666,
+              "allMs": 23.827542,
+              "totalMs": 38.171208
+            },
+            {
+              "constructionMs": 13.776458,
+              "allMs": 23.281667,
+              "totalMs": 37.058125
+            },
+            {
+              "constructionMs": 13.669791,
+              "allMs": 23.088542,
+              "totalMs": 36.758333
+            },
+            {
+              "constructionMs": 13.73875,
+              "allMs": 23.2515,
+              "totalMs": 36.99025
+            },
+            {
+              "constructionMs": 14.468709,
+              "allMs": 23.806875,
+              "totalMs": 38.275584
+            },
+            {
+              "constructionMs": 13.755083,
+              "allMs": 23.682875,
+              "totalMs": 37.437958
+            },
+            {
+              "constructionMs": 13.10575,
+              "allMs": 22.629583,
+              "totalMs": 35.735333
+            },
+            {
+              "constructionMs": 13.092958,
+              "allMs": 22.746459,
+              "totalMs": 35.839417
+            },
+            {
+              "constructionMs": 13.201834,
+              "allMs": 22.626166,
+              "totalMs": 35.828
+            },
+            {
+              "constructionMs": 12.993417,
+              "allMs": 23.422125,
+              "totalMs": 36.415542
+            },
+            {
+              "constructionMs": 13.546875,
+              "allMs": 22.985083,
+              "totalMs": 36.531958
+            },
+            {
+              "constructionMs": 13.916417,
+              "allMs": 23.32575,
+              "totalMs": 37.242167
+            }
+          ],
+          "candidate": [
+            {
+              "constructionMs": 13.35,
+              "allMs": 4.947667,
+              "totalMs": 18.297667
+            },
+            {
+              "constructionMs": 13.701917,
+              "allMs": 4.761167,
+              "totalMs": 18.463084
+            },
+            {
+              "constructionMs": 14.300791,
+              "allMs": 8.692834,
+              "totalMs": 22.993625
+            },
+            {
+              "constructionMs": 14.013166,
+              "allMs": 4.712667,
+              "totalMs": 18.725833
+            },
+            {
+              "constructionMs": 13.715875,
+              "allMs": 4.448542,
+              "totalMs": 18.164417
+            },
+            {
+              "constructionMs": 13.514666,
+              "allMs": 4.618,
+              "totalMs": 18.132666
+            },
+            {
+              "constructionMs": 14.98375,
+              "allMs": 4.650625,
+              "totalMs": 19.634375
+            },
+            {
+              "constructionMs": 14.076166,
+              "allMs": 4.392542,
+              "totalMs": 18.468708
+            },
+            {
+              "constructionMs": 13.33125,
+              "allMs": 4.43325,
+              "totalMs": 17.7645
+            },
+            {
+              "constructionMs": 13.117333,
+              "allMs": 4.162084,
+              "totalMs": 17.279417
+            },
+            {
+              "constructionMs": 12.914042,
+              "allMs": 4.363875,
+              "totalMs": 17.277917
+            },
+            {
+              "constructionMs": 12.843333,
+              "allMs": 4.391,
+              "totalMs": 17.234333
+            },
+            {
+              "constructionMs": 14.046833,
+              "allMs": 4.631167,
+              "totalMs": 18.678
+            },
+            {
+              "constructionMs": 13.778875,
+              "allMs": 4.583542,
+              "totalMs": 18.362417
+            },
+            {
+              "constructionMs": 13.401417,
+              "allMs": 4.592958,
+              "totalMs": 17.994375
+            }
+          ]
+        }
+      },
+      {
+        "id": "daily30_utc",
+        "baseline": {
+          "constructionMs": {
+            "median": 1.986667,
+            "min": 1.94275,
+            "max": 2.257208
+          },
+          "allMs": {
+            "median": 0.317416,
+            "min": 0.284417,
+            "max": 0.568125
+          },
+          "totalMs": {
+            "median": 2.304083,
+            "min": 2.252792,
+            "max": 2.825333
+          }
+        },
+        "candidate": {
+          "constructionMs": {
+            "median": 1.986666,
+            "min": 1.872,
+            "max": 3.538667
+          },
+          "allMs": {
+            "median": 0.366292,
+            "min": 0.350084,
+            "max": 0.525708
+          },
+          "totalMs": {
+            "median": 2.366,
+            "min": 2.228667,
+            "max": 4.064375
+          }
+        },
+        "samples": {
+          "baseline": [
+            {
+              "constructionMs": 1.969792,
+              "allMs": 0.325667,
+              "totalMs": 2.295459
+            },
+            {
+              "constructionMs": 1.958417,
+              "allMs": 0.322667,
+              "totalMs": 2.281084
+            },
+            {
+              "constructionMs": 1.985625,
+              "allMs": 0.31025,
+              "totalMs": 2.295875
+            },
+            {
+              "constructionMs": 1.986667,
+              "allMs": 0.317416,
+              "totalMs": 2.304083
+            },
+            {
+              "constructionMs": 1.958042,
+              "allMs": 0.320667,
+              "totalMs": 2.278709
+            },
+            {
+              "constructionMs": 2.040084,
+              "allMs": 0.359666,
+              "totalMs": 2.39975
+            },
+            {
+              "constructionMs": 2.115042,
+              "allMs": 0.284417,
+              "totalMs": 2.399459
+            },
+            {
+              "constructionMs": 1.963708,
+              "allMs": 0.328333,
+              "totalMs": 2.292041
+            },
+            {
+              "constructionMs": 2.257208,
+              "allMs": 0.568125,
+              "totalMs": 2.825333
+            },
+            {
+              "constructionMs": 2.091,
+              "allMs": 0.312792,
+              "totalMs": 2.403792
+            },
+            {
+              "constructionMs": 2.195584,
+              "allMs": 0.313958,
+              "totalMs": 2.509542
+            },
+            {
+              "constructionMs": 1.976417,
+              "allMs": 0.30275,
+              "totalMs": 2.279167
+            },
+            {
+              "constructionMs": 2.021541,
+              "allMs": 0.317542,
+              "totalMs": 2.339083
+            },
+            {
+              "constructionMs": 1.94275,
+              "allMs": 0.310042,
+              "totalMs": 2.252792
+            },
+            {
+              "constructionMs": 2.009208,
+              "allMs": 0.316625,
+              "totalMs": 2.325833
+            }
+          ],
+          "candidate": [
+            {
+              "constructionMs": 1.915167,
+              "allMs": 0.363125,
+              "totalMs": 2.278292
+            },
+            {
+              "constructionMs": 1.986666,
+              "allMs": 0.379334,
+              "totalMs": 2.366
+            },
+            {
+              "constructionMs": 1.931125,
+              "allMs": 0.358167,
+              "totalMs": 2.289292
+            },
+            {
+              "constructionMs": 2.075625,
+              "allMs": 0.385583,
+              "totalMs": 2.461208
+            },
+            {
+              "constructionMs": 2.337917,
+              "allMs": 0.414292,
+              "totalMs": 2.752209
+            },
+            {
+              "constructionMs": 2.032333,
+              "allMs": 0.395958,
+              "totalMs": 2.428291
+            },
+            {
+              "constructionMs": 2.034083,
+              "allMs": 0.350084,
+              "totalMs": 2.384167
+            },
+            {
+              "constructionMs": 1.929084,
+              "allMs": 0.35425,
+              "totalMs": 2.283334
+            },
+            {
+              "constructionMs": 3.538667,
+              "allMs": 0.525708,
+              "totalMs": 4.064375
+            },
+            {
+              "constructionMs": 2.156416,
+              "allMs": 0.450125,
+              "totalMs": 2.606541
+            },
+            {
+              "constructionMs": 2.033125,
+              "allMs": 0.3535,
+              "totalMs": 2.386625
+            },
+            {
+              "constructionMs": 1.952458,
+              "allMs": 0.366292,
+              "totalMs": 2.31875
+            },
+            {
+              "constructionMs": 1.98225,
+              "allMs": 0.365917,
+              "totalMs": 2.348167
+            },
+            {
+              "constructionMs": 1.961708,
+              "allMs": 0.373125,
+              "totalMs": 2.334833
+            },
+            {
+              "constructionMs": 1.872,
+              "allMs": 0.356667,
+              "totalMs": 2.228667
+            }
+          ]
+        }
+      },
+      {
+        "id": "monthly_slots_chicago",
+        "baseline": {
+          "constructionMs": {
+            "median": 13.267875,
+            "min": 13.084167,
+            "max": 14.087
+          },
+          "allMs": {
+            "median": 25.493459,
+            "min": 24.624333,
+            "max": 26.599584
+          },
+          "totalMs": {
+            "median": 38.967083,
+            "min": 37.723666,
+            "max": 40.584417
+          }
+        },
+        "candidate": {
+          "constructionMs": {
+            "median": 13.4525,
+            "min": 12.864375,
+            "max": 14.029333
+          },
+          "allMs": {
+            "median": 22.427875,
+            "min": 21.640125,
+            "max": 24.407125
+          },
+          "totalMs": {
+            "median": 35.799625,
+            "min": 34.754875,
+            "max": 37.76675
+          }
+        },
+        "samples": {
+          "baseline": [
+            {
+              "constructionMs": 13.089875,
+              "allMs": 25.925417,
+              "totalMs": 39.015292
+            },
+            {
+              "constructionMs": 13.208125,
+              "allMs": 26.400167,
+              "totalMs": 39.608292
+            },
+            {
+              "constructionMs": 13.523958,
+              "allMs": 25.443125,
+              "totalMs": 38.967083
+            },
+            {
+              "constructionMs": 13.448,
+              "allMs": 24.933792,
+              "totalMs": 38.381792
+            },
+            {
+              "constructionMs": 13.267875,
+              "allMs": 24.796125,
+              "totalMs": 38.064
+            },
+            {
+              "constructionMs": 13.223292,
+              "allMs": 25.381791,
+              "totalMs": 38.605083
+            },
+            {
+              "constructionMs": 13.099333,
+              "allMs": 24.624333,
+              "totalMs": 37.723666
+            },
+            {
+              "constructionMs": 13.554375,
+              "allMs": 26.584875,
+              "totalMs": 40.13925
+            },
+            {
+              "constructionMs": 13.371541,
+              "allMs": 25.493459,
+              "totalMs": 38.865
+            },
+            {
+              "constructionMs": 13.084167,
+              "allMs": 24.688583,
+              "totalMs": 37.77275
+            },
+            {
+              "constructionMs": 13.155875,
+              "allMs": 24.911042,
+              "totalMs": 38.066917
+            },
+            {
+              "constructionMs": 14.087,
+              "allMs": 25.619458,
+              "totalMs": 39.706458
+            },
+            {
+              "constructionMs": 13.984833,
+              "allMs": 26.599584,
+              "totalMs": 40.584417
+            },
+            {
+              "constructionMs": 13.443167,
+              "allMs": 26.020166,
+              "totalMs": 39.463333
+            },
+            {
+              "constructionMs": 13.248041,
+              "allMs": 25.908625,
+              "totalMs": 39.156666
+            }
+          ],
+          "candidate": [
+            {
+              "constructionMs": 13.768709,
+              "allMs": 23.985083,
+              "totalMs": 37.753792
+            },
+            {
+              "constructionMs": 13.790583,
+              "allMs": 23.839959,
+              "totalMs": 37.630542
+            },
+            {
+              "constructionMs": 13.106042,
+              "allMs": 21.915583,
+              "totalMs": 35.021625
+            },
+            {
+              "constructionMs": 13.240125,
+              "allMs": 22.550375,
+              "totalMs": 35.7905
+            },
+            {
+              "constructionMs": 13.32175,
+              "allMs": 22.427875,
+              "totalMs": 35.749625
+            },
+            {
+              "constructionMs": 12.864375,
+              "allMs": 21.8905,
+              "totalMs": 34.754875
+            },
+            {
+              "constructionMs": 13.1435,
+              "allMs": 21.813208,
+              "totalMs": 34.956708
+            },
+            {
+              "constructionMs": 13.157291,
+              "allMs": 22.1685,
+              "totalMs": 35.325791
+            },
+            {
+              "constructionMs": 13.46075,
+              "allMs": 21.640125,
+              "totalMs": 35.100875
+            },
+            {
+              "constructionMs": 13.852458,
+              "allMs": 21.947167,
+              "totalMs": 35.799625
+            },
+            {
+              "constructionMs": 14.029333,
+              "allMs": 22.410125,
+              "totalMs": 36.439458
+            },
+            {
+              "constructionMs": 13.538042,
+              "allMs": 23.018375,
+              "totalMs": 36.556417
+            },
+            {
+              "constructionMs": 13.359625,
+              "allMs": 24.407125,
+              "totalMs": 37.76675
+            },
+            {
+              "constructionMs": 13.4525,
+              "allMs": 22.912041,
+              "totalMs": 36.364541
+            },
+            {
+              "constructionMs": 13.643209,
+              "allMs": 22.836958,
+              "totalMs": 36.480167
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "isolatedRechecks": {
+    "note": "Scenarios below 0.97x in the full runs, re-measured alone. Generation re-checks ran utc.mjs with 11 samples in both role orientations; the query re-check ran five alternating processes per build.",
+    "generation": [
+      {
+        "id": "yearly_dates_1000",
+        "v226Ms": [
+          1.083,
+          1.135
+        ],
+        "v227Ms": [
+          1.062,
+          1.128
+        ],
+        "speedup": [
+          1.021,
+          1.006
+        ]
+      },
+      {
+        "id": "monthly_slots_1000",
+        "v226Ms": [
+          0.926,
+          0.917
+        ],
+        "v227Ms": [
+          0.945,
+          0.931
+        ],
+        "speedup": [
+          0.981,
+          0.985
+        ]
+      },
+      {
+        "id": "weekly_time_slots_1000_UTC",
+        "v226Ms": [
+          0.494,
+          0.541
+        ],
+        "v227Ms": [
+          0.494,
+          0.513
+        ],
+        "speedup": [
+          1.0,
+          1.053
+        ]
+      },
+      {
+        "id": "weekly_mwf_780_America/Chicago",
+        "v226Ms": [
+          0.855,
+          0.843
+        ],
+        "v227Ms": [
+          0.867,
+          0.836
+        ],
+        "speedup": [
+          0.986,
+          1.008
+        ]
+      }
+    ],
+    "queries": [
+      {
+        "scenario": "DAILY previous, COUNT 9k, rank 8.5k, Chicago",
+        "v226RunMediansUs": [
+          1.91,
+          1.95,
+          1.93,
+          1.94,
+          1.93
+        ],
+        "v227RunMediansUs": [
+          1.97,
+          1.93,
+          1.92,
+          1.93,
+          2.0
+        ]
+      }
+    ]
+  },
+  "fullGeneration": {
+    "harness": "benchmarks/run.mjs",
+    "config": {
+      "warmupMs": 200,
+      "sampleMs": 200,
+      "samples": 5
+    },
+    "libraries": {
+      "rrule": "2.8.1",
+      "rrule-rust": "3.1.1"
+    },
+    "results": [
+      {
+        "scenario": "30 daily occurrences",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 80644.0,
+            "meanOps": 81350.0,
+            "medianUs": 12.4
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 25702145.0,
+            "meanOps": 25646932.0,
+            "medianUs": 0.0
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 15625.0,
+            "meanOps": 15629.0,
+            "medianUs": 64.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 809723.0,
+            "meanOps": 805561.0,
+            "medianUs": 1.2
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 181503.0,
+            "meanOps": 181733.0,
+            "medianUs": 5.5
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7699450.0,
+            "meanOps": 7717898.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "30 daily occurrences",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 34793.0,
+            "meanOps": 34311.0,
+            "medianUs": 28.7
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 24466035.0,
+            "meanOps": 23015955.0,
+            "medianUs": 0.0
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 288.0,
+            "meanOps": 282.0,
+            "medianUs": 3474.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 752179.0,
+            "meanOps": 755340.0,
+            "medianUs": 1.3
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 163250.0,
+            "meanOps": 163422.0,
+            "medianUs": 6.1
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7732942.0,
+            "meanOps": 7715947.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Daily weekdays across many cycles",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 4015.0,
+            "meanOps": 4022.0,
+            "medianUs": 249.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 7033274.0,
+            "meanOps": 7047638.0,
+            "medianUs": 0.1
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 747.0,
+            "meanOps": 744.0,
+            "medianUs": 1339.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 45759.0,
+            "meanOps": 45703.0,
+            "medianUs": 21.9
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 10264.0,
+            "meanOps": 10350.0,
+            "medianUs": 97.4
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7737810.0,
+            "meanOps": 7790503.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Daily weekdays across many cycles",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 2021.0,
+            "meanOps": 2016.0,
+            "medianUs": 495.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 6846706.0,
+            "meanOps": 6791410.0,
+            "medianUs": 0.1
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 19.4,
+            "meanOps": 20.0,
+            "medianUs": 51530.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 44981.0,
+            "meanOps": 44869.0,
+            "medianUs": 22.2
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 10024.0,
+            "meanOps": 10044.0,
+            "medianUs": 99.8
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7800592.0,
+            "meanOps": 7757134.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Daily time-slot expansion",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 2365.0,
+            "meanOps": 2256.0,
+            "medianUs": 423.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 2826138.0,
+            "meanOps": 2619634.0,
+            "medianUs": 0.4
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 1045.0,
+            "meanOps": 1045.0,
+            "medianUs": 957.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 24132.0,
+            "meanOps": 24126.0,
+            "medianUs": 41.4
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 10665.0,
+            "meanOps": 10626.0,
+            "medianUs": 93.8
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 8098457.0,
+            "meanOps": 8066729.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Daily time-slot expansion",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1076.0,
+            "meanOps": 1066.0,
+            "medianUs": 929.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 2795352.0,
+            "meanOps": 2831175.0,
+            "medianUs": 0.4
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 11.5,
+            "meanOps": 11.4,
+            "medianUs": 87316.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 20968.0,
+            "meanOps": 20999.0,
+            "medianUs": 47.7
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 8972.0,
+            "meanOps": 8969.0,
+            "medianUs": 111.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7471793.0,
+            "meanOps": 7480191.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "720 hourly occurrences",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 2744.0,
+            "meanOps": 2806.0,
+            "medianUs": 364.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 4423950.0,
+            "meanOps": 4327544.0,
+            "medianUs": 0.2
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 705.0,
+            "meanOps": 696.0,
+            "medianUs": 1418.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 34771.0,
+            "meanOps": 34748.0,
+            "medianUs": 28.8
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 7310.0,
+            "meanOps": 7296.0,
+            "medianUs": 137.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7717387.0,
+            "meanOps": 7714198.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "720 hourly occurrences",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1382.0,
+            "meanOps": 1364.0,
+            "medianUs": 724.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 4375132.0,
+            "meanOps": 4365543.0,
+            "medianUs": 0.2
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 13.4,
+            "meanOps": 14.1,
+            "medianUs": 74589.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 33894.0,
+            "meanOps": 34030.0,
+            "medianUs": 29.5
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 6724.0,
+            "meanOps": 6709.0,
+            "medianUs": 149.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7822616.0,
+            "meanOps": 7837076.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "1,440 minutely occurrences",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1740.0,
+            "meanOps": 1682.0,
+            "medianUs": 575.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 1715651.0,
+            "meanOps": 1687707.0,
+            "medianUs": 0.6
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 337.0,
+            "meanOps": 337.0,
+            "medianUs": 2969.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 17623.0,
+            "meanOps": 17554.0,
+            "medianUs": 56.7
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 4156.0,
+            "meanOps": 4158.0,
+            "medianUs": 241.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 8079457.0,
+            "meanOps": 8065434.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "1,440 minutely occurrences",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 771.0,
+            "meanOps": 770.0,
+            "medianUs": 1298.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 1947071.0,
+            "meanOps": 1886660.0,
+            "medianUs": 0.5
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 7.1,
+            "meanOps": 7.3,
+            "medianUs": 140819.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 17355.0,
+            "meanOps": 17293.0,
+            "medianUs": 57.6
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 3273.0,
+            "meanOps": 3191.0,
+            "medianUs": 306.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7123454.0,
+            "meanOps": 7030840.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "3,600 secondly occurrences",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 532.0,
+            "meanOps": 541.0,
+            "medianUs": 1878.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 1940896.0,
+            "meanOps": 1858356.0,
+            "medianUs": 0.5
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 129.0,
+            "meanOps": 127.0,
+            "medianUs": 7726.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 7036.0,
+            "meanOps": 6925.0,
+            "medianUs": 142.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 1742.0,
+            "meanOps": 1741.0,
+            "medianUs": 574.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7713037.0,
+            "meanOps": 7769532.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "3,600 secondly occurrences",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 296.0,
+            "meanOps": 293.0,
+            "medianUs": 3379.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 1540484.0,
+            "meanOps": 1550726.0,
+            "medianUs": 0.6
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 2.9,
+            "meanOps": 2.9,
+            "medianUs": 347025.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 6965.0,
+            "meanOps": 6962.0,
+            "medianUs": 144.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 1656.0,
+            "meanOps": 1644.0,
+            "medianUs": 604.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7777318.0,
+            "meanOps": 7813171.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Weekly MO/WE/FR across many cycles",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 2842.0,
+            "meanOps": 2854.0,
+            "medianUs": 352.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 4089307.0,
+            "meanOps": 4087928.0,
+            "medianUs": 0.2
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 1116.0,
+            "meanOps": 1114.0,
+            "medianUs": 896.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 29392.0,
+            "meanOps": 29343.0,
+            "medianUs": 34.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 9346.0,
+            "meanOps": 9351.0,
+            "medianUs": 107.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7912732.0,
+            "meanOps": 7890024.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Weekly MO/WE/FR across many cycles",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1235.0,
+            "meanOps": 1239.0,
+            "medianUs": 810.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 4200280.0,
+            "meanOps": 4193223.0,
+            "medianUs": 0.2
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 14.5,
+            "meanOps": 14.5,
+            "medianUs": 69149.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 29403.0,
+            "meanOps": 29308.0,
+            "medianUs": 34.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 8558.0,
+            "meanOps": 8559.0,
+            "medianUs": 117.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 6104206.0,
+            "meanOps": 6362020.0,
+            "medianUs": 0.2
+          }
+        ]
+      },
+      {
+        "scenario": "Weekly day and time-slot expansion",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1784.0,
+            "meanOps": 1831.0,
+            "medianUs": 560.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 2731631.0,
+            "meanOps": 2717412.0,
+            "medianUs": 0.4
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 1174.0,
+            "meanOps": 1174.0,
+            "medianUs": 852.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 23068.0,
+            "meanOps": 21888.0,
+            "medianUs": 43.4
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 9073.0,
+            "meanOps": 9012.0,
+            "medianUs": 110.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7698587.0,
+            "meanOps": 7697556.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Weekly day and time-slot expansion",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 987.0,
+            "meanOps": 990.0,
+            "medianUs": 1013.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 3018417.0,
+            "meanOps": 3008996.0,
+            "medianUs": 0.3
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 11.2,
+            "meanOps": 11.2,
+            "medianUs": 88935.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 23103.0,
+            "meanOps": 22997.0,
+            "medianUs": 43.3
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 8396.0,
+            "meanOps": 8363.0,
+            "medianUs": 119.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7823208.0,
+            "meanOps": 7810398.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Monthly last weekday across 20 years",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 2252.0,
+            "meanOps": 2233.0,
+            "medianUs": 444.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 12253174.0,
+            "meanOps": 12259997.0,
+            "medianUs": 0.1
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 1027.0,
+            "meanOps": 996.0,
+            "medianUs": 974.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 28771.0,
+            "meanOps": 28830.0,
+            "medianUs": 34.8
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 11233.0,
+            "meanOps": 11227.0,
+            "medianUs": 89.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7979642.0,
+            "meanOps": 7985891.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Monthly last weekday across 20 years",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1681.0,
+            "meanOps": 1695.0,
+            "medianUs": 595.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 13009650.0,
+            "meanOps": 12985666.0,
+            "medianUs": 0.1
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 44.2,
+            "meanOps": 42.7,
+            "medianUs": 22615.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 28478.0,
+            "meanOps": 28508.0,
+            "medianUs": 35.1
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 10139.0,
+            "meanOps": 10144.0,
+            "medianUs": 98.6
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7806842.0,
+            "meanOps": 7843295.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Monthly first and last weekday across 20 years",
+        "tz": "UTC",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1757.0,
+            "meanOps": 1764.0,
+            "medianUs": 569.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 6413387.0,
+            "meanOps": 6284060.0,
+            "medianUs": 0.2
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 1042.0,
+            "meanOps": 1052.0,
+            "medianUs": 960.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 16635.0,
+            "meanOps": 16561.0,
+            "medianUs": 60.1
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 8479.0,
+            "meanOps": 8563.0,
+            "medianUs": 118.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 7801648.0,
+            "meanOps": 7896781.0,
+            "medianUs": 0.1
+          }
+        ]
+      },
+      {
+        "scenario": "Monthly first and last weekday across 20 years",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "library": "rrule-temporal",
+            "cache": "off",
+            "medianOps": 1068.0,
+            "meanOps": 1057.0,
+            "medianUs": 936.0
+          },
+          {
+            "library": "rrule-temporal",
+            "cache": "on",
+            "medianOps": 7399360.0,
+            "meanOps": 7413597.0,
+            "medianUs": 0.1
+          },
+          {
+            "library": "rrule",
+            "cache": "off",
+            "medianOps": 23.1,
+            "meanOps": 22.1,
+            "medianUs": 43298.0
+          },
+          {
+            "library": "rrule",
+            "cache": "on",
+            "medianOps": 18312.0,
+            "meanOps": 18302.0,
+            "medianUs": 54.6
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "off",
+            "medianOps": 7983.0,
+            "meanOps": 7959.0,
+            "medianUs": 125.0
+          },
+          {
+            "library": "rrule-rust",
+            "cache": "on",
+            "medianOps": 8084055.0,
+            "meanOps": 8020442.0,
+            "medianUs": 0.1
+          }
+        ]
+      }
+    ]
+  }
+}

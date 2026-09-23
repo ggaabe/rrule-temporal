@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.7 (2026-09-24)
 
 - Accelerated `next()`, `previous()`, `between()`, `matches()`, and
   `occursOn()` for rules without COUNT (unbounded or UNTIL-bounded). Simple
@@ -8,17 +8,22 @@
   recurrence periods around the query in integer time instead of cloning the
   rule and replaying it through Temporal; RDATE/EXDATE merge as for COUNT
   plans. Unsupported shapes, DST gaps, and scans the general engine could not
-  finish within `maxIterations` keep the existing path.
+  finish within `maxIterations` keep the existing path. Local polyfill
+  benchmarks against v2.2.6 measured 31.67-118x faster `next()`/`previous()`
+  calls for the selected shapes and 2.30-5.66x faster one-month `between()`
+  windows.
 - Built timezone transition tables from the Temporal implementation's own
-  transitions instead of daily Intl probes: first queries in a new zone are
-  several times cheaper on the polyfill, and optimized paths now agree with
-  the general engine where the polyfill's offsets differ from Intl (e.g.
+  transitions instead of daily Intl probes. First queries in a new zone are
+  several times cheaper on the polyfill (a fresh process's first Chicago
+  weekday `all()` went from 23.3 ms to 4.6 ms), and optimized paths now agree
+  with the general engine where the polyfill's offsets differ from Intl (e.g.
   Africa/Casablanca, Africa/Cairo, Pacific/Fiji).
 - Fixed transition tables doubling toward the past on every forward miss,
   which made long-running processes that query later and later dates slow
   down exponentially. Tables now extend only toward requests, incrementally.
 - Allowed UTC WEEKLY, MONTHLY, and expanded DAILY generation to keep their
   fast paths when RDATE/EXDATE are present, as named-zone generation does.
+  The selected WEEKLY exception benchmark improved by 18.02x.
 - Bounded the DST-gap checks of named-zone DAILY/WEEKLY COUNT generation by
   the rule's actual span, so long rules no longer fall back to the general
   engine; rule clones reuse already-normalized dates.
@@ -38,9 +43,13 @@
   in exact time, limiting parts select them, finer BYMINUTE/BYSECOND expand
   them, and BYSETPOS applies per period. Results match python-dateutil for
   152 reference rules and an independent oracle across DST transitions, and
-  generation is faster for every measured shape. SECONDLY/MINUTELY rules
-  limited by BYDAY now begin at the matching day's first second or minute
-  rather than at DTSTART's time of day.
+  the selected sub-daily benchmarks generated 1.81-3.70x faster.
+  SECONDLY/MINUTELY rules limited by BYDAY now begin at the matching day's
+  first second or minute rather than at DTSTART's time of day.
+- Validated all 1,567 tests on Node 20, 24, and 26, plus 377,164 extended
+  seeded fuzz comparisons of the new query plans and sub-daily engine against
+  the general engine and independent oracles. Sub-daily rules also matched
+  v2.2.6 for 1,436 rules across 15 DTSTART calendars.
 
 ## 2.2.6 (2026-09-17)
 
