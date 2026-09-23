@@ -57,6 +57,38 @@ interface NumericQueryPlan {
   lowerBound(targetEpochNanoseconds: bigint, strict: boolean): number;
 }
 
+/**
+ * Occurrences of a rule without COUNT, grouped by recurrence period. Without
+ * COUNT an occurrence's rank from DTSTART is irrelevant, so a query can start
+ * at the period around its target instead of enumerating from DTSTART.
+ * Periods cover contiguous, increasing wall-clock spans.
+ */
+interface PeriodQueryPlan {
+  /** Fixed-step rules advance in exact time: occurrence k is DTSTART + k * step. */
+  readonly stepMilliseconds?: number;
+  /** Upper bound on the candidates the general engine evaluates per period. */
+  readonly candidatesPerPeriod: number;
+  /** Recurrence period whose span contains a wall-clock (as-if-UTC) time. */
+  periodOfWall(wallMilliseconds: number): number;
+  /** Ascending wall-clock milliseconds of a period's occurrences, after BYSETPOS. */
+  wallsForPeriod(period: number): number[] | null;
+  /**
+   * With BYSETPOS, the wall-clock span of a period's candidates. A skipped
+   * wall time is omitted before ranking, so a gap anywhere in it can change
+   * the selection.
+   */
+  rankedPeriodWallSpan?(period: number): [number, number] | null;
+}
+
+/** Most periods a next()/previous() plan scans before deferring to the general engine. */
+const PERIOD_SCAN_LIMIT = 1_000;
+/**
+ * The general engine's aligned query clones can start a few periods before the
+ * target (e.g. to find a DTSTART-like anchor on the 31st or February 29).
+ * Plans answer only when that engine could not reach maxIterations.
+ */
+const PERIOD_ITERATION_SLACK = 16;
+
 interface CandidateWorkBudget {
   evaluated: number;
   seenOccurrences: Set<bigint>;
@@ -95,6 +127,24 @@ function ceilDivBigInt(dividend: bigint, divisor: bigint): bigint {
   return -floorDivBigInt(-dividend, divisor);
 }
 
+/** First whole millisecond at (or, when strict, after) an instant. */
+function firstMillisecondFrom(epochNanoseconds: bigint, strict: boolean): number {
+  return Number(
+    strict
+      ? floorDivBigInt(epochNanoseconds, NS_PER_MILLISECOND) + 1n
+      : ceilDivBigInt(epochNanoseconds, NS_PER_MILLISECOND),
+  );
+}
+
+/** Last whole millisecond at (or, when strict, before) an instant. */
+function lastMillisecondThrough(epochNanoseconds: bigint, strict: boolean): number {
+  return Number(
+    strict
+      ? ceilDivBigInt(epochNanoseconds, NS_PER_MILLISECOND) - 1n
+      : floorDivBigInt(epochNanoseconds, NS_PER_MILLISECOND),
+  );
+}
+
 function isSafeTemporalEpochMilliseconds(value: number): boolean {
   return (
     Number.isSafeInteger(value) && value >= -TEMPORAL_MAX_EPOCH_MILLISECONDS && value <= TEMPORAL_MAX_EPOCH_MILLISECONDS
@@ -110,6 +160,20 @@ function gregorianEpochDay(year: number, month: number, day: number): number {
   const dayOfYear = Math.floor((153 * adjustedMonth + 2) / 5) + day - 1;
   const dayOfEra = yearOfEra * 365 + Math.floor(yearOfEra / 4) - Math.floor(yearOfEra / 100) + dayOfYear;
   return era * 146_097 + dayOfEra - 719_468;
+}
+
+/** Proleptic Gregorian year and month of an epoch day (inverse of gregorianEpochDay). */
+function gregorianYearMonthOfEpochDay(epochDay: number): {year: number; month: number} {
+  const shifted = epochDay + 719_468;
+  const era = Math.floor(shifted / 146_097);
+  const dayOfEra = shifted - era * 146_097;
+  const yearOfEra = Math.floor(
+    (dayOfEra - Math.floor(dayOfEra / 1_460) + Math.floor(dayOfEra / 36_524) - Math.floor(dayOfEra / 146_096)) / 365,
+  );
+  const dayOfYear = dayOfEra - (365 * yearOfEra + Math.floor(yearOfEra / 4) - Math.floor(yearOfEra / 100));
+  const shiftedMonth = Math.floor((5 * dayOfYear + 2) / 153);
+  const month = shiftedMonth + (shiftedMonth < 10 ? 3 : -9);
+  return {year: yearOfEra + era * 400 + (month <= 2 ? 1 : 0), month};
 }
 
 function isoDayOfWeekOfEpochDay(epochDay: number): number {
@@ -211,6 +275,9 @@ function normalizeZonedDateTime(value: TemporalZonedDateTimeInput, label: string
   if (!isTemporalZonedDateTimeInput(value)) {
     throw new Error(`${label} must be a ZonedDateTime`);
   }
+  // Values are immutable, so the implementation's own instances (including
+  // every option of a rule being cloned) need no copy.
+  if (value instanceof Temporal.ZonedDateTime) return value;
 
   try {
     const epochNanoseconds = zonedDateTimeEpochNanoseconds(value);
@@ -682,6 +749,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private zoneResolver?: ZoneOffsetResolver;
   private emitAnchorZdt?: Temporal.ZonedDateTime;
   private numericQueryPlanCache: NumericQueryPlan | null | undefined;
+  private periodQueryPlanCache: PeriodQueryPlan | null | undefined;
   private static readonly rscaleCalendarSupport: Record<string, boolean> = {};
 
   /**
@@ -2095,17 +2163,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   private canUseUtcLinearFastPath(iterator?: InternalRRuleTemporalIterator): boolean {
+    // RDATE and EXDATE are applied to the COUNT-bounded result in allInternal(),
+    // as for every other non-streaming generator.
     if (iterator || !this.canUseUtcCalendarFastPaths() || this.opts.rscale) {
-      return false;
-    }
-    if (
-      (this.opts.rDate || this.opts.exDate) &&
-      (this.originalDtstart.timeZoneId !== this.tzid ||
-        this.originalDtstart.calendarId !== 'iso8601' ||
-        this.opts.byHour ||
-        this.opts.byMinute ||
-        this.opts.bySecond)
-    ) {
       return false;
     }
 
@@ -2136,8 +2196,6 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       this.canUseUtcCalendarFastPaths() &&
       this.opts.freq === 'WEEKLY' &&
       !this.opts.rscale &&
-      !this.opts.rDate &&
-      !this.opts.exDate &&
       !this.opts.byMonth &&
       !this.opts.byMonthDay &&
       !this.opts.byYearDay &&
@@ -2156,8 +2214,6 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       this.canUseUtcCalendarFastPaths() &&
       this.opts.freq === 'MONTHLY' &&
       !this.opts.rscale &&
-      !this.opts.rDate &&
-      !this.opts.exDate &&
       !this.opts.byYearDay &&
       !this.opts.byWeekNo &&
       this.canUseEpochMillisecondsPrecisionFlag &&
@@ -2890,6 +2946,185 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return this.numericQueryPlanCache;
   }
 
+  /**
+   * Build the period plan for a rule without COUNT. Eligibility mirrors the
+   * COUNT plans above, and periods reuse their calendar generators.
+   */
+  private buildPeriodQueryPlan(): PeriodQueryPlan | null {
+    const interval = this.opts.interval!;
+    if (
+      this.opts.count !== undefined ||
+      !Number.isSafeInteger(interval) ||
+      interval <= 0 ||
+      !Number.isSafeInteger(this.maxIterations) ||
+      this.maxIterations <= 2 * PERIOD_ITERATION_SLACK ||
+      this.maxCandidateEvaluations !== 1_000_000 ||
+      this.includeDtstart ||
+      this.opts.rscale !== undefined ||
+      !this.canUseEpochMillisecondsPrecisionFlag ||
+      this.originalDtstart.timeZoneId !== this.tzid ||
+      !['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)
+    ) {
+      return null;
+    }
+
+    const {freq, byDay, byMonth, byMonthDay, byYearDay, byWeekNo, bySetPos} = this.opts;
+    const hasCalendarFilters = Boolean(byMonth || byMonthDay || byYearDay || byWeekNo || bySetPos);
+    const hasTimeFilters = Boolean(this.opts.byHour || this.opts.byMinute || this.opts.bySecond);
+    const startWallMilliseconds =
+      this.tzid === 'UTC' ? this.originalDtstart.epochMilliseconds : this.wallMsOf(this.originalDtstart);
+    const startEpochDay = Math.floor(startWallMilliseconds / MS_PER_DAY);
+    const slots = this.timeSlotOffsetsMs;
+
+    switch (freq) {
+      case 'HOURLY':
+      case 'MINUTELY':
+      case 'SECONDLY': {
+        if (hasCalendarFilters || byDay || hasTimeFilters) return null;
+        // rawAdvance() skips a repeated named-zone hour for this one shape.
+        const isNamedZone =
+          !['UTC', 'Etc/UTC', 'Etc/GMT'].includes(this.tzid) && !/^[-+]\d{2}:?\d{2}(?::?\d{2})?$/.test(this.tzid);
+        if (isNamedZone && freq === 'HOURLY' && interval === 1) return null;
+        const unit = freq === 'HOURLY' ? MS_PER_HOUR : freq === 'MINUTELY' ? MS_PER_MINUTE : MS_PER_SECOND;
+        const stepMilliseconds = unit * interval;
+        if (!Number.isSafeInteger(stepMilliseconds)) return null;
+        return {stepMilliseconds, candidatesPerPeriod: 1, periodOfWall: () => 0, wallsForPeriod: () => null};
+      }
+      case 'DAILY': {
+        if (hasCalendarFilters || this.hasOrdinalByDay || !slots?.length || !this.hasUniqueTimeSlotOffsets) return null;
+        const allowedDays = this.simpleByDayIsoDays;
+        if (
+          allowedDays?.length &&
+          this.findFirstMatchingDailyStep(isoDayOfWeekOfEpochDay(startEpochDay), interval, allowedDays) === null
+        ) {
+          return null;
+        }
+        const allowedDayMask = weekdayMask(allowedDays);
+        return {
+          candidatesPerPeriod: slots.length,
+          periodOfWall: (wall) => Math.floor((Math.floor(wall / MS_PER_DAY) - startEpochDay) / interval),
+          wallsForPeriod: (period) => {
+            const epochDay = startEpochDay + period * interval;
+            if (!Number.isSafeInteger(epochDay)) return null;
+            if (!includesIsoWeekday(allowedDayMask, isoDayOfWeekOfEpochDay(epochDay))) return [];
+            return slots.map((slot) => epochDay * MS_PER_DAY + slot);
+          },
+        };
+      }
+      case 'WEEKLY': {
+        if (hasCalendarFilters || this.hasOrdinalByDay || !slots?.length || !this.hasUniqueTimeSlotOffsets) return null;
+        const startDayOfWeek = isoDayOfWeekOfEpochDay(startEpochDay);
+        const wkstDay = weekdayToIsoDay[extractWeekdayToken(this.opts.wkst || 'MO') ?? 'MO'] ?? 1;
+        const targetDays = byDay ? [...(this.allByDayIsoDays ?? [])] : [startDayOfWeek];
+        const dayOffsets = targetDays.map((day) => (day - wkstDay + 7) % 7).sort((a, b) => a - b);
+        if (dayOffsets.length === 0) return null;
+        const weekOffsets = dayOffsets.flatMap((dayOffset) => slots.map((slot) => dayOffset * MS_PER_DAY + slot));
+        const firstWeekStartDay = startEpochDay - ((startDayOfWeek - wkstDay + 7) % 7);
+        const periodDays = 7 * interval;
+        return {
+          candidatesPerPeriod: weekOffsets.length,
+          periodOfWall: (wall) => Math.floor((Math.floor(wall / MS_PER_DAY) - firstWeekStartDay) / periodDays),
+          wallsForPeriod: (period) => {
+            const weekStartDay = firstWeekStartDay + period * periodDays;
+            if (!Number.isSafeInteger(weekStartDay)) return null;
+            return weekOffsets.map((offset) => weekStartDay * MS_PER_DAY + offset);
+          },
+        };
+      }
+      case 'MONTHLY': {
+        if (byYearDay || byWeekNo || !slots?.length || !this.hasUniqueTimeSlotOffsets) return null;
+        if (byMonth?.some((value) => typeof value !== 'number')) return null;
+        const startMonthIndex = this.originalDtstart.year * 12 + (this.originalDtstart.month - 1);
+        const monthOf = (period: number): {year: number; month: number} | null => {
+          const monthIndex = startMonthIndex + period * interval;
+          if (!Number.isSafeInteger(monthIndex)) return null;
+          const yearMonth = this.monthIndexToYearMonth(monthIndex);
+          const monthStartMs = gregorianEpochDay(yearMonth.year, yearMonth.month, 1) * MS_PER_DAY;
+          return isSafeTemporalEpochMilliseconds(monthStartMs) ? yearMonth : null;
+        };
+        return {
+          candidatesPerPeriod: 2 * 31 * slots.length,
+          periodOfWall: (wall) => {
+            const {year, month} = gregorianYearMonthOfEpochDay(Math.floor(wall / MS_PER_DAY));
+            return Math.floor((year * 12 + month - 1 - startMonthIndex) / interval);
+          },
+          wallsForPeriod: (period) => {
+            const yearMonth = monthOf(period);
+            return yearMonth && this.generateMonthlyOccurrenceEpochsUtc(yearMonth.year, yearMonth.month);
+          },
+          rankedPeriodWallSpan: bySetPos
+            ? (period) => {
+                const yearMonth = monthOf(period);
+                if (!yearMonth) return null;
+                const monthStartMs = gregorianEpochDay(yearMonth.year, yearMonth.month, 1) * MS_PER_DAY;
+                const days = this.daysInGregorianMonth(yearMonth.year, yearMonth.month);
+                return [monthStartMs, monthStartMs + days * MS_PER_DAY];
+              }
+            : undefined,
+        };
+      }
+      case 'YEARLY': {
+        if (byYearDay || byWeekNo || !slots?.length || !this.hasUniqueTimeSlotOffsets) return null;
+        if (byMonth?.some((value) => typeof value !== 'number')) return null;
+        // Keep the multi-slot implicit-date shapes the COUNT plan also leaves
+        // to the general engine, and its ordinal-weekday restrictions.
+        const hasDateExpansion = Boolean(byDay || byMonthDay);
+        if (!hasDateExpansion && (slots.length !== 1 || (byMonth && bySetPos))) return null;
+        if (
+          this.hasOrdinalByDay &&
+          !this.numericByMonths?.length &&
+          (byMonthDay || this.parsedByDayTokens?.some((token) => token.ord === 0 || Math.abs(token.ord) > 52))
+        ) {
+          return null;
+        }
+        const startYear = this.originalDtstart.year;
+        const yearOf = (period: number): number | null => {
+          const year = startYear + period * interval;
+          return Number.isSafeInteger(year) && year > -271_821 && year < 275_760 ? year : null;
+        };
+        return {
+          candidatesPerPeriod: 2 * 366 * slots.length,
+          periodOfWall: (wall) =>
+            Math.floor((gregorianYearMonthOfEpochDay(Math.floor(wall / MS_PER_DAY)).year - startYear) / interval),
+          wallsForPeriod: (period) => {
+            const year = yearOf(period);
+            return year === null ? null : this.generateYearlyOccurrenceEpochsUtc(year);
+          },
+          rankedPeriodWallSpan: bySetPos
+            ? (period) => {
+                const year = yearOf(period);
+                if (year === null) return null;
+                return [gregorianEpochDay(year, 1, 1) * MS_PER_DAY, gregorianEpochDay(year + 1, 1, 1) * MS_PER_DAY];
+              }
+            : undefined,
+        };
+      }
+    }
+    return null;
+  }
+
+  private getPeriodQueryPlan(): PeriodQueryPlan | null {
+    if (this.periodQueryPlanCache !== undefined) {
+      return this.periodQueryPlanCache;
+    }
+    try {
+      this.periodQueryPlanCache = this.buildPeriodQueryPlan();
+      // An explicit DTSTART may name the later side of a fold; generated wall
+      // times resolve ambiguities to the earlier instant.
+      if (
+        this.periodQueryPlanCache &&
+        this.tzid !== 'UTC' &&
+        this.resolveNumericWallMilliseconds(this.wallMsOf(this.originalDtstart)) !==
+          this.originalDtstart.epochMilliseconds
+      ) {
+        this.periodQueryPlanCache = null;
+      }
+    } catch {
+      this.periodQueryPlanCache = null;
+    }
+    return this.periodQueryPlanCache;
+  }
+
   private findFirstMatchingDailyStep(startDayOfWeek: number, stepDays: number, allowedDays: number[]): number | null {
     let dayOfWeek = startDayOfWeek;
     for (let steps = 0; steps < 7; steps++) {
@@ -3521,10 +3756,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   private zdtFromEpochMs(epochMs: number): Temporal.ZonedDateTime {
-    // Native Temporal constructs cheaply from epoch nanoseconds. On the
-    // polyfill, deriving from an anchored instance via add() skips repeated
-    // time-zone slot setup and is measurably faster for non-UTC zones.
-    if (isNativeTemporal) {
+    // Native Temporal constructs cheaply from epoch nanoseconds, as does the
+    // polyfill in UTC. For other zones on the polyfill, deriving from an
+    // anchored instance via add() skips repeated time-zone slot setup.
+    if (isNativeTemporal || this.tzid === 'UTC') {
       return new Temporal.ZonedDateTime(
         BigInt(epochMs) * NS_PER_MILLISECOND,
         this.tzid,
@@ -3583,23 +3818,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (this.opts.until) {
       endMs = this.opts.until.epochMilliseconds;
     } else if (this.opts.count !== undefined) {
-      // Conservative overestimates of the calendar span needed to emit
-      // `count` occurrences (coverage tables are cheap and zone-cached).
-      const steps = this.opts.count * this.opts.interval!;
-      let spanMs: number;
-      switch (this.opts.freq) {
-        case 'DAILY':
-          spanMs = steps * 7 * MS_PER_DAY; // BYDAY can thin days to 1-in-7
-          break;
-        case 'WEEKLY':
-          spanMs = steps * MS_PER_WEEK;
-          break;
-        default: {
-          const monthFactor = this.numericByMonths?.length ? Math.ceil(12 / this.numericByMonths.length) : 1;
-          spanMs = steps * monthFactor * 31 * MS_PER_DAY;
-          break;
-        }
-      }
+      const spanMs = this.tzFastPathCountSpanMs(this.opts.count);
+      if (spanMs === undefined) return true;
       endMs = startMs + spanMs + 30 * MS_PER_DAY;
     } else {
       return true; // unreachable behind all()'s COUNT/UNTIL guard; be safe
@@ -3610,6 +3830,45 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return true; // enormous rules: let the general engine handle them
     }
     return this.getZoneResolver().timeOfDayMayHitGap(timeOfDayMs, startMs - MS_PER_DAY, endMs + MS_PER_DAY);
+  }
+
+  /**
+   * The wall-clock span from DTSTART that the first `count` occurrences of a
+   * TZ fast path can reach, or undefined when none is known. DAILY and WEEKLY
+   * bounds allow a period of candidates before DTSTART.
+   */
+  private tzFastPathCountSpanMs(count: number): number | undefined {
+    const interval = this.opts.interval!;
+    const slots = this.timeSlotOffsetsMs?.length ?? 1;
+    const startWallMs = this.wallMsOf(this.originalDtstart);
+    switch (this.opts.freq) {
+      case 'DAILY': {
+        // Weekday phases repeat every 7 / gcd(INTERVAL, 7) periods.
+        const allowedDays = this.simpleByDayIsoDays;
+        const cyclePeriods = allowedDays?.length ? 7 / gcd(interval, 7) : 1;
+        let matchingPeriods = cyclePeriods;
+        if (allowedDays?.length) {
+          const startDayOfWeek = isoDayOfWeekOfEpochDay(Math.floor(startWallMs / MS_PER_DAY));
+          matchingPeriods = 0;
+          for (let period = 0; period < cyclePeriods; period++) {
+            if (allowedDays.includes(addIsoDays(startDayOfWeek, period * interval))) matchingPeriods++;
+          }
+          if (matchingPeriods === 0) return 0;
+        }
+        return (Math.ceil(count / (matchingPeriods * slots)) + 1) * cyclePeriods * interval * MS_PER_DAY;
+      }
+      case 'WEEKLY': {
+        const days = this.opts.byDay ? (this.allByDayIsoDays?.length ?? 0) : 1;
+        if (days === 0) return 0;
+        return (Math.ceil(count / (days * slots)) + 1) * interval * MS_PER_WEEK;
+      }
+      case 'MONTHLY': {
+        // Months select varying numbers of dates; keep the per-month estimate.
+        const monthFactor = this.numericByMonths?.length ? Math.ceil(12 / this.numericByMonths.length) : 1;
+        return count * interval * monthFactor * 31 * MS_PER_DAY;
+      }
+    }
+    return undefined;
   }
 
   private allTzEpochFastPath(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] | null {
@@ -5092,6 +5351,273 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   /**
+   * Periods a plan may scan while the general engine it replaces stays within
+   * maxIterations and maxCandidateEvaluations. previous() backs its search off
+   * in powers of four, so its engine can visit four times the periods scanned.
+   */
+  private periodScanBudget(plan: PeriodQueryPlan, factor: number, limit: number): number {
+    const iterations = Math.floor((this.maxIterations - PERIOD_ITERATION_SLACK) / factor);
+    const candidates =
+      Math.floor(this.maxCandidateEvaluations / (plan.candidatesPerPeriod * factor)) - PERIOD_ITERATION_SLACK;
+    return Math.min(limit, iterations, candidates);
+  }
+
+  /** Resolve a period's wall times, or null when any needs the general engine (e.g. a DST gap). */
+  private resolvePeriodEpochs(plan: PeriodQueryPlan, period: number): number[] | null {
+    if (plan.rankedPeriodWallSpan && this.tzid !== 'UTC') {
+      const span = plan.rankedPeriodWallSpan(period);
+      if (!span) return null;
+      const resolver = this.getZoneResolver();
+      if (
+        this.timeSlotOffsetsMs!.some((slot) =>
+          resolver.timeOfDayMayHitGap(slot, span[0] - MS_PER_DAY, span[1] + MS_PER_DAY),
+        )
+      ) {
+        return null;
+      }
+    }
+    const walls = plan.wallsForPeriod(period);
+    if (!walls) return null;
+    const epochs = new Array<number>(walls.length);
+    for (let index = 0; index < walls.length; index++) {
+      const epochMilliseconds = this.resolveNumericWallMilliseconds(walls[index]!);
+      if (epochMilliseconds === null) return null;
+      epochs[index] = epochMilliseconds;
+    }
+    return epochs;
+  }
+
+  private isExcludedEpochMilliseconds(epochMilliseconds: number): boolean {
+    return Boolean(this.opts.exDate?.length) && this.isExcludedEpoch(BigInt(epochMilliseconds) * NS_PER_MILLISECOND);
+  }
+
+  /**
+   * First RRULE instant at or after `lowerMs` that EXDATE does not remove. An
+   * instant after `stopAfterMs` is returned unchecked: a caller holding an
+   * earlier RDATE needs no later rule instant. Returns null when UNTIL ends the
+   * rule first, and undefined when the general engine must answer.
+   */
+  private periodScanForward(
+    plan: PeriodQueryPlan,
+    lowerMs: number,
+    stopAfterMs?: number,
+    budgetFactor = 1,
+  ): number | null | undefined {
+    const startMs = this.originalDtstart.epochMilliseconds;
+    const untilMs = this.opts.until?.epochMilliseconds;
+    const fromMs = Math.max(lowerMs, startMs);
+    if (untilMs !== undefined && fromMs > untilMs) return null;
+    const budget = this.periodScanBudget(plan, budgetFactor, PERIOD_SCAN_LIMIT);
+    const visit = (epochMilliseconds: number): number | null | undefined => {
+      if (untilMs !== undefined && epochMilliseconds > untilMs) return null;
+      if (stopAfterMs !== undefined && epochMilliseconds > stopAfterMs) return epochMilliseconds;
+      return this.isExcludedEpochMilliseconds(epochMilliseconds) ? undefined : epochMilliseconds;
+    };
+
+    const step = plan.stepMilliseconds;
+    if (step !== undefined) {
+      let epochMilliseconds = startMs + Math.ceil((fromMs - startMs) / step) * step;
+      if (epochMilliseconds < fromMs) epochMilliseconds += step;
+      else if (epochMilliseconds - step >= fromMs) epochMilliseconds -= step;
+      for (let scanned = 0; scanned < budget; scanned++, epochMilliseconds += step) {
+        if (!isSafeTemporalEpochMilliseconds(epochMilliseconds)) return undefined;
+        const result = visit(epochMilliseconds);
+        if (result !== undefined) return result;
+      }
+      return undefined;
+    }
+
+    // Any offset is under a day, so earlier periods resolve before fromMs.
+    let period = Math.max(0, plan.periodOfWall(this.tzid === 'UTC' ? fromMs : fromMs - MS_PER_DAY));
+    for (let scanned = 0; scanned < budget; scanned++, period++) {
+      const epochs = this.resolvePeriodEpochs(plan, period);
+      if (!epochs) return undefined;
+      for (const epochMilliseconds of epochs) {
+        if (epochMilliseconds < fromMs) continue;
+        const result = visit(epochMilliseconds);
+        if (result !== undefined) return result;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Last RRULE instant at or before `upperMs` (and UNTIL) that EXDATE does not
+   * remove. An instant before `stopBeforeMs` is returned unchecked: a caller
+   * holding a later RDATE needs no earlier rule instant. Returns null before
+   * DTSTART, and undefined when the general engine must answer.
+   */
+  private periodScanBackward(plan: PeriodQueryPlan, upperMs: number, stopBeforeMs?: number): number | null | undefined {
+    const startMs = this.originalDtstart.epochMilliseconds;
+    const untilMs = this.opts.until?.epochMilliseconds;
+    const toMs = untilMs === undefined ? upperMs : Math.min(upperMs, untilMs);
+    if (toMs < startMs) return null;
+    // The general engine can revisit four times these periods (see tryPeriodPrevious()).
+    const budget = this.periodScanBudget(plan, 8, PERIOD_SCAN_LIMIT);
+    const visit = (epochMilliseconds: number): number | null | undefined => {
+      if (epochMilliseconds < startMs) return null;
+      if (stopBeforeMs !== undefined && epochMilliseconds < stopBeforeMs) return epochMilliseconds;
+      return this.isExcludedEpochMilliseconds(epochMilliseconds) ? undefined : epochMilliseconds;
+    };
+
+    const step = plan.stepMilliseconds;
+    if (step !== undefined) {
+      let epochMilliseconds = startMs + Math.floor((toMs - startMs) / step) * step;
+      if (epochMilliseconds > toMs) epochMilliseconds -= step;
+      else if (epochMilliseconds + step <= toMs) epochMilliseconds += step;
+      for (let scanned = 0; scanned < budget; scanned++, epochMilliseconds -= step) {
+        const result = visit(epochMilliseconds);
+        if (result !== undefined) return result;
+      }
+      return undefined;
+    }
+
+    // Any offset is under a day, so later periods resolve after toMs.
+    let period = plan.periodOfWall(this.tzid === 'UTC' ? toMs : toMs + MS_PER_DAY);
+    for (let scanned = 0; scanned < budget; scanned++, period--) {
+      if (period < 0) return null;
+      const epochs = this.resolvePeriodEpochs(plan, period);
+      if (!epochs) return undefined;
+      for (let index = epochs.length - 1; index >= 0; index--) {
+        const epochMilliseconds = epochs[index]!;
+        if (epochMilliseconds > toMs) continue;
+        const result = visit(epochMilliseconds);
+        if (result !== undefined) return result;
+      }
+    }
+    return undefined;
+  }
+
+  /** RRULE instants in [lowerMs, upperMs] without EXDATEs, or null when the general engine must answer. */
+  private periodEpochsBetween(plan: PeriodQueryPlan, lowerMs: number, upperMs: number): number[] | null {
+    const startMs = this.originalDtstart.epochMilliseconds;
+    const untilMs = this.opts.until?.epochMilliseconds;
+    const fromMs = Math.max(lowerMs, startMs);
+    const toMs = untilMs === undefined ? upperMs : Math.min(upperMs, untilMs);
+    const epochs: number[] = [];
+    if (fromMs > toMs) return epochs;
+    const budget = this.periodScanBudget(plan, 1, Infinity);
+
+    const step = plan.stepMilliseconds;
+    if (step !== undefined) {
+      let first = startMs + Math.ceil((fromMs - startMs) / step) * step;
+      if (first < fromMs) first += step;
+      else if (first - step >= fromMs) first -= step;
+      if ((toMs - first) / step >= budget) return null;
+      for (let epochMilliseconds = first; epochMilliseconds <= toMs; epochMilliseconds += step) {
+        if (!isSafeTemporalEpochMilliseconds(epochMilliseconds)) return null;
+        if (!this.isExcludedEpochMilliseconds(epochMilliseconds)) epochs.push(epochMilliseconds);
+      }
+      return epochs;
+    }
+
+    const utc = this.tzid === 'UTC';
+    const firstPeriod = Math.max(0, plan.periodOfWall(utc ? fromMs : fromMs - MS_PER_DAY));
+    const lastPeriod = plan.periodOfWall(utc ? toMs : toMs + MS_PER_DAY);
+    if (lastPeriod - firstPeriod >= budget) return null;
+    for (let period = firstPeriod; period <= lastPeriod; period++) {
+      const periodEpochs = this.resolvePeriodEpochs(plan, period);
+      if (!periodEpochs) return null;
+      for (const epochMilliseconds of periodEpochs) {
+        if (epochMilliseconds < fromMs || epochMilliseconds > toMs) continue;
+        if (!this.isExcludedEpochMilliseconds(epochMilliseconds)) epochs.push(epochMilliseconds);
+      }
+    }
+    return epochs;
+  }
+
+  private tryPeriodNext(
+    targetEpochNanoseconds: bigint,
+    inclusive: boolean,
+  ): NumericQueryResult<Temporal.ZonedDateTime | null> {
+    const plan = this.getPeriodQueryPlan();
+    if (!plan) return {handled: false};
+
+    const rDate = this.opts.rDate
+      ? this.getNumericRDates()[this.numericRDateLowerBound(targetEpochNanoseconds, !inclusive)]
+      : undefined;
+    const ruleEpoch = this.periodScanForward(
+      plan,
+      firstMillisecondFrom(targetEpochNanoseconds, !inclusive),
+      rDate ? lastMillisecondThrough(rDate.epochNanoseconds, false) : undefined,
+    );
+    if (ruleEpoch === undefined) return {handled: false};
+    // RRULE wins an exact-instant tie, matching the recurrence-set merge.
+    if (rDate && (ruleEpoch === null || BigInt(ruleEpoch) * NS_PER_MILLISECOND > rDate.epochNanoseconds)) {
+      return {handled: true, value: rDate};
+    }
+    return {handled: true, value: ruleEpoch === null ? null : this.zdtFromEpochMs(ruleEpoch)};
+  }
+
+  private tryPeriodPrevious(
+    targetEpochNanoseconds: bigint,
+    inclusive: boolean,
+  ): NumericQueryResult<Temporal.ZonedDateTime | null> {
+    const plan = this.getPeriodQueryPlan();
+    if (!plan) return {handled: false};
+
+    const rDateIndex = this.opts.rDate ? this.numericRDateLowerBound(targetEpochNanoseconds, inclusive) - 1 : -1;
+    const rDate = rDateIndex >= 0 ? this.getNumericRDates()[rDateIndex]! : null;
+    const ruleEpoch = this.periodScanBackward(
+      plan,
+      lastMillisecondThrough(targetEpochNanoseconds, !inclusive),
+      rDate ? firstMillisecondFrom(rDate.epochNanoseconds, false) : undefined,
+    );
+    if (ruleEpoch === undefined) return {handled: false};
+    // The general engine backs its anchor off in powers of four and scans
+    // forward until an instant passes the target, or UNTIL ends the rule; it
+    // exhausts maxIterations when neither happens. Answer only when both halves
+    // of that scan fit the budget.
+    if (
+      this.periodScanForward(plan, firstMillisecondFrom(targetEpochNanoseconds, inclusive), undefined, 2) === undefined
+    ) {
+      return {handled: false};
+    }
+    if (rDate && (ruleEpoch === null || BigInt(ruleEpoch) * NS_PER_MILLISECOND < rDate.epochNanoseconds)) {
+      return {handled: true, value: rDate};
+    }
+    return {handled: true, value: ruleEpoch === null ? null : this.zdtFromEpochMs(ruleEpoch)};
+  }
+
+  private tryPeriodBetween(
+    startEpochNanoseconds: bigint,
+    endEpochNanoseconds: bigint,
+    inclusive: boolean,
+  ): NumericQueryResult<Temporal.ZonedDateTime[]> {
+    if (startEpochNanoseconds > endEpochNanoseconds) return {handled: false};
+    const plan = this.getPeriodQueryPlan();
+    if (!plan) return {handled: false};
+
+    const ruleEpochs = this.periodEpochsBetween(
+      plan,
+      firstMillisecondFrom(startEpochNanoseconds, !inclusive),
+      lastMillisecondThrough(endEpochNanoseconds, !inclusive),
+    );
+    if (!ruleEpochs) return {handled: false};
+    const ruleDates = ruleEpochs.map((epochMilliseconds) => this.zdtFromEpochMs(epochMilliseconds));
+    if (!this.opts.rDate) return {handled: true, value: ruleDates};
+
+    const rDates = this.getNumericRDates();
+    const endRDateIndex = this.numericRDateLowerBound(endEpochNanoseconds, inclusive);
+    const dates: Temporal.ZonedDateTime[] = [];
+    let ruleIndex = 0;
+    let rDateIndex = this.numericRDateLowerBound(startEpochNanoseconds, !inclusive);
+    while (ruleIndex < ruleDates.length || rDateIndex < endRDateIndex) {
+      const ruleDate = ruleDates[ruleIndex];
+      const rDate = rDateIndex < endRDateIndex ? rDates[rDateIndex] : undefined;
+      if (!rDate || (ruleDate && ruleDate.epochNanoseconds <= rDate.epochNanoseconds)) {
+        dates.push(ruleDate!);
+        ruleIndex += 1;
+        if (rDate && rDate.epochNanoseconds === ruleDate!.epochNanoseconds) rDateIndex += 1;
+      } else {
+        dates.push(rDate);
+        rDateIndex += 1;
+      }
+    }
+    return {handled: true, value: dates};
+  }
+
+  /**
    * Returns all occurrences of the rule within a specified time window.
    * @param after - The start date or Temporal.ZonedDateTime object.
    * @param before - The end date or Temporal.ZonedDateTime object.
@@ -5105,6 +5631,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const numericResult = this.tryNumericBetween(startEpochNanoseconds, endEpochNanoseconds, inc);
     if (numericResult.handled) {
       return this.toPublicDates(numericResult.value);
+    }
+    const periodResult = this.tryPeriodBetween(startEpochNanoseconds, endEpochNanoseconds, inc);
+    if (periodResult.handled) {
+      return this.toPublicDates(periodResult.value);
     }
 
     const startZdt = new Temporal.ZonedDateTime(startEpochNanoseconds, this.tzid, this.originalDtstart.calendarId);
@@ -5316,6 +5846,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (numericResult.handled) {
       return numericResult.value;
     }
+    const periodResult = this.tryPeriodNext(afterEpochNanoseconds, inc);
+    if (periodResult.handled) {
+      return periodResult.value;
+    }
 
     let result: Temporal.ZonedDateTime | null = null;
     const scanFrom = (rule: RRuleTemporal<TOutput>) => {
@@ -5391,6 +5925,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const numericResult = this.tryNumericPrevious(beforeEpochNanoseconds, inc);
     if (numericResult.handled) {
       return this.toPublicDate(numericResult.value);
+    }
+    const periodResult = this.tryPeriodPrevious(beforeEpochNanoseconds, inc);
+    if (periodResult.handled) {
+      return this.toPublicDate(periodResult.value);
     }
 
     let rDate: Temporal.ZonedDateTime | null = null;

@@ -227,6 +227,47 @@ describe('exception-bearing linear rules retain fast generation', () => {
     });
   });
 
+  it.each(['iso8601', 'gregory'])('keeps weekly and monthly fast generation with exceptions (%s)', (calendar) => {
+    const dtstart = start.withCalendar(calendar);
+    const exceptions = {
+      rDate: [dtstart.subtract({days: 1}), dtstart, dtstart.add({days: 9, hours: 1}), dtstart.add({years: 2})],
+      exDate: [dtstart, dtstart.add({days: 7}), dtstart.add({days: 5}), dtstart.add({months: 2, days: 13})],
+    };
+    for (const includeDtstart of [false, true]) {
+      for (const bound of [{count: 40}, {until: dtstart.add({months: 9})}]) {
+        compare({
+          freq: 'WEEKLY',
+          dtstart,
+          interval: 2,
+          byDay: ['MO', 'WE', 'FR'],
+          includeDtstart,
+          ...bound,
+          ...exceptions,
+        });
+        compare({
+          freq: 'WEEKLY',
+          dtstart,
+          byDay: ['TU', 'SA'],
+          byHour: [8, 20],
+          includeDtstart,
+          ...bound,
+          ...exceptions,
+        });
+        compare({
+          freq: 'MONTHLY',
+          dtstart,
+          byDay: weekdays,
+          bySetPos: [1, -1],
+          includeDtstart,
+          ...bound,
+          ...exceptions,
+        });
+        compare({freq: 'MONTHLY', dtstart, byMonthDay: [1, 17, -1], includeDtstart, ...bound, ...exceptions});
+        compare({freq: 'DAILY', dtstart, byHour: [6, 18], byMinute: [0, 34], includeDtstart, ...bound, ...exceptions});
+      }
+    }
+  });
+
   it('preserves DST-gap fallback with exceptions', () => {
     compare({
       freq: 'DAILY',
