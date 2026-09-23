@@ -20,6 +20,39 @@ describe('String parsing tests', () => {
     ]);
   });
 
+  it.each([false, true])('parses a quoted DTSTART timezone (strict=%s)', (strict) => {
+    const rule = new RRuleTemporal({
+      rruleString: 'DTSTART;VALUE=DATE-TIME;TZID="America/New_York":20260307T090000\nRRULE:FREQ=DAILY;COUNT=3',
+      strict,
+    });
+    const dates = ['2026-03-07T14:00:00.000Z', '2026-03-08T13:00:00.000Z', '2026-03-09T13:00:00.000Z'];
+
+    assertDates({rule}, dates);
+    assertDates({rule: parse(rule.toString())}, dates);
+  });
+
+  it.each([false, true])('parses a quoted EXDATE timezone (strict=%s)', (strict) => {
+    const rule = new RRuleTemporal({
+      rruleString:
+        'DTSTART:20260307T130000Z\nRRULE:FREQ=DAILY;COUNT=3\n' +
+        'EXDATE;TZID="America/New_York";VALUE=DATE-TIME:20260308T090000,20260309T090000',
+      strict,
+    });
+
+    assertDates({rule}, ['2026-03-07T13:00:00.000Z']);
+  });
+
+  it.each([false, true])('parses a quoted RDATE timezone (strict=%s)', (strict) => {
+    const rule = new RRuleTemporal({
+      rruleString:
+        'DTSTART:20260307T140000Z\nRRULE:FREQ=DAILY;COUNT=1\n' +
+        'RDATE;TZID="America/\r\n New_York":20260308T090000,20260309T090000',
+      strict,
+    });
+
+    assertDates({rule}, ['2026-03-07T14:00:00.000Z', '2026-03-08T13:00:00.000Z', '2026-03-09T13:00:00.000Z']);
+  });
+
   it('testStrType', () => {
     const rruleString = 'DTSTART:19970902T090000\nRRULE:FREQ=YEARLY;COUNT=3';
     expect(parse(rruleString)).toBeInstanceOf(RRuleTemporal);
