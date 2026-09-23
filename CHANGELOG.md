@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+- Accelerated `next()`, `previous()`, `between()`, `matches()`, and
+  `occursOn()` for rules without COUNT (unbounded or UNTIL-bounded). Simple
+  DAILY/WEEKLY/MONTHLY/YEARLY and fixed-step shapes now visit only the
+  recurrence periods around the query in integer time instead of cloning the
+  rule and replaying it through Temporal; RDATE/EXDATE merge as for COUNT
+  plans. Unsupported shapes, DST gaps, and scans the general engine could not
+  finish within `maxIterations` keep the existing path.
+- Built timezone transition tables from the Temporal implementation's own
+  transitions instead of daily Intl probes: first queries in a new zone are
+  several times cheaper on the polyfill, and optimized paths now agree with
+  the general engine where the polyfill's offsets differ from Intl (e.g.
+  Africa/Casablanca, Africa/Cairo, Pacific/Fiji).
+- Fixed transition tables doubling toward the past on every forward miss,
+  which made long-running processes that query later and later dates slow
+  down exponentially. Tables now extend only toward requests, incrementally.
+- Allowed UTC WEEKLY, MONTHLY, and expanded DAILY generation to keep their
+  fast paths when RDATE/EXDATE are present, as named-zone generation does.
+- Bounded the DST-gap checks of named-zone DAILY/WEEKLY COUNT generation by
+  the rule's actual span, so long rules no longer fall back to the general
+  engine; rule clones reuse already-normalized dates.
+
 ## 2.2.6 (2026-09-17)
 
 - Fixed invalid inherited dates in MONTHLY and YEARLY rules (#140). Missing

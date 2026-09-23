@@ -4,16 +4,17 @@ const MS_PER_SECOND = 1_000;
 const MS_PER_HOUR = 3_600_000;
 const MS_PER_DAY = 86_400_000;
 
-// Probe daily: tzdb includes regimes lasting only a week (Brazil in 2000,
-// Palestine in 2040) and a twelve-day change in Argentina in 2004. Sampling
-// every fifteen days can see the same offset on both sides and miss both
-// transitions. The resulting table still serves integer-only hot lookups.
-const SAMPLE_STEP_MS = MS_PER_DAY;
+// temporal-polyfill's forward transition search stops about three years past
+// the later of its starting instant and the current time, so `null` there only
+// means "none within that horizon". Resume well inside it rather than at it.
+const POLYFILL_RESUME_STEP_MS = 180 * MS_PER_DAY;
 // Extra coverage built around requested instants so tables rarely rebuild.
 const COVERAGE_MARGIN_MS = 400 * MS_PER_DAY;
 // A UTC offset can never exceed ±18h (RFC 5545 / Temporal both cap at ±14h in
 // practice), so probes ±30h from a wall time bracket its possible instants.
 const PROBE_DISTANCE_MS = 30 * MS_PER_HOUR;
+// Temporal instants lie within ±10^8 days of the epoch.
+const MAX_EPOCH_MS = 8_640_000_000_000_000;
 
 export interface WallResolution {
   epochMs: number;
@@ -40,7 +41,6 @@ function parseFixedOffsetMs(tzid: string): number | null {
  */
 export class ZoneOffsetResolver {
   private readonly fixedOffsetMs: number | null;
-  private dtf?: Intl.DateTimeFormat;
   /** transitions[i] is the instant at which offsets[i + 1] takes effect. */
   private transitions: number[] = [];
   private offsets: number[] = [];
@@ -52,141 +52,94 @@ export class ZoneOffsetResolver {
     this.fixedOffsetMs = parseFixedOffsetMs(tzid);
   }
 
-  private formatter(): Intl.DateTimeFormat {
-    return (this.dtf ??= new Intl.DateTimeFormat('en-US', {
-      timeZone: this.tzid,
-      hourCycle: 'h23',
-      era: 'short',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }));
-  }
-
-  /** Exact offset via Intl (expensive; only used while building tables). */
-  private exactOffsetMs(epochMs: number): number {
-    const parts = this.formatter().formatToParts(epochMs);
-    let year = 0;
-    let bce = false;
-    let month = 1;
-    let day = 1;
-    let hour = 0;
-    let minute = 0;
-    let second = 0;
-    for (const part of parts) {
-      switch (part.type) {
-        case 'year':
-          year = Number(part.value);
-          break;
-        case 'era':
-          bce = part.value === 'BC' || part.value === 'B';
-          break;
-        case 'month':
-          month = Number(part.value);
-          break;
-        case 'day':
-          day = Number(part.value);
-          break;
-        case 'hour':
-          hour = Number(part.value) % 24;
-          break;
-        case 'minute':
-          minute = Number(part.value);
-          break;
-        case 'second':
-          second = Number(part.value);
-          break;
-      }
-    }
-    if (bce) year = 1 - year;
-    // Date.UTC misinterprets years 0-99; build via setUTCFullYear instead.
-    const wall = new Date(0);
-    wall.setUTCFullYear(year, month - 1, day);
-    wall.setUTCHours(hour, minute, second, 0);
-    // formatToParts is second-granular; align the epoch the same way.
-    return wall.getTime() - Math.floor(epochMs / MS_PER_SECOND) * MS_PER_SECOND;
+  private zonedAt(epochMs: number): Temporal.ZonedDateTime {
+    return new Temporal.ZonedDateTime(BigInt(epochMs) * 1_000_000n, this.tzid);
   }
 
   private ensureCoverage(fromMs: number, toMs: number): void {
     if (this.fixedOffsetMs !== null) return;
     if (this.covered && fromMs >= this.coverStart && toMs <= this.coverEnd) return;
 
-    let newStart = Math.min(fromMs, this.covered ? this.coverStart : fromMs) - COVERAGE_MARGIN_MS;
-    let newEnd = Math.max(toMs, this.covered ? this.coverEnd : toMs) + COVERAGE_MARGIN_MS;
-    if (this.covered) {
-      // Grow exponentially so repeated near-miss queries amortize rebuilds.
-      const grownSpan = Math.max(newEnd - newStart, 2 * (this.coverEnd - this.coverStart));
-      if (newStart < this.coverStart) newStart = Math.min(newStart, newEnd - grownSpan);
-      if (newEnd > this.coverEnd) newEnd = Math.max(newEnd, newStart + grownSpan);
-    }
+    // Extensions scan only the newly covered span, so the margin alone
+    // amortizes them. Grow only toward the request: growing both ends on every
+    // miss doubled the table away from the queries.
+    let newStart = !this.covered || fromMs < this.coverStart ? fromMs - COVERAGE_MARGIN_MS : this.coverStart;
+    let newEnd = !this.covered || toMs > this.coverEnd ? toMs + COVERAGE_MARGIN_MS : this.coverEnd;
+    // Margins and growth must not push an in-range request out of range.
+    newStart = Math.max(newStart, Math.min(fromMs, -MAX_EPOCH_MS));
+    newEnd = Math.min(newEnd, Math.max(toMs, MAX_EPOCH_MS));
     // Transition instants are second-aligned. Carrying the requesting
     // occurrence's milliseconds into the binary search shifts every boundary.
-    this.rebuild(
-      Math.floor(newStart / MS_PER_SECOND) * MS_PER_SECOND,
-      Math.ceil(newEnd / MS_PER_SECOND) * MS_PER_SECOND,
-    );
+    newStart = Math.floor(newStart / MS_PER_SECOND) * MS_PER_SECOND;
+    newEnd = Math.ceil(newEnd / MS_PER_SECOND) * MS_PER_SECOND;
+
+    if (!this.covered) {
+      const table = this.scan(newStart, newEnd);
+      this.transitions = table.transitions;
+      this.offsets = table.offsets;
+    } else {
+      // Scan only the newly covered spans and splice them onto the table.
+      if (newStart < this.coverStart) {
+        const head = this.scan(newStart, this.coverStart);
+        this.transitions = head.transitions.concat(this.transitions);
+        this.offsets = head.offsets.concat(this.offsets.slice(1));
+      }
+      if (newEnd > this.coverEnd) {
+        const tail = this.scan(this.coverEnd, newEnd);
+        this.transitions = this.transitions.concat(tail.transitions);
+        this.offsets = this.offsets.concat(tail.offsets.slice(1));
+      }
+    }
+    this.coverStart = newStart;
+    this.coverEnd = newEnd;
+    this.covered = true;
   }
 
-  private rebuild(startMs: number, endMs: number): void {
-    // Native Temporal exposes the timezone database's actual transitions,
-    // avoiding both sampling assumptions and Intl probes across long spans.
-    if (isNativeTemporal) {
-      let cursor = new Temporal.ZonedDateTime(BigInt(startMs) * 1_000_000n, this.tzid);
-      const transitions: number[] = [];
-      const offsets = [cursor.offsetNanoseconds / 1_000_000];
-      while (true) {
-        const next = cursor.getTimeZoneTransition('next');
-        if (!next || next.epochMilliseconds > endMs) break;
+  /**
+   * Transitions in (startMs, endMs], with offsets[0] in effect at startMs.
+   * Reads them from the Temporal implementation that constructs this
+   * library's values, so the table agrees with every ZonedDateTime emitted.
+   * Probing Intl directly can disagree with the polyfill, whose own sampling
+   * misses some short regimes (e.g. Morocco's Ramadan offsets), and costs a
+   * formatToParts() call per day of coverage.
+   */
+  private scan(startMs: number, endMs: number): {transitions: number[]; offsets: number[]} {
+    let cursor = this.zonedAt(startMs);
+    const transitions: number[] = [];
+    const offsets = [cursor.offsetNanoseconds / 1_000_000];
+    while (true) {
+      const next = cursor.getTimeZoneTransition('next');
+      if (next) {
+        if (next.epochMilliseconds > endMs) break;
         transitions.push(next.epochMilliseconds);
         offsets.push(next.offsetNanoseconds / 1_000_000);
         cursor = next;
-      }
-      this.transitions = transitions;
-      this.offsets = offsets;
-      this.coverStart = startMs;
-      this.coverEnd = endMs;
-      this.covered = true;
-      return;
-    }
-    const transitions: number[] = [];
-    const offsets: number[] = [this.exactOffsetMs(startMs)];
-
-    let cursor = startMs;
-    let cursorOffset = offsets[0]!;
-    while (cursor < endMs) {
-      const next = Math.min(cursor + SAMPLE_STEP_MS, endMs);
-      const nextOffset = this.exactOffsetMs(next);
-      if (nextOffset === cursorOffset) {
-        cursor = next;
         continue;
       }
-      // Binary-search the first second-aligned instant with the new offset.
-      let lo = cursor;
-      let hi = next;
-      while (hi - lo > MS_PER_SECOND) {
-        let mid = lo + Math.floor((hi - lo) / 2 / MS_PER_SECOND) * MS_PER_SECOND;
-        if (mid <= lo) mid = lo + MS_PER_SECOND;
-        if (this.exactOffsetMs(mid) === cursorOffset) {
-          lo = mid;
-        } else {
-          hi = mid;
+      if (isNativeTemporal) break;
+      const resumeMs =
+        Math.ceil((Math.max(cursor.epochMilliseconds, Date.now()) + POLYFILL_RESUME_STEP_MS) / MS_PER_SECOND) *
+        MS_PER_SECOND;
+      if (resumeMs >= endMs || resumeMs > MAX_EPOCH_MS) break;
+      const resumed = this.zonedAt(resumeMs);
+      const lastOffset = offsets[offsets.length - 1]!;
+      if (resumed.offsetNanoseconds / 1_000_000 !== lastOffset) {
+        // Only reachable if the polyfill's search horizon shrinks below the
+        // resume step: bisect to the second for the transition it skipped.
+        let lo = cursor.epochMilliseconds;
+        let hi = resumeMs;
+        while (hi - lo > MS_PER_SECOND) {
+          let mid = lo + Math.floor((hi - lo) / 2 / MS_PER_SECOND) * MS_PER_SECOND;
+          if (mid <= lo) mid = lo + MS_PER_SECOND;
+          if (this.zonedAt(mid).offsetNanoseconds / 1_000_000 === lastOffset) lo = mid;
+          else hi = mid;
         }
+        transitions.push(hi);
+        offsets.push(this.zonedAt(hi).offsetNanoseconds / 1_000_000);
       }
-      const transitionOffset = this.exactOffsetMs(hi);
-      transitions.push(hi);
-      offsets.push(transitionOffset);
-      cursor = hi;
-      cursorOffset = transitionOffset;
+      cursor = resumed;
     }
-
-    this.transitions = transitions;
-    this.offsets = offsets;
-    this.coverStart = startMs;
-    this.coverEnd = endMs;
-    this.covered = true;
+    return {transitions, offsets};
   }
 
   offsetMsAt(epochMs: number): number {
@@ -244,9 +197,16 @@ export class ZoneOffsetResolver {
   timeOfDayMayHitGap(timeOfDayMs: number, fromEpochMs: number, toEpochMs: number): boolean {
     if (this.fixedOffsetMs !== null) return false;
     this.ensureCoverage(fromEpochMs, toEpochMs);
-    for (let i = 0; i < this.transitions.length; i++) {
-      const transition = this.transitions[i]!;
-      if (transition < fromEpochMs || transition > toEpochMs) continue;
+    const transitions = this.transitions;
+    let first = 0;
+    let last = transitions.length;
+    while (first < last) {
+      const mid = (first + last) >> 1;
+      if (transitions[mid]! < fromEpochMs) first = mid + 1;
+      else last = mid;
+    }
+    for (let i = first; i < transitions.length && transitions[i]! <= toEpochMs; i++) {
+      const transition = transitions[i]!;
       const offsetBefore = this.offsets[i]!;
       const offsetAfter = this.offsets[i + 1]!;
       const gapMs = offsetAfter - offsetBefore;
