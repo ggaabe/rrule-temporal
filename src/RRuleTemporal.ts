@@ -1968,8 +1968,18 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const {byYearDay} = this.opts;
     if (!byYearDay) return true;
     const dayOfYear = zdt.dayOfYear;
-    const last = zdt.with({month: 12, day: 31}).dayOfYear;
+    const last = this.lastByYearDay(zdt);
     return this.matchesNumericConstraint(dayOfYear, byYearDay, last);
+  }
+
+  /**
+   * The day of the year that negative BYYEARDAY values count back from: the
+   * end of month 12. Calendars with a 13th month end later, so code that
+   * seeks year days must use this rather than daysInYear to agree with
+   * matchesByYearDay.
+   */
+  private lastByYearDay(zdt: Temporal.ZonedDateTime | Temporal.PlainDate): number {
+    return zdt.with({month: 12, day: 31}).dayOfYear;
   }
 
   private getIsoWeekInfo(input: Temporal.ZonedDateTime | Temporal.PlainDate): {week: number; year: number} {
@@ -4913,8 +4923,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
     if (!this.matchesByYearDay(date)) {
       const daysInYear = date.daysInYear;
+      const last = this.lastByYearDay(date);
       const yearDays = this.opts
-        .byYearDay!.map((day) => (day > 0 ? day : daysInYear + day + 1))
+        .byYearDay!.map((day) => (day > 0 ? day : last + day + 1))
         .filter((day) => day > date.dayOfYear && day <= daysInYear);
       if (yearDays.length) return date.add({days: Math.min(...yearDays) - date.dayOfYear});
       return date.with({month: 1, day: 1}).add({years: 1});

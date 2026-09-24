@@ -106,3 +106,34 @@ describe('sub-daily rules keep the DTSTART + k * INTERVAL cadence', () => {
     ]);
   });
 });
+
+describe('sub-daily date limits in DTSTART calendars', () => {
+  // Without RSCALE, BY parts use DTSTART's calendar. Sub-daily rules jump over
+  // dates those parts reject, so they must land on the days a DAILY rule with
+  // the same parts selects, including where a 13th month moves the day that
+  // negative BYYEARDAY values count back from.
+  const days = (dates: Temporal.ZonedDateTime[]) => [...new Set(dates.map((date) => date.toPlainDate().toString()))];
+  const calendars = ['hebrew', 'chinese', 'coptic', 'ethiopic', 'indian', 'persian', 'islamic-civil', 'gregory'];
+
+  describe.each(calendars)('%s', (calendar) => {
+    const dtstart = Temporal.ZonedDateTime.from('2024-01-01T00:00:00[UTC]').withCalendar(calendar);
+    const laterMonth = ((dtstart.month + 2) % dtstart.monthsInYear) + 1;
+    it.each([
+      ['BYYEARDAY=-1', {byYearDay: [-1]}],
+      ['BYYEARDAY=-40', {byYearDay: [-40]}],
+      ['BYYEARDAY=100', {byYearDay: [100]}],
+      [`BYMONTH=${laterMonth}`, {byMonth: [laterMonth]}],
+      ['BYMONTHDAY=-1', {byMonthDay: [-1]}],
+      ['BYWEEKNO=10', {byWeekNo: [10]}],
+      ['BYDAY=SU', {byDay: ['SU']}],
+    ])('selects the DAILY days for %s', (_, parts) => {
+      const daily = new RRuleTemporal({freq: 'DAILY', ...parts, count: 3, dtstart}).all();
+      const hourly = new RRuleTemporal({freq: 'HOURLY', ...parts, count: 72, dtstart}).all();
+      const minutely = new RRuleTemporal({freq: 'MINUTELY', byHour: [12], byMinute: [0], ...parts, count: 3, dtstart});
+      expect(days(daily)).toHaveLength(3);
+      // 72 UTC hours fill exactly three days only if no hour of them is skipped.
+      expect(days(hourly)).toEqual(days(daily));
+      expect(days(minutely.all())).toEqual(days(daily));
+    });
+  });
+});
