@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.2.7 (2026-09-24)
+## 2.2.7 (2026-09-25)
 
 - Accelerated `next()`, `previous()`, `between()`, `matches()`, and
   `occursOn()` for rules without COUNT (unbounded or UNTIL-bounded). Simple
