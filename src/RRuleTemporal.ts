@@ -474,7 +474,8 @@ function parseIcsDatePropertyLine(
     if (equalsIndex === -1) continue;
 
     const paramName = param.slice(0, equalsIndex).toUpperCase();
-    const paramValue = param.slice(equalsIndex + 1);
+    const rawValue = param.slice(equalsIndex + 1);
+    const paramValue = rawValue.startsWith('"') && rawValue.endsWith('"') ? rawValue.slice(1, -1) : rawValue;
     if (paramName === 'VALUE') {
       valueType = paramValue.toUpperCase();
     } else if (paramName === 'TZID') {
