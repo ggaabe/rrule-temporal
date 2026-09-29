@@ -318,109 +318,13 @@ Notes
 
 ## Benchmarks
 
-### Queries without COUNT and sub-daily rules (v2.2.7)
-
-Measured September 23, 2026 on an Apple M2 Max with Node 25.2.1 and the
-bundled Temporal polyfill, comparing builds of `v2.2.6` and v2.2.7. Every
-scenario returned identical results from both builds before timing. Query rows
-are warm medians per call, generation rows are uncached `all()` calls with the
-builds alternating each sample, and the last row is the first `all()` in a
-fresh process (median of 15).
-
-| Scenario | v2.2.6 | v2.2.7 | Speedup |
-| --- | ---: | ---: | ---: |
-| WEEKLY M/W/F `next()`, no end, UTC | 61.25 us | 0.69 us | 88.77x |
-| WEEKLY M/W/F `next()`, 40 EXDATEs, no end, Chicago | 157.5 us | 1.33 us | 118x |
-| WEEKLY M/W/F `between()` one month, no end, UTC | 36.22 us | 6.40 us | 5.66x |
-| MONTHLY last Friday `next()`, no end, Chicago | 68.79 us | 1.39 us | 49.49x |
-| YEARLY `previous()`, no end, Chicago | 79.11 us | 2.23 us | 35.48x |
-| UTC WEEKLY M/W/F with RDATE/EXDATE, `all()`, COUNT 1,000 | 12.555 ms | 0.697 ms | 18.02x |
-| HOURLY quarter hours, `all()`, COUNT 1,000, UTC | 3.967 ms | 1.073 ms | 3.70x |
-| MINUTELY 9:00-16:45 quarter hours, `all()`, COUNT 1,000, Chicago | 4.516 ms | 2.034 ms | 2.22x |
-| Chicago weekdays, first `all()` in a fresh process | 23.282 ms | 4.593 ms | 5.07x |
-
-Queries on unbounded and UNTIL-bound rules, the usual calendar case, now visit
-only the recurrence periods around the target instead of replaying the rule
-through Temporal. Sub-daily rules with BYxxx parts run on a new integer engine,
-which also fixes their INTERVAL cadence, and timezone tables are built from
-Temporal's own transitions. In the same runs, the 13 COUNT-bound query
-scenarios measured 0.93-2.81x and the 29 existing generation scenarios
-0.93-1.18x; isolated re-runs of the lowest cases were within 2% of v2.2.6.
-
-See [`benchmarks/README.md`](benchmarks/README.md) for every scenario, raw
-measurements, and the reproduction commands.
-
-### UTC generation improvements (v2.2.4)
-
-Measured September 5, 2026 on an Apple M2 Max with Node 25.2.1 and the
-bundled Temporal polyfill, comparing a build of `v2.2.3` (`474c88c`) with the
-v2.2.4 implementation after the DST fix (`0274381`). These are uncached
-`all()` calls: seven samples of at least 300 ms after a 200 ms warmup,
-alternating baseline/candidate order each sample. Rule construction is outside
-the timings. Every scenario's complete result was compared against the baseline
-before timing. These are local medians; sample ranges are recorded with the raw
-results, and timings vary with machine load.
-
-| UTC scenario | v2.2.3 | v2.2.4 | Speedup |
-| --- | ---: | ---: | ---: |
-| YEARLY last weekday, COUNT 1,000 | 1,866.627 ms | 27.755 ms | 67.25x |
-| YEARLY quarterly months / two month days, COUNT 1,000 | 22.255 ms | 2.046 ms | 10.88x |
-| MONTHLY weekdays / four time slots, COUNT 1,000 | 6.402 ms | 1.192 ms | 5.37x |
-| MONTHLY first/last weekday time slots, COUNT 240 | 20.788 ms | 0.825 ms | 25.20x |
-| DAILY RDATE/EXDATE, COUNT 1,000 | 3.645 ms | 0.720 ms | 5.06x |
-
-UTC monthly/yearly generation now selects calendar days and BYSETPOS ranks
-using integers, then constructs only the Temporal candidates that the visitor
-consumes. Simple UTC DAILY/HOURLY/MINUTELY/SECONDLY rules retain their fast
-generators when RDATE/EXDATE are present; exceptions are applied afterward in
-recurrence-set order. Unsupported shapes retain the general engine, including
-expanded exception rules whose iteration limits differ.
-
-The release passed all 1,167 tests on both Temporal backends, plus CI on
-Node 20, 24, and 26. The timings above use the polyfill only. The general
-calendar engine now restores DTSTART's time after DST gaps; this has a cost
-in fallback cases. The Chicago DAILY exception control measured 3.960 ms
-for v2.2.3 and 4.840 ms for v2.2.4, about 22% slower in this run.
-
-See [`benchmarks/README.md`](benchmarks/README.md) for all scenarios, raw
-measurements, and the reproduction command.
-
-### COUNT-bound queries
-
-Measured September 24, 2026 on an Apple M2 Max with Node 25.2.1, comparing
-the exact `v2.2.2` tag (`6be2251`) with v2.2.7. The table reports warmed median
-time per call from seven 300 ms samples after a 250 ms warmup; lower is better.
-Each build ran three times in alternating processes, and the table shows the
-median run. Both builds returned identical results, and v2.2.7 uses the
-production-minified bundle described below.
-
-| Scenario | v2.2.2 | v2.2.7 | Speedup |
-| --- | ---: | ---: | ---: |
-| SECONDLY next, COUNT 128, rank 63 | 9.44 us | 0.49 us | 19.27x |
-| SECONDLY next, COUNT 250k, rank 200k | 9.38 us | 0.52 us | 18.04x |
-| DAILY next, COUNT 9k, rank 8.5k, UTC | 9.80 us | 1.11 us | 8.83x |
-| DAILY previous, COUNT 9k, rank 8.5k, Chicago | 12.64 us | 2.39 us | 5.29x |
-| DAILY weekdays next, COUNT 9k, distant, UTC | 10.00 us | 1.22 us | 8.20x |
-| DAILY slots narrow between, COUNT 9k, UTC | 32.88 us | 5.86 us | 5.61x |
-| WEEKLY M/W/F slots next, COUNT 9k, UTC | 10.58 us | 1.27 us | 8.33x |
-| MONTHLY last weekday next, COUNT 9k, UTC | 31.55 us | 21.28 us | 1.48x |
-| MONTHLY last weekday next, COUNT 128, rank 63 | 21.99 us | 11.70 us | 1.88x |
-| SECONDLY `occursOn()`, COUNT 100k | 254.7 ms | 9.35 us | 27,241x |
-| DAILY RDATE/EXDATE next, COUNT 9k, rank 8.5k | 53.0 ms | 1.61 us | 32,919x |
-| YEARLY BYMONTH/BYMONTHDAY next, COUNT 9k, rank 8.5k | 388.9 ms | 7.41 us | 52,483x |
-| SECONDLY `all()`, COUNT 3.6k, explicit Temporal output | 42.9 ms | 18.7 ms | 2.29x |
-
-The named-zone cold call still includes lazy transition-table construction;
-the query harness prints cold timings and each sample's warm range.
-
-### Full recurrence generation
-
-Uncached median ops/s for v2.2.7, measured September 23, 2026 on the same
-Apple M2 Max with Node 25.2.1 using the polyfill backend and `rrule` 2.8.1.
-Each result is the median of five 200 ms samples after a 200 ms warmup. The
-production bundle is minified, which disables `temporal-polyfill`'s
-development-only per-instance debug strings. The three-library comparison,
-query methodology, and cached-mode summary live in
+Full recurrence generation with uncached `all()` calls, in median ops/s
+(higher is better). Measured September 23, 2026 with v2.2.7 on an Apple M2 Max
+with Node 25.2.1, using the polyfill backend and `rrule` 2.8.1. Each result is
+the median of five 200 ms samples after a 200 ms warmup. The production bundle
+is minified, which disables `temporal-polyfill`'s development-only
+per-instance debug strings. The three-library comparison, query benchmarks,
+release-to-release comparisons, and cached-mode summary live in
 [`benchmarks/README.md`](benchmarks/README.md).
 
 | Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
