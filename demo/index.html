@@ -1,31 +1,53 @@
 <!doctype html>
 <html lang="en">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='24' rx='6' fill='%234f46e5'/%3E%3Crect x='3' y='5' width='26' height='8' rx='4' fill='%233730a3'/%3E%3Ccircle cx='11' cy='19' r='2' fill='white'/%3E%3Ccircle cx='16' cy='19' r='2' fill='white'/%3E%3Ccircle cx='21' cy='19' r='2' fill='white'/%3E%3Ccircle cx='11' cy='24' r='2' fill='white' fill-opacity='.5'/%3E%3C/svg%3E"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>rrule-temporal demo site</title>
+    <title>rrule-temporal playground</title>
 
-    <meta name="description"
-        content="Interactive demo for rrule-temporal. Build and test iCalendar RRULE recurrence schedules (RFC 5545) using the JavaScript Temporal API. Generate occurrences, parse rules, and see human-readable text." />
-    <meta name="keywords"
-        content="RRULE,iCalendar,RFC 5545,recurrence rules,JavaScript,Temporal API,scheduling,calendar" />
-    <meta property="og:title" content="rrule-temporal demo site" />
-    <meta property="og:description"
-        content="Interactive demo for rrule-temporal to build and test iCalendar RRULE recurrence rules (RFC 5545) with the JavaScript Temporal API." />
+    <meta
+      name="description"
+      content="Interactive playground for rrule-temporal. Build iCalendar RRULE recurrence rules (RFC 5545 and RFC 7529), see every occurrence in a list or calendar, and try the query API, with time zones, daylight saving, and non-Gregorian calendars on the JavaScript Temporal API."
+    />
+    <meta
+      name="keywords"
+      content="RRULE,iCalendar,RFC 5545,RFC 7529,recurrence rules,JavaScript,Temporal API,scheduling,calendar,time zones"
+    />
+    <meta property="og:title" content="rrule-temporal playground" />
+    <meta
+      property="og:description"
+      content="Build and explore iCalendar RRULE recurrence rules (RFC 5545) on the JavaScript Temporal API."
+    />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="rrule-temporal demo site" />
-    <meta name="twitter:description"
-        content="Build and test iCalendar RRULE recurrence schedules (RFC 5545) with the JavaScript Temporal API." />
+    <meta name="twitter:title" content="rrule-temporal playground" />
+    <meta
+      name="twitter:description"
+      content="Build and explore iCalendar RRULE recurrence rules (RFC 5545) on the JavaScript Temporal API."
+    />
 
+    <script>
+      // Apply the saved or system theme before the first paint.
+      (function () {
+        var dark;
+        try {
+          var saved = localStorage.getItem('theme');
+          dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        } catch (error) {
+          dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        document.documentElement.classList.toggle('dark', dark);
+      })();
+    </script>
+  </head>
 
-</head>
-
-<body>
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-</body>
-
+  </body>
 </html>
