@@ -18,8 +18,12 @@ function snippet(ics: string, includeDtstart: boolean, language: Language, descr
     '});',
     '',
     'rule.all((date, i) => i < 10); // the first 10 occurrences',
-    'rule.next();                   // the next occurrence after now',
-    'rule.between(start, end);      // every occurrence in a window',
+    'rule.next(); // the next occurrence after now',
+    '',
+    'const start = new Date();',
+    'const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);',
+    'rule.between(start, end); // every occurrence in the next 30 days',
+    '',
     `${textCall}; // ${JSON.stringify(description)}`,
   ].join('\n');
 }

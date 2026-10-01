@@ -28,16 +28,23 @@ export function QueryPanel({rule, options, zone}: {rule: Rule; options: RuleOpti
     }
   }, [at, zone]);
 
+  const ruleZone = options.tzid ?? options.dtstart.timeZoneId;
   const results = useMemo(() => {
     if (!instant) return null;
-    return timed(() => ({
-      next: attempt(() => rule.next(instant)),
-      previous: attempt(() => rule.previous(instant)),
-      matches: attempt(() => rule.matches(instant)),
-      occursOn: attempt(() => rule.occursOn(instant.toPlainDate())),
-      between: attempt(() => rule.between(instant, instant.add({days: 30}))),
-    }));
-  }, [rule, instant]);
+    // occursOn() reads its date in the rule's time zone, which can differ
+    // from the zone the moment was entered in.
+    const ruleDate = instant.withTimeZone(ruleZone).toPlainDate();
+    return {
+      ruleDate,
+      ...timed(() => ({
+        next: attempt(() => rule.next(instant)),
+        previous: attempt(() => rule.previous(instant)),
+        matches: attempt(() => rule.matches(instant)),
+        occursOn: attempt(() => rule.occursOn(ruleDate)),
+        between: attempt(() => rule.between(instant, instant.add({days: 30}))),
+      })),
+    };
+  }, [rule, instant, ruleZone]);
 
   const show = (date: Zdt | null) =>
     date ? (
@@ -94,8 +101,26 @@ export function QueryPanel({rule, options, zone}: {rule: Rule; options: RuleOpti
           <QueryRow call="rule.matches(at)" description="Whether this exact instant is an occurrence.">
             {results.matches.error !== null ? failure(results.matches.error) : yesNo(results.matches.value)}
           </QueryRow>
-          <QueryRow call="rule.occursOn(date)" description="Whether any occurrence falls on this calendar date.">
-            {results.occursOn.error !== null ? failure(results.occursOn.error) : yesNo(results.occursOn.value)}
+          <QueryRow
+            call="rule.occursOn(date)"
+            description="Whether any occurrence falls on this date in the rule's time zone."
+          >
+            {results.occursOn.error !== null ? (
+              failure(results.occursOn.error)
+            ) : (
+              <span className="flex flex-wrap items-center gap-2">
+                {yesNo(results.occursOn.value)}
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {results.ruleDate.toLocaleString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                  {ruleZone !== zone && ` in ${ruleZone}`}
+                </span>
+              </span>
+            )}
           </QueryRow>
           <QueryRow call="rule.between(at, at + 30 days)" description="Every occurrence in a window.">
             {results.between.error !== null ? (
