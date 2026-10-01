@@ -751,6 +751,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private emitAnchorZdt?: Temporal.ZonedDateTime;
   private numericQueryPlanCache: NumericQueryPlan | null | undefined;
   private periodQueryPlanCache: PeriodQueryPlan | null | undefined;
+  private dtstartIsOccurrenceCache?: boolean;
   private static readonly rscaleCalendarSupport: Record<string, boolean> = {};
 
   /**
@@ -2156,8 +2157,43 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return new RRuleTemporal<TOutput>(merged);
   }
 
+  /**
+   * Whether the rule itself generates DTSTART, so includeDtstart must not add
+   * it again. The BYxxx filters decide this unless BYSETPOS is present: it can
+   * skip a DTSTART that every filter accepts, as a last-Friday rule skips any
+   * other Friday. Then the rule, generated without includeDtstart, must start
+   * at DTSTART.
+   */
+  private dtstartIsOccurrence(): boolean {
+    if (this.dtstartIsOccurrenceCache !== undefined) return this.dtstartIsOccurrenceCache;
+    let occurs = this.matchesAll(this.originalDtstart);
+    if (occurs && this.opts.bySetPos?.length) {
+      const rule = new RRuleTemporal<TOutput>({
+        ...this.opts,
+        temporal: this.outputTemporal,
+        dtstart: this.originalDtstart,
+        includeDtstart: false,
+        rDate: undefined,
+        exDate: undefined,
+      } as RRuleOptions<TOutput>);
+      let first: bigint | undefined;
+      try {
+        rule.allInternal((date) => {
+          first = date.epochNanoseconds;
+          return false;
+        });
+      } catch {
+        // DTSTART would be the first occurrence found, so a rule that finds
+        // none within its iteration limits does not generate it.
+      }
+      occurs = first === this.originalDtstart.epochNanoseconds;
+    }
+    this.dtstartIsOccurrenceCache = occurs;
+    return occurs;
+  }
+
   private addDtstartIfNeeded(dates: Temporal.ZonedDateTime[], iterator?: InternalRRuleTemporalIterator): boolean {
-    if (this.includeDtstart && !this.matchesAll(this.originalDtstart)) {
+    if (this.includeDtstart && !this.dtstartIsOccurrence()) {
       // Skip if dtstart is excluded and we have an iterator
       if (iterator && this.isExcluded(this.originalDtstart)) {
         return true; // continue without adding
