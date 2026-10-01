@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.8 (2026-10-01)
 
 - Fixed `includeDtstart` omitting a DTSTART that matches every BYxxx part but
   that BYSETPOS skips, such as a Friday DTSTART for a last-Friday rule (#150).
@@ -8,6 +8,9 @@
   method. Thanks to @m0dded for the report.
 - Accepted quoted TZID parameters, such as `TZID="America/New_York"`, in
   DTSTART, EXDATE, and RDATE (#144). Thanks to @bensynapse for the fix.
+- Validated all 1,607 tests on Node 20, 24, and 26, plus 4,549 differential
+  checks of `includeDtstart` with BYSETPOS across every query method and
+  151,168 query-window fuzz comparisons.
 
 ## 2.2.7 (2026-09-25)
 
