@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Fixed `includeDtstart` omitting a DTSTART that matches every BYxxx part but
+  that BYSETPOS skips, such as a Friday DTSTART for a last-Friday rule (#150).
+  DTSTART is now added and counted toward COUNT by generation and every query
+  method. Thanks to @m0dded for the report.
+- Accepted quoted TZID parameters, such as `TZID="America/New_York"`, in
+  DTSTART, EXDATE, and RDATE (#144). Thanks to @bensynapse for the fix.
+
 ## 2.2.7 (2026-09-25)
 
 - Accelerated `next()`, `previous()`, `between()`, `matches()`, and
