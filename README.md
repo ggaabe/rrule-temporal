@@ -6,6 +6,8 @@ The library accepts the familiar `RRULE` format and returns
 
 See the [demo site](https://ggaabe.github.io/rrule-temporal/) for an interactive playground.
 
+If rrule-temporal saves you or your company time, please consider [sponsoring it](https://github.com/sponsors/ggaabe).
+
 > RRule-temporal was created to advance the JS RRule ecosystem to use Temporal instead of Date, and to properly support cross-timezone and calendar aware recurrence rules, as per the suggestion of rrule.js contributors.
 >https://github.com/jkbrzt/rrule/issues/450#issuecomment-1055853095
 
@@ -492,6 +494,14 @@ change with the runtime.
 
 ## Sponsor
 
-If this library saves you time, sponsorship helps keep it maintained.
+rrule-temporal powers RRULE scheduling in [pg-boss](https://github.com/timgit/pg-boss), is used by [node-ical](https://github.com/jens-maus/node-ical), and is installed millions of times a week. [Sponsoring it on GitHub](https://github.com/sponsors/ggaabe) helps keep it maintained. Company sponsors get a link here and on the [demo site](https://ggaabe.github.io/rrule-temporal/).
 
-> This library is sponsored by [PostalForm 💌](https://postalform.com/?utm_source=github&utm_medium=readme&utm_campaign=rrule-temporal) — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The only mailing platform for AI Agents via MCP, and the easiest one for humans!
+### Bronze sponsors
+
+> [PostalForm 💌](https://postalform.com/?utm_source=github&utm_medium=readme&utm_campaign=rrule-temporal) — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The only mailing platform for AI Agents via MCP, and the easiest one for humans!
+
+Need help with recurring events, time zones, or iCalendar in your own product? I'm available for consulting: reach me on [X](https://x.com/gabgarrett).
+
+## Author
+
+Built and maintained by [Gabriel Garrett](https://github.com/ggaabe).

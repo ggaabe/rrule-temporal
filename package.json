@@ -44,6 +44,10 @@
     "url": "https://github.com/ggaabe/rrule-temporal/issues"
   },
   "homepage": "https://ggaabe.github.io/rrule-temporal/",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/ggaabe"
+  },
   "files": [
     "dist"
   ],
