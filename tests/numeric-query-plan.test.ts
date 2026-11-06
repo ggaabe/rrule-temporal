@@ -605,6 +605,24 @@ describe('candidate budget', () => {
     expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
   });
 
+  test('does not materialize a YEARLY period just over the budget', () => {
+    // About 1,051,000 candidates a year, against the 998,000 that keep their plan below.
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 1000,
+      byMonthDay: range(1, 31),
+      byHour: range(0, 23),
+      byMinute: range(0, 39),
+      bySecond: [0, 1, 2],
+      dtstart,
+    });
+    const generated = countGeneratedYears(rule);
+
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-01T00:01:00Z'), true)).toHaveLength(4);
+    expect(generated.calls).toBe(0);
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
   test('stops a YEARLY plan as soon as its years exceed the budget', () => {
     // About 998,000 candidates a year, so the second year is already over budget.
     const rule = new RRuleTemporal({
