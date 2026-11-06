@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed query methods materializing a dense YEARLY rule's candidates before
+  checking `maxCandidateEvaluations`, which exhausted the heap again since 2.2.3
+  (#133). `all()` was not affected.
+
 ## 2.2.8 (2026-10-01)
 
 - Fixed `includeDtstart` omitting a DTSTART that matches every BYxxx part but
