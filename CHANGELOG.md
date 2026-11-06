@@ -5,6 +5,8 @@
 - Fixed query methods materializing a dense YEARLY rule's candidates before
   checking `maxCandidateEvaluations`, which exhausted the heap again since 2.2.3
   (#133). `all()` was not affected.
+- Fixed `all()` and queries on a YEARLY rule with an ordinal BYDAY that a year
+  lacks, such as `53MO`, finding an occurrence in the next or previous year.
 
 ## 2.2.8 (2026-10-01)
 

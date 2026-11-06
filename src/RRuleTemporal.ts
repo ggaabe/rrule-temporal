@@ -6466,8 +6466,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           const delta = (dec31.dayOfWeek - wd + 7) % 7;
           dt = dec31.subtract({days: delta + 7 * (-ord - 1)});
         }
-        // byMonth is already checked to be falsy in the outer condition
-        occs.push(dt);
+        // byMonth is already checked to be falsy in the outer condition.
+        // A year without a 53rd such weekday has no occurrence, rather than one in a neighboring year.
+        if (dt.year === sample.year) occs.push(dt);
       }
     } else if (!this.opts.byYearDay && !this.opts.byWeekNo) {
       // Build per-month then apply RFC 7529 SKIP if RSCALE present and BYMONTHDAY invalid

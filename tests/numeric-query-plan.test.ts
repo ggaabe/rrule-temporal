@@ -640,6 +640,34 @@ describe('candidate budget', () => {
     expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
   });
 
+  test('keeps a 53rd weekday in its year without the plan', () => {
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 13,
+      byDay: ['53MO'],
+      byHour: range(0, 23),
+      byMinute: range(0, 59),
+      bySecond: range(0, 59),
+      bySetPos: [1],
+      dtstart,
+    });
+
+    expect(rule.next(new Date('2025-01-01T00:00:00Z'))?.toPlainDate().toString()).toBe('2029-12-31');
+    expect(rule.matches(new Date('2026-01-05T00:00:00Z'))).toBe(false);
+    expect(rule.occursOn(Temporal.PlainDate.from('2026-01-05'))).toBe(false);
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
+  test('skips a year without a 53rd weekday in all()', () => {
+    const dates = (byDay: string) =>
+      new RRuleTemporal({freq: 'YEARLY', count: 2, byDay: [byDay], dtstart})
+        .all()
+        .map((date) => date.toPlainDate().toString());
+
+    expect(dates('53MO')).toEqual(['2029-12-31', '2035-12-31']);
+    expect(dates('-53MO')).toEqual(['2029-01-01', '2035-01-01']);
+  });
+
   test('keeps the plan for a YEARLY rule within the budget', () => {
     // The same rule again, with few enough occurrences to stay in its first year.
     const rule = new RRuleTemporal({
