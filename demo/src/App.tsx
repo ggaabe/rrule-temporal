@@ -30,6 +30,7 @@ type Editor = 'builder' | 'text';
 type ValidRule = Extract<ParsedRule, {error: null}>;
 
 const zoneLabel = (zone: string) => (zone === 'UTC' ? 'UTC' : `${zone.split('/').pop()!.replace(/_/g, ' ')} time`);
+const creditLink = 'font-medium text-indigo-600 hover:underline dark:text-indigo-400';
 
 export default function App() {
   const [state, setState] = useState<AppState>(readInitialState);
@@ -93,17 +94,26 @@ export default function App() {
       </div>
 
       <aside className="mb-8 rounded-2xl bg-white px-4 py-3 text-sm text-pretty text-zinc-700 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-white/10">
-        Sponsored by{' '}
-        <a
-          href="https://postalform.com/?utm_source=github&utm_medium=demo&utm_campaign=rrule-temporal"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-        >
-          PostalForm 💌
-        </a>{' '}
-        — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The easiest mailing platform for
-        both AI Agents via MCP and humans!
+        <p>
+          Sponsored by{' '}
+          <a
+            href="https://postalform.com/?utm_source=github&utm_medium=demo&utm_campaign=rrule-temporal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={creditLink}
+          >
+            PostalForm 💌
+          </a>{' '}
+          — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The easiest mailing platform for
+          both AI Agents via MCP and humans!
+        </p>
+        <p className="mt-1">
+          If rrule-temporal saves your team time,{' '}
+          <a href="https://github.com/sponsors/ggaabe" target="_blank" rel="noopener noreferrer" className={creditLink}>
+            sponsor it on GitHub
+          </a>
+          .
+        </p>
       </aside>
 
       <section aria-labelledby="examples-heading" className="mb-4">
@@ -268,8 +278,14 @@ export default function App() {
           </a>
         </nav>
         <p>
-          Built with rrule-temporal v{__RRULE_TEMPORAL_VERSION__} on the Temporal API. Links to this page keep your
-          rule.
+          Made by{' '}
+          <a
+            className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100"
+            href="https://github.com/ggaabe"
+          >
+            Gabriel Garrett
+          </a>{' '}
+          with rrule-temporal v{__RRULE_TEMPORAL_VERSION__} on the Temporal API. Links to this page keep your rule.
         </p>
       </footer>
     </div>
