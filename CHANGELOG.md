@@ -18,6 +18,9 @@
   (#133). `all()` was not affected.
 - Fixed `all()` and queries on a YEARLY rule with an ordinal BYDAY that a year
   lacks, such as `53MO`, finding an occurrence in the next or previous year.
+- Fixed dense DAILY, WEEKLY and MONTHLY queries skipping `maxCandidateEvaluations`
+  at its default, which let a one-year `between()` build tens of millions of dates.
+  They now throw at the budget, as a lower budget already does.
 
 ## 2.2.8 (2026-10-01)
 

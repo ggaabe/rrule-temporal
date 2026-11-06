@@ -1182,7 +1182,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
   private recordCandidateEvaluation(work: CandidateWorkBudget, count = 1): void {
     work.evaluated += count;
-    if (work.evaluated > this.maxCandidateEvaluations) {
+    this.assertCandidateBudget(work.evaluated);
+  }
+
+  private assertCandidateBudget(evaluated: number): void {
+    if (evaluated > this.maxCandidateEvaluations) {
       throw new Error(`Maximum candidate evaluations (${this.maxCandidateEvaluations}) exceeded in all()`);
     }
   }
@@ -3441,6 +3445,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
+          this.assertCandidateBudget(dates.length);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -3562,6 +3567,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
+          this.assertCandidateBudget(dates.length);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -4123,6 +4129,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.zdtFromEpochMs(resolution.epochMs));
+          this.assertCandidateBudget(dates.length);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -4273,6 +4280,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.zdtFromEpochMs(resolution.epochMs));
+          this.assertCandidateBudget(dates.length);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -5645,6 +5653,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     if (firstIndex >= endIndex && !this.opts.rDate) {
       return {handled: true, value: []};
+    }
+    // Only rules that expand time slots have a budget on every other path
+    if (this.opts.byHour || this.opts.byMinute || this.opts.bySecond) {
+      this.assertCandidateBudget(endIndex - firstIndex);
     }
 
     if (!this.opts.rDate && !this.opts.exDate) {
