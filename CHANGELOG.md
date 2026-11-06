@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed dense DAILY, WEEKLY and MONTHLY queries skipping `maxCandidateEvaluations`
+  at its default, which let a one-year `between()` build tens of millions of dates.
+  They now throw at the budget, as a lower budget already does.
+
 ## 2.2.8 (2026-10-01)
 
 - Fixed `includeDtstart` omitting a DTSTART that matches every BYxxx part but
