@@ -699,6 +699,7 @@ describe('candidate budget', () => {
     });
 
     expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-01T00:01:00Z'), true)).toHaveLength(4);
-    expectPlan(rule, 'yearly');
+    const planned = rule as unknown as {getNumericQueryPlan(): {kind: string} | null};
+    expect(planned.getNumericQueryPlan()?.kind).toBe('yearly');
   });
 });
