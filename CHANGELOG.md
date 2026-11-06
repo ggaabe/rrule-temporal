@@ -13,6 +13,9 @@
 - Fixed a non-numeric BYMONTH value in a rule string, such as `BYMONTH=abc`,
   never matching, so a YEARLY rule had no dates. Outside strict mode it's now
   dropped, like an out-of-range month.
+- Fixed query methods materializing a dense YEARLY rule's candidates before
+  checking `maxCandidateEvaluations`, which exhausted the heap again since 2.2.3
+  (#133). `all()` was not affected.
 
 ## 2.2.8 (2026-10-01)
 

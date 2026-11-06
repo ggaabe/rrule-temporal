@@ -2790,7 +2790,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return calendarDays.map(({month, day}) => gregorianEpochDay(year, month, day));
   }
 
-  private generateYearlyOccurrenceEpochsUtc(year: number, applyBySetPos = true): number[] {
+  private generateYearlyOccurrenceEpochsUtc(year: number): number[] {
     const timeSlotOffsets = this.timeSlotOffsetsMs;
     if (!timeSlotOffsets?.length) return [];
     const walls: number[] = [];
@@ -2803,13 +2803,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
     walls.sort((left, right) => left - right);
 
-    if (!applyBySetPos || !this.opts.bySetPos?.length) return walls;
+    if (!this.opts.bySetPos?.length) return walls;
     const selected = this.applyBySetPosToSortedList(walls).sort((left, right) => left - right);
     return selected.filter((wall, index) => index === 0 || wall !== selected[index - 1]);
   }
 
-  private yearlyCandidateEvaluationCountUtc(year: number): number {
-    const candidateCount = this.generateYearlyOccurrenceEpochsUtc(year, false).length;
+  /** Count one year's candidates without materializing them. */
+  private yearlyCandidateCountUtc(year: number): number {
+    return this.generateYearlyOccurrenceDaysUtc(year).length * this.timeSlotOffsetsMs!.length;
+  }
+
+  private yearlyCandidateEvaluationCount(candidateCount: number): number {
     const positions = this.opts.bySetPos;
     if (!positions?.length) return candidateCount;
 
@@ -2844,8 +2848,13 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return null;
     }
 
-    const startEpochMilliseconds = this.originalDtstart.epochMilliseconds;
     const startYear = this.originalDtstart.year;
+    // A dense rule can name tens of millions of candidates in one year, so bound
+    // the period before materializing it and leave it to the general engine.
+    const firstYearCandidates = this.yearlyCandidateCountUtc(startYear);
+    if (firstYearCandidates > this.maxCandidateEvaluations) return null;
+
+    const startEpochMilliseconds = this.originalDtstart.epochMilliseconds;
     const wallsForPeriod = (periodIndex: number): number[] | null => {
       const yearDelta = periodIndex * interval;
       const year = startYear + yearDelta;
@@ -2872,6 +2881,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const requiredCycleOccurrences = Math.max(0, maximumCount - firstCandidates.length);
     const cyclePrefixCounts = [0];
     const cyclePrefixEvaluations = [0];
+    // What the loop below materializes, which BYSETPOS then narrows down. It stops once
+    // that passes the budget, rather than walking up to 400 years before the check after it.
+    let materializedCandidates = firstYearCandidates;
     for (
       let periodOffset = 0;
       periodOffset < cyclePeriods && cyclePrefixCounts.at(-1)! < requiredCycleOccurrences;
@@ -2881,7 +2893,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       if (!walls) return null;
       cyclePrefixCounts.push(cyclePrefixCounts[periodOffset]! + walls.length);
       const year = startYear + (1 + periodOffset) * interval;
-      cyclePrefixEvaluations.push(cyclePrefixEvaluations[periodOffset]! + this.yearlyCandidateEvaluationCountUtc(year));
+      const candidates = this.yearlyCandidateCountUtc(year);
+      cyclePrefixEvaluations.push(
+        cyclePrefixEvaluations[periodOffset]! + this.yearlyCandidateEvaluationCount(candidates),
+      );
+      materializedCandidates += candidates;
+      if (hasDateExpansion && materializedCandidates > this.maxCandidateEvaluations) return null;
     }
     const precomputedPeriods = cyclePrefixCounts.length - 1;
     const completedCycle = precomputedPeriods === cyclePeriods;
@@ -2889,7 +2906,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (occurrencesPerPrecomputedSpan === 0 && firstCandidates.length < maximumCount) return null;
 
     if (hasDateExpansion) {
-      let candidateEvaluations = this.yearlyCandidateEvaluationCountUtc(startYear);
+      let candidateEvaluations = this.yearlyCandidateEvaluationCount(firstYearCandidates);
       if (completedCycle && requiredCycleOccurrences > 0) {
         const fullCycles = Math.floor(requiredCycleOccurrences / occurrencesPerPrecomputedSpan);
         const remainder = requiredCycleOccurrences % occurrencesPerPrecomputedSpan;
