@@ -967,6 +967,30 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     }).toThrow('interval must be greater than 0');
   });
 
+  it.each([NaN, 'abc'])('should handle %s interval', (interval) => {
+    expect(() => {
+      new RRuleTemporal({
+        freq: 'DAILY',
+        interval: interval as number,
+        dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]'),
+      });
+    }).toThrow('interval must be greater than 0');
+  });
+
+  it.each(['abc', '', 'NaN'])('should reject the non-numeric INTERVAL value "%s"', (value) => {
+    const rruleString = `DTSTART:20250101T000000Z\nRRULE:FREQ=DAILY;INTERVAL=${value}`;
+
+    expect(() => new RRuleTemporal({rruleString})).toThrow('interval must be greater than 0');
+    expect(() => new RRuleTemporal({rruleString, strict: true})).toThrow(`Invalid INTERVAL value: ${value}`);
+  });
+
+  it('should keep reading an INTERVAL that starts with a number outside strict mode', () => {
+    const rule = new RRuleTemporal({rruleString: 'DTSTART:20250101T000000Z\nRRULE:FREQ=DAILY;INTERVAL=2x;COUNT=2'});
+
+    expect(rule.options().interval).toBe(2);
+    expect(rule.all().map((date) => date.day)).toEqual([1, 3]);
+  });
+
   it('should throw non-UTC UNTIL values when DTSTART has time zone reference', () => {
     const ics = `DTSTART;TZID=America/Chicago:20250320T170000\nRRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
     expect(() => new RRuleTemporal({rruleString: ics})).toThrow();

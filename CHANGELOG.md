@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed a non-numeric INTERVAL, such as `INTERVAL=abc`, passing the constructor
+  and then failing `between()` and `all()` with an unrelated `RangeError`. It now
+  throws the same error as `INTERVAL=0`.
+
 ## 2.2.8 (2026-10-01)
 
 - Fixed `includeDtstart` omitting a DTSTART that matches every BYxxx part but
