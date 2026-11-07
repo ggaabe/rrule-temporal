@@ -846,7 +846,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
     if (!manual.freq) throw new Error('RRULE must include FREQ');
     manual.interval = manual.interval ?? 1;
-    if (manual.interval <= 0) {
+    // Negated to also reject NaN, as `NaN <= 0` is false
+    if (!(manual.interval > 0)) {
       throw new Error('Cannot create RRule: interval must be greater than 0');
     }
     this.opts = this.sanitizeOpts(manual);
