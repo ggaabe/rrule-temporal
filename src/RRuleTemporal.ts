@@ -45,8 +45,14 @@ interface NumericCandidate {
   occurrenceIndex: number;
 }
 
+/** Plans holding more candidates stay cached on one rule at a time, so that they can't add up across rules. */
+const MAX_CACHED_PLAN_CANDIDATES = 10_000;
+let lastLargePlanRule: WeakRef<RRuleTemporal> | null = null;
+
 interface NumericQueryPlan {
   readonly kind: 'fixed-step' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  /** Number of candidates this plan holds in memory. */
+  readonly heldCandidates: number;
   /** Number of RRULE occurrences after applying COUNT and inclusive UNTIL. */
   readonly count: number;
   /** Original COUNT before an optional UNTIL shortens the sequence. */
@@ -2314,6 +2320,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     kind: NumericQueryPlan['kind'],
     maximumCount: number,
     select: (index: number) => NumericCandidate | null,
+    heldCandidates = 0,
     directLowerBound?: (targetEpochNanoseconds: bigint, strict: boolean) => number,
   ): NumericQueryPlan | null {
     const first = select(0);
@@ -2361,6 +2368,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     return {
       kind,
+      heldCandidates,
       count,
       maximumCount,
       select: (index) => {
@@ -2420,7 +2428,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return Number(rawIndex);
     };
 
-    return this.createNumericQueryPlan('fixed-step', maximumCount, select, directLowerBound);
+    return this.createNumericQueryPlan('fixed-step', maximumCount, select, 0, directLowerBound);
   }
 
   private resolveNumericWallMilliseconds(wallMilliseconds: number): number | null {
@@ -2545,7 +2553,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return {epochMilliseconds, periodIndex, occurrenceIndex: index};
     };
 
-    const plan = this.createNumericQueryPlan('daily', maximumCount, select);
+    const heldCandidates = firstCandidates.length + cycleSlots.length;
+    const plan = this.createNumericQueryPlan('daily', maximumCount, select, heldCandidates);
     const last = plan?.select(maximumCount - 1);
     if (last && timeSlotOffsets.some((offset) => this.numericQueryGapHazard(offset, last.epochMilliseconds))) {
       return null;
@@ -2602,7 +2611,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return {epochMilliseconds, periodIndex, occurrenceIndex: index};
     };
 
-    const plan = this.createNumericQueryPlan('weekly', maximumCount, select);
+    const heldCandidates = firstCandidates.length + weeklySlots.length;
+    const plan = this.createNumericQueryPlan('weekly', maximumCount, select, heldCandidates);
     const last = plan?.select(maximumCount - 1);
     if (last && timeSlotOffsets.some((offset) => this.numericQueryGapHazard(offset, last.epochMilliseconds))) {
       return null;
@@ -2695,7 +2705,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return {epochMilliseconds, periodIndex, occurrenceIndex: index};
     };
 
-    const plan = this.createNumericQueryPlan('monthly', maximumCount, select);
+    const plan = this.createNumericQueryPlan('monthly', maximumCount, select, firstCandidates.length);
     const last = plan?.select(maximumCount - 1);
     if (last && timeSlotOffsets.some((offset) => this.numericQueryGapHazard(offset, last.epochMilliseconds))) {
       return null;
@@ -2758,7 +2768,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return calendarDays.map(({month, day}) => gregorianEpochDay(year, month, day));
   }
 
-  private generateYearlyOccurrenceEpochsUtc(year: number, applyBySetPos = true): number[] {
+  private generateYearlyOccurrenceEpochsUtc(year: number): number[] {
     const timeSlotOffsets = this.timeSlotOffsetsMs;
     if (!timeSlotOffsets?.length) return [];
     const walls: number[] = [];
@@ -2771,13 +2781,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
     walls.sort((left, right) => left - right);
 
-    if (!applyBySetPos || !this.opts.bySetPos?.length) return walls;
+    if (!this.opts.bySetPos?.length) return walls;
     const selected = this.applyBySetPosToSortedList(walls).sort((left, right) => left - right);
     return selected.filter((wall, index) => index === 0 || wall !== selected[index - 1]);
   }
 
-  private yearlyCandidateEvaluationCountUtc(year: number): number {
-    const candidateCount = this.generateYearlyOccurrenceEpochsUtc(year, false).length;
+  /** Count one year's candidates without materializing them. */
+  private yearlyCandidateCountUtc(year: number): number {
+    return this.generateYearlyOccurrenceDaysUtc(year).length * this.timeSlotOffsetsMs!.length;
+  }
+
+  private yearlyCandidateEvaluationCount(candidateCount: number): number {
     const positions = this.opts.bySetPos;
     if (!positions?.length) return candidateCount;
 
@@ -2812,8 +2826,13 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return null;
     }
 
-    const startEpochMilliseconds = this.originalDtstart.epochMilliseconds;
     const startYear = this.originalDtstart.year;
+    // A dense rule can name tens of millions of candidates in one year, so bound
+    // the period before materializing it and leave it to the general engine.
+    const firstYearCandidates = this.yearlyCandidateCountUtc(startYear);
+    if (firstYearCandidates > this.maxCandidateEvaluations) return null;
+
+    const startEpochMilliseconds = this.originalDtstart.epochMilliseconds;
     const wallsForPeriod = (periodIndex: number): number[] | null => {
       const yearDelta = periodIndex * interval;
       const year = startYear + yearDelta;
@@ -2840,6 +2859,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     const requiredCycleOccurrences = Math.max(0, maximumCount - firstCandidates.length);
     const cyclePrefixCounts = [0];
     const cyclePrefixEvaluations = [0];
+    // What the loop below materializes, which BYSETPOS then narrows down. It stops once
+    // that passes the budget, rather than walking up to 400 years before the check after it.
+    let materializedCandidates = firstYearCandidates;
     for (
       let periodOffset = 0;
       periodOffset < cyclePeriods && cyclePrefixCounts.at(-1)! < requiredCycleOccurrences;
@@ -2849,7 +2871,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       if (!walls) return null;
       cyclePrefixCounts.push(cyclePrefixCounts[periodOffset]! + walls.length);
       const year = startYear + (1 + periodOffset) * interval;
-      cyclePrefixEvaluations.push(cyclePrefixEvaluations[periodOffset]! + this.yearlyCandidateEvaluationCountUtc(year));
+      const candidates = this.yearlyCandidateCountUtc(year);
+      cyclePrefixEvaluations.push(
+        cyclePrefixEvaluations[periodOffset]! + this.yearlyCandidateEvaluationCount(candidates),
+      );
+      materializedCandidates += candidates;
+      if (hasDateExpansion && materializedCandidates > this.maxCandidateEvaluations) return null;
     }
     const precomputedPeriods = cyclePrefixCounts.length - 1;
     const completedCycle = precomputedPeriods === cyclePeriods;
@@ -2857,7 +2884,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (occurrencesPerPrecomputedSpan === 0 && firstCandidates.length < maximumCount) return null;
 
     if (hasDateExpansion) {
-      let candidateEvaluations = this.yearlyCandidateEvaluationCountUtc(startYear);
+      let candidateEvaluations = this.yearlyCandidateEvaluationCount(firstYearCandidates);
       if (completedCycle && requiredCycleOccurrences > 0) {
         const fullCycles = Math.floor(requiredCycleOccurrences / occurrencesPerPrecomputedSpan);
         const remainder = requiredCycleOccurrences % occurrencesPerPrecomputedSpan;
@@ -2905,7 +2932,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       return {epochMilliseconds, periodIndex, occurrenceIndex: index};
     };
 
-    const plan = this.createNumericQueryPlan('yearly', maximumCount, select);
+    const plan = this.createNumericQueryPlan('yearly', maximumCount, select, firstCandidates.length);
     const last = plan?.select(maximumCount - 1);
     if (last && timeSlotOffsets.some((offset) => this.numericQueryGapHazard(offset, last.epochMilliseconds))) {
       return null;
@@ -2973,24 +3000,31 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (this.numericQueryPlanCache !== undefined) {
       return this.numericQueryPlanCache;
     }
+    let plan: NumericQueryPlan | null;
     try {
-      this.numericQueryPlanCache = this.buildNumericQueryPlan();
+      plan = this.buildNumericQueryPlan();
       // An explicit DTSTART may name the later side of a fold; wall-clock
       // rank/select resolves ambiguities to the earlier instant.
       if (
-        this.numericQueryPlanCache &&
+        plan &&
         this.tzid !== 'UTC' &&
         this.resolveNumericWallMilliseconds(this.wallMsOf(this.originalDtstart)) !==
           this.originalDtstart.epochMilliseconds
       ) {
-        this.numericQueryPlanCache = null;
+        plan = null;
       }
     } catch {
       // The optimized path is deliberately conservative. Unsupported Intl
       // ranges or numeric edge cases fall back to the existing engine.
-      this.numericQueryPlanCache = null;
+      plan = null;
     }
-    return this.numericQueryPlanCache;
+    if (plan && plan.heldCandidates > MAX_CACHED_PLAN_CANDIDATES && typeof WeakRef === 'function') {
+      const previousRule = lastLargePlanRule?.deref();
+      if (previousRule) previousRule.numericQueryPlanCache = undefined;
+      lastLargePlanRule = new WeakRef(this as unknown as RRuleTemporal);
+    }
+    this.numericQueryPlanCache = plan;
+    return plan;
   }
 
   /**
@@ -6449,8 +6483,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           const delta = (dec31.dayOfWeek - wd + 7) % 7;
           dt = dec31.subtract({days: delta + 7 * (-ord - 1)});
         }
-        // byMonth is already checked to be falsy in the outer condition
-        occs.push(dt);
+        // byMonth is already checked to be falsy in the outer condition.
+        // A year without a 53rd such weekday has no occurrence, rather than one in a neighboring year.
+        if (dt.year === sample.year) occs.push(dt);
       }
     } else if (!this.opts.byYearDay && !this.opts.byWeekNo) {
       // Build per-month then apply RFC 7529 SKIP if RSCALE present and BYMONTHDAY invalid

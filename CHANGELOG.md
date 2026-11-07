@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Fixed query methods materializing a dense YEARLY rule's candidates before
+  checking `maxCandidateEvaluations`, which exhausted the heap again since 2.2.3
+  (#133). `all()` was not affected.
+- Fixed `all()` and queries on a YEARLY rule with an ordinal BYDAY that a year
+  lacks, such as `53MO`, finding an occurrence in the next or previous year.
+- Fixed cached query plans adding up across rules, which let a small calendar of
+  dense rules exhaust the heap. Plans over 10,000 candidates now stay cached one
+  at a time, so alternating queries between such rules rebuild them.
+
 ## 2.2.8 (2026-10-01)
 
 - Fixed `includeDtstart` omitting a DTSTART that matches every BYxxx part but

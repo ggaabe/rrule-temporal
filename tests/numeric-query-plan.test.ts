@@ -572,3 +572,134 @@ describe('early Gregorian years', () => {
     expectPlan(rule, 'monthly');
   });
 });
+
+describe('candidate budget', () => {
+  const range = (start: number, end: number) => Array.from({length: end - start + 1}, (_, index) => start + index);
+  const dtstart = Temporal.ZonedDateTime.from('2025-01-01T00:00:00+00:00[UTC]');
+  const countGeneratedYears = (rule: RRuleTemporal) => {
+    const inspectable = rule as unknown as {generateYearlyOccurrenceEpochsUtc: (...args: unknown[]) => number[]};
+    const generate = inspectable.generateYearlyOccurrenceEpochsUtc;
+    const counter = {calls: 0};
+    inspectable.generateYearlyOccurrenceEpochsUtc = function (this: RRuleTemporal, ...args) {
+      counter.calls += 1;
+      return generate.apply(this, args);
+    };
+    return counter;
+  };
+
+  test('does not materialize a dense YEARLY period over the budget', () => {
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 1,
+      byMonth: range(1, 12),
+      byMonthDay: range(1, 31),
+      byHour: range(0, 23),
+      byMinute: range(0, 59),
+      bySecond: range(0, 59),
+      dtstart,
+    });
+    const generated = countGeneratedYears(rule);
+
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-02T00:00:00Z'), true)).toHaveLength(1);
+    expect(generated.calls).toBe(0);
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
+  test('does not materialize a YEARLY period just over the budget', () => {
+    // About 1,051,000 candidates a year, against the 998,000 that keep their plan below.
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 1000,
+      byMonthDay: range(1, 31),
+      byHour: range(0, 23),
+      byMinute: range(0, 39),
+      bySecond: [0, 1, 2],
+      dtstart,
+    });
+    const generated = countGeneratedYears(rule);
+
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-01T00:01:00Z'), true)).toHaveLength(4);
+    expect(generated.calls).toBe(0);
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
+  test('stops a YEARLY plan as soon as its years exceed the budget', () => {
+    // About 998,000 candidates a year, so the second year is already over budget.
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 100_000_000,
+      byMonthDay: range(1, 31),
+      byHour: range(0, 23),
+      byMinute: range(0, 37),
+      bySecond: [0, 1, 2],
+      dtstart,
+    });
+    const generated = countGeneratedYears(rule);
+
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-01T00:01:00Z'), true)).toHaveLength(4);
+    expect(generated.calls).toBeLessThan(10);
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
+  test('counts the candidates BYSETPOS narrows down towards the budget', () => {
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 100_000_000,
+      byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
+      byHour: range(0, 23),
+      byMinute: range(0, 59),
+      bySetPos: [1, -1],
+      dtstart,
+    });
+    const generated = countGeneratedYears(rule);
+
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-02T00:00:00Z'), true)).toHaveLength(1);
+    expect(generated.calls).toBeLessThan(10);
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
+  test('keeps a 53rd weekday in its year without the plan', () => {
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 13,
+      byDay: ['53MO'],
+      byHour: range(0, 23),
+      byMinute: range(0, 59),
+      bySecond: range(0, 59),
+      bySetPos: [1],
+      dtstart,
+    });
+
+    expect(rule.next(new Date('2025-01-01T00:00:00Z'))?.toPlainDate().toString()).toBe('2029-12-31');
+    expect(rule.matches(new Date('2026-01-05T00:00:00Z'))).toBe(false);
+    expect(rule.occursOn(Temporal.PlainDate.from('2026-01-05'))).toBe(false);
+    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+  });
+
+  test('skips a year without a 53rd weekday in all()', () => {
+    const dates = (byDay: string) =>
+      new RRuleTemporal({freq: 'YEARLY', count: 2, byDay: [byDay], dtstart})
+        .all()
+        .map((date) => date.toPlainDate().toString());
+
+    expect(dates('53MO')).toEqual(['2029-12-31', '2035-12-31']);
+    expect(dates('-53MO')).toEqual(['2029-01-01', '2035-01-01']);
+  });
+
+  test('keeps the plan for a YEARLY rule within the budget', () => {
+    // The same rule again, with few enough occurrences to stay in its first year.
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      count: 1000,
+      byMonthDay: range(1, 31),
+      byHour: range(0, 23),
+      byMinute: range(0, 37),
+      bySecond: [0, 1, 2],
+      dtstart,
+    });
+
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-01T00:01:00Z'), true)).toHaveLength(4);
+    const planned = rule as unknown as {getNumericQueryPlan(): {kind: string} | null};
+    expect(planned.getNumericQueryPlan()?.kind).toBe('yearly');
+  });
+});
