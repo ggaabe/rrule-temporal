@@ -967,6 +967,81 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     }).toThrow('interval must be greater than 0');
   });
 
+  it.each([NaN, 'abc'])('should handle %s interval', (interval) => {
+    expect(() => {
+      new RRuleTemporal({
+        freq: 'DAILY',
+        interval: interval as number,
+        dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]'),
+      });
+    }).toThrow('interval must be greater than 0');
+  });
+
+  it.each(['abc', '', 'NaN'])('should reject the non-numeric INTERVAL value "%s"', (value) => {
+    const rruleString = `DTSTART:20250101T000000Z\nRRULE:FREQ=DAILY;INTERVAL=${value}`;
+
+    expect(() => new RRuleTemporal({rruleString})).toThrow('interval must be greater than 0');
+    expect(() => new RRuleTemporal({rruleString, strict: true})).toThrow(`Invalid INTERVAL value: ${value}`);
+  });
+
+  it.each([NaN, 'abc'])('should reject a %s count', (count) => {
+    expect(() => {
+      new RRuleTemporal({
+        freq: 'YEARLY',
+        count: count as number,
+        dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]'),
+      });
+    }).toThrow('count must be a number');
+  });
+
+  it.each(['abc', '', 'NaN', 'Infinity'])('should reject the non-numeric COUNT value "%s"', (value) => {
+    const rruleString = `DTSTART:20250101T000000Z\nRRULE:FREQ=YEARLY;COUNT=${value}`;
+
+    expect(() => new RRuleTemporal({rruleString})).toThrow('count must be a number');
+    expect(() => new RRuleTemporal({rruleString, strict: true})).toThrow(`Invalid COUNT value: ${value}`);
+  });
+
+  it('should leave only an infinite count out of toString()', () => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
+    const rule = new RRuleTemporal({freq: 'DAILY', count: Infinity, dtstart});
+    const reparsed = new RRuleTemporal({rruleString: rule.toString()});
+
+    expect(rule.toString()).not.toContain('COUNT');
+    expect(reparsed.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-31T00:00:00Z'), true)).toHaveLength(30);
+    expect(new RRuleTemporal({freq: 'DAILY', count: 0, dtstart}).toString()).toContain('COUNT=0');
+  });
+
+  it('should keep reading an INTERVAL or COUNT that starts with a number outside strict mode', () => {
+    const rule = new RRuleTemporal({rruleString: 'DTSTART:20250101T000000Z\nRRULE:FREQ=DAILY;INTERVAL=2x;COUNT=2x'});
+
+    expect(rule.options().interval).toBe(2);
+    expect(rule.options().count).toBe(2);
+    expect(rule.all().map((date) => date.day)).toEqual([1, 3]);
+  });
+
+  it('should drop a non-numeric BYMONTH value like an out-of-range one outside strict mode', () => {
+    const rruleString = (byMonth: string) => `DTSTART:20250101T000000Z\nRRULE:FREQ=YEARLY;BYMONTH=${byMonth}`;
+    const dates = (byMonth: string) =>
+      new RRuleTemporal({rruleString: rruleString(byMonth)})
+        .between(new Date('2025-01-01T00:00:00Z'), new Date('2026-12-31T00:00:00Z'), true)
+        .map((date) => date.toPlainDate().toString());
+
+    expect(dates('abc')).toEqual(['2025-01-01', '2026-01-01']);
+    expect(dates('abc')).toEqual(dates('13'));
+    expect(dates('6,abc')).toEqual(['2025-06-01', '2026-06-01']);
+    expect(dates('M05')).toEqual(['2025-05-01', '2026-05-01']);
+    expect(dates('m05')).toEqual(['2025-05-01', '2026-05-01']);
+    expect(dates('M05L')).toEqual([]);
+    expect(dates('M005')).toEqual(dates('13'));
+    expect(new RRuleTemporal({rruleString: rruleString('5L')}).options().byMonth).toEqual(['5L']);
+    expect(() => new RRuleTemporal({rruleString: rruleString('abc'), strict: true})).toThrow(
+      'Invalid BYMONTH value: abc',
+    );
+    expect(() => new RRuleTemporal({rruleString: rruleString('M05'), strict: true})).toThrow(
+      'Invalid BYMONTH value: M05',
+    );
+  });
+
   it('should throw non-UTC UNTIL values when DTSTART has time zone reference', () => {
     const ics = `DTSTART;TZID=America/Chicago:20250320T170000\nRRULE:FREQ=DAILY;UNTIL=20250325T170000;COUNT=5`;
     expect(() => new RRuleTemporal({rruleString: ics})).toThrow();

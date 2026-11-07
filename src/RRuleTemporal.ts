@@ -504,14 +504,14 @@ function parseNumberArray(val: string, sort = false, strict = false, label = 'nu
 
 /**
  * Parse BYMONTH values, supporting RFC 7529 leap-month tokens with an "L" suffix (e.g., "5L").
- * Returns a heterogeneous array keeping original tokens for serialization.
+ * Returns a heterogeneous array keeping those tokens and month codes (e.g., "M05").
  */
 function parseByMonthArray(val: string, strict = false): Array<number | string> {
   return val.split(',').map((tok) => {
     const t = tok.trim();
     if (/^\d+L$/i.test(t)) return t.toUpperCase();
     const n = parseIntegerToken(t, 'BYMONTH', strict);
-    return Number.isFinite(n) ? n : t;
+    return /^M\d{2}L?$/i.test(t) ? t : n;
   });
 }
 
@@ -846,8 +846,13 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
     if (!manual.freq) throw new Error('RRULE must include FREQ');
     manual.interval = manual.interval ?? 1;
-    if (manual.interval <= 0) {
+    // Negated to also reject NaN, as `NaN <= 0` is false
+    if (!(manual.interval > 0)) {
       throw new Error('Cannot create RRule: interval must be greater than 0');
+    }
+    // Coerced to also reject a string like 'abc', which Number.isNaN() alone lets through
+    if (manual.count !== undefined && Number.isNaN(Number(manual.count))) {
+      throw new Error('Cannot create RRule: count must be a number');
     }
     this.opts = this.sanitizeOpts(manual);
     this.maxIterations = manual.maxIterations ?? 10000;
@@ -6359,7 +6364,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (this.opts.rscale && this.opts.skip) rule.push(`SKIP=${this.opts.skip}`);
     rule.push(`FREQ=${freq}`);
     if (interval !== 1) rule.push(`INTERVAL=${interval}`);
-    if (count !== undefined) rule.push(`COUNT=${count}`);
+    // COUNT=Infinity would not parse, and leaving it out keeps every date
+    if (count !== undefined && count !== Infinity) rule.push(`COUNT=${count}`);
     if (until) {
       rule.push(`UNTIL=${this.formatIcsDateTime(until)}`);
     }
