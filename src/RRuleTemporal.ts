@@ -3187,13 +3187,22 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return null;
   }
 
-  private allUtcFastPath(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] | null {
+  /** First instant an expanded path has to build: DTSTART, or the query's lower bound once it's later. */
+  private firstExpandedEpochMs(queryLowerBound?: Temporal.ZonedDateTime): number {
+    const startEpochMs = this.originalDtstart.epochMilliseconds;
+    return queryLowerBound ? Math.max(startEpochMs, queryLowerBound.epochMilliseconds) : startEpochMs;
+  }
+
+  private allUtcFastPath(
+    iterator?: InternalRRuleTemporalIterator,
+    queryLowerBound?: Temporal.ZonedDateTime,
+  ): Temporal.ZonedDateTime[] | null {
     if (this.canUseUtcLinearFastPath(iterator)) {
       switch (this.opts.freq) {
         case 'DAILY':
           return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
             ? this.hasUniqueTimeSlotOffsets
-              ? this._allUtcDailyExpanded()
+              ? this._allUtcDailyExpanded(queryLowerBound)
               : null
             : this._allUtcDailySimple();
         case 'HOURLY':
@@ -3212,7 +3221,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (this.canUseUtcWeeklyFastPath(iterator)) {
       return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
         ? this.hasUniqueTimeSlotOffsets
-          ? this._allUtcWeeklyExpanded()
+          ? this._allUtcWeeklyExpanded(queryLowerBound)
           : null
         : this._allUtcWeeklySimple();
     }
@@ -3355,7 +3364,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return dates;
   }
 
-  private _allUtcDailyExpanded(): Temporal.ZonedDateTime[] {
+  private _allUtcDailyExpanded(queryLowerBound?: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     if (!this.addDtstartIfNeeded(dates)) {
       return dates;
@@ -3363,6 +3372,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     const timeSlotOffsets = this.timeSlotOffsetsMs!;
     const startMilliseconds = this.originalDtstart.epochMilliseconds;
+    const firstMilliseconds = this.firstExpandedEpochMs(queryLowerBound);
     const untilMilliseconds = this.opts.until?.epochMilliseconds;
     const stepDays = this.opts.interval!;
     const allowedDays = this.simpleByDayIsoDays;
@@ -3389,7 +3399,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         const dayStartMilliseconds = epochDay * MS_PER_DAY;
         for (const timeSlotOffset of timeSlotOffsets) {
           const occurrenceMilliseconds = dayStartMilliseconds + timeSlotOffset;
-          if (occurrenceMilliseconds < startMilliseconds) {
+          if (occurrenceMilliseconds < firstMilliseconds) {
             continue;
           }
           if (untilMilliseconds !== undefined && occurrenceMilliseconds > untilMilliseconds) {
@@ -3483,7 +3493,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
   }
 
-  private _allUtcWeeklyExpanded(): Temporal.ZonedDateTime[] {
+  private _allUtcWeeklyExpanded(queryLowerBound?: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] {
     const dates: Temporal.ZonedDateTime[] = [];
     if (!this.addDtstartIfNeeded(dates)) {
       return dates;
@@ -3491,6 +3501,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     const start = this.originalDtstart;
     const startMilliseconds = start.epochMilliseconds;
+    const firstMilliseconds = this.firstExpandedEpochMs(queryLowerBound);
     const startEpochDay = Math.floor(startMilliseconds / MS_PER_DAY);
     const untilMilliseconds = this.opts.until?.epochMilliseconds;
     const timeSlotOffsets = this.timeSlotOffsetsMs!;
@@ -3511,7 +3522,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         const dayStartMilliseconds = (weekStartDay + dayOffset) * MS_PER_DAY;
         for (const timeSlotOffset of timeSlotOffsets) {
           const occurrenceMilliseconds = dayStartMilliseconds + timeSlotOffset;
-          if (occurrenceMilliseconds < startMilliseconds) {
+          if (occurrenceMilliseconds < firstMilliseconds) {
             continue;
           }
           if (untilMilliseconds !== undefined && occurrenceMilliseconds > untilMilliseconds) {
@@ -3924,7 +3935,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return undefined;
   }
 
-  private allTzEpochFastPath(iterator?: InternalRRuleTemporalIterator): Temporal.ZonedDateTime[] | null {
+  private allTzEpochFastPath(
+    iterator?: InternalRRuleTemporalIterator,
+    queryLowerBound?: Temporal.ZonedDateTime,
+  ): Temporal.ZonedDateTime[] | null {
     if (!this.canUseTzEpochFastPaths(iterator)) {
       return null;
     }
@@ -3938,7 +3952,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           if (!this.hasOrdinalByDay) {
             return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
               ? this.hasUniqueTimeSlotOffsets
-                ? this._allTzDailyExpanded()
+                ? this._allTzDailyExpanded(queryLowerBound)
                 : null
               : this._allTzDailySimple();
           }
@@ -3967,7 +3981,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     if (this.opts.freq === 'WEEKLY' && linearEligible && !this.hasOrdinalByDay && this.hasUniqueTimeSlotOffsets) {
       return this.opts.byHour || this.opts.byMinute || this.opts.bySecond
-        ? this._allTzWeeklyExpanded()
+        ? this._allTzWeeklyExpanded(queryLowerBound)
         : this._allTzWeeklySimple();
     }
 
@@ -4028,14 +4042,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     return dates;
   }
 
-  private _allTzDailyExpanded(): Temporal.ZonedDateTime[] | null {
+  private _allTzDailyExpanded(queryLowerBound?: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] | null {
     const dates: Temporal.ZonedDateTime[] = [];
     if (!this.addDtstartIfNeeded(dates)) {
       return dates;
     }
 
     const resolver = this.getZoneResolver();
-    const startEpochMs = this.originalDtstart.epochMilliseconds;
+    const firstEpochMs = this.firstExpandedEpochMs(queryLowerBound);
     const startWallMs = this.wallMsOf(this.originalDtstart);
     const timeSlotOffsets = this.timeSlotOffsetsMs!;
     for (const timeSlotOffset of timeSlotOffsets) {
@@ -4073,7 +4087,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           if (resolution.pushed) {
             return null;
           }
-          if (resolution.epochMs < startEpochMs) {
+          if (resolution.epochMs < firstEpochMs) {
             continue;
           }
           if (untilMs !== undefined && resolution.epochMs > untilMs) {
@@ -4184,7 +4198,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
   }
 
-  private _allTzWeeklyExpanded(): Temporal.ZonedDateTime[] | null {
+  private _allTzWeeklyExpanded(queryLowerBound?: Temporal.ZonedDateTime): Temporal.ZonedDateTime[] | null {
     const dates: Temporal.ZonedDateTime[] = [];
     if (!this.addDtstartIfNeeded(dates)) {
       return dates;
@@ -4192,7 +4206,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     const resolver = this.getZoneResolver();
     const start = this.originalDtstart;
-    const startEpochMs = start.epochMilliseconds;
+    const firstEpochMs = this.firstExpandedEpochMs(queryLowerBound);
     const startWallMs = this.wallMsOf(start);
     const startEpochDay = Math.floor(startWallMs / MS_PER_DAY);
     const timeSlotOffsets = this.timeSlotOffsetsMs!;
@@ -4224,7 +4238,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           if (resolution.pushed) {
             return null;
           }
-          if (resolution.epochMs < startEpochMs) {
+          if (resolution.epochMs < firstEpochMs) {
             continue;
           }
           if (untilMs !== undefined && resolution.epochMs > untilMs) {
@@ -5133,14 +5147,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       this.addDtstartIfNeeded(dates, iterator);
       return this.applyCountLimitAndMergeRDates(dates, iterator);
     }
-    const utcFastPathDates = this.allUtcFastPath(iterator);
+    const utcFastPathDates = this.allUtcFastPath(iterator, queryLowerBound);
     if (utcFastPathDates) {
       return this.opts.rDate || this.opts.exDate
         ? this.applyCountLimitAndMergeRDates(utcFastPathDates)
         : utcFastPathDates;
     }
 
-    const tzFastPathDates = this.allTzEpochFastPath(iterator);
+    const tzFastPathDates = this.allTzEpochFastPath(iterator, queryLowerBound);
     if (tzFastPathDates) {
       // Like UTC generation, compute the COUNT-bounded rule first, then union
       // RDATE and subtract EXDATE. Streaming uses the recurrence-set iterator.
