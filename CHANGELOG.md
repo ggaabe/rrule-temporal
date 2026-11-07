@@ -5,6 +5,14 @@
 - Fixed a non-numeric INTERVAL, such as `INTERVAL=abc`, passing the constructor
   and then failing `between()` and `all()` with an unrelated `RangeError`. It now
   throws the same error as `INTERVAL=0`.
+- Fixed a non-numeric COUNT, such as `COUNT=abc`, passing the constructor, so
+  `between()` found no dates for rules like `FREQ=YEARLY;COUNT=abc` while
+  `next()` and `matches()` did. It now throws when the rule is created, also
+  for a stored `COUNT=Infinity` or `COUNT=NaN`, and `toString()` leaves out an
+  infinite `count` instead of writing `COUNT=Infinity`.
+- Fixed a non-numeric BYMONTH value in a rule string, such as `BYMONTH=abc`,
+  never matching, so a YEARLY rule had no dates. Outside strict mode it's now
+  dropped, like an out-of-range month.
 
 ## 2.2.8 (2026-10-01)
 
