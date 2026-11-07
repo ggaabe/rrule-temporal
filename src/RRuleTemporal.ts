@@ -3018,7 +3018,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       // ranges or numeric edge cases fall back to the existing engine.
       plan = null;
     }
-    if (plan && plan.heldCandidates > MAX_CACHED_PLAN_CANDIDATES) {
+    if (plan && plan.heldCandidates > MAX_CACHED_PLAN_CANDIDATES && typeof WeakRef === 'function') {
       const previousRule = lastLargePlanRule?.deref();
       if (previousRule) previousRule.numericQueryPlanCache = undefined;
       lastLargePlanRule = new WeakRef(this as unknown as RRuleTemporal);

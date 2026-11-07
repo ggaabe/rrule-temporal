@@ -38,6 +38,21 @@ describe('query plan cache', () => {
     expect(planOf(rule)?.kind).toBe('yearly');
   });
 
+  test('keeps every plan where WeakRef is missing', () => {
+    vi.stubGlobal('WeakRef', undefined);
+    try {
+      const first = yearlyRule([9, 10, 11, 12], range(0, 6));
+      const second = yearlyRule([13, 14, 15, 16], range(0, 6));
+      first.next(after);
+      second.next(after);
+
+      expect(planOf(first)?.kind).toBe('yearly');
+      expect(planOf(second)?.kind).toBe('yearly');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   test('drops a larger plan when another rule builds a larger one', () => {
     // 4 hours x 7 minutes on 365 days is 10,220 candidates
     const first = yearlyRule([9, 10, 11, 12], range(0, 6));
