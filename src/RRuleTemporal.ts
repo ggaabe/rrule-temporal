@@ -6431,7 +6431,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let occs: Temporal.PlainDate[] = [];
 
     const hasOrdinalByDay = this.opts.byDay && this.opts.byDay.some((t) => /^[+-]?\d/.test(t));
-    if (hasOrdinalByDay && !this.opts.byMonth) {
+    // BYWEEKNO adds its own days next to BYYEARDAY, so only BYYEARDAY without
+    // it is limited by BYDAY and BYMONTHDAY.
+    const limitYearDays = Boolean(this.opts.byYearDay) && !this.opts.byWeekNo;
+    if (hasOrdinalByDay && !this.opts.byMonth && !limitYearDays) {
       // nth weekday of year
       const dayMap = weekdayToIsoDay;
       for (const tok of this.opts.byDay!) {
@@ -6452,6 +6455,16 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         // byMonth is already checked to be falsy in the outer condition
         occs.push(dt);
       }
+      // A weekday without an ordinal next to ordinal ones still means every such day of the year
+      const jan1 = sample.with({month: 1, day: 1});
+      for (const tok of this.opts.byDay!) {
+        const parsed = parseByDayToken(tok);
+        if (!parsed || parsed.ord !== 0) continue;
+        let dt = jan1.add({days: (dayMap[parsed.weekday]! - jan1.dayOfWeek + 7) % 7});
+        for (; dt.year === jan1.year; dt = dt.add({days: 7})) occs.push(dt);
+      }
+      // BYMONTHDAY limits the weekdays that BYDAY selects
+      if (this.opts.byMonthDay) occs = occs.filter((dt) => this.matchesByMonthDay(dt));
     } else if (!this.opts.byYearDay && !this.opts.byWeekNo) {
       // Build per-month then apply RFC 7529 SKIP if RSCALE present and BYMONTHDAY invalid
       occs = [];
@@ -6489,7 +6502,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           this.opts.freq === 'MINUTELY'
             ? sample.with({month: 1, day: 1}).add({days: dayNum - 1})
             : sample.with({month: 1, day: 1}).add({days: dayNum - 1});
-        if (!this.opts.byMonth || this.opts.byMonth!.includes(dt.month)) {
+        if (
+          (!this.opts.byMonth || this.opts.byMonth!.includes(dt.month)) &&
+          (!limitYearDays || (this.matchesByMonthDay(dt) && this.matchesYearlyByDay(dt)))
+        ) {
           occs.push(dt);
         }
       }
@@ -6508,6 +6524,24 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     }
 
     return this.sortedUniqueDateCandidates(occs);
+  }
+
+  /**
+   * BYDAY as a limit on a date of a YEARLY rule. An ordinal weekday counts
+   * within the month when BYMONTH is given and within the year otherwise,
+   * the same way the weekdays are generated.
+   */
+  private matchesYearlyByDay(date: Temporal.PlainDate): boolean {
+    if (!this.opts.byDay) return true;
+    for (const token of this.parsedByDayTokens ?? []) {
+      if (date.dayOfWeek !== token.isoDay) continue;
+      if (token.ord === 0) return true;
+      const position = this.opts.byMonth ? date.day : date.dayOfYear;
+      const length = this.opts.byMonth ? date.daysInMonth : date.daysInYear;
+      const nth = token.ord > 0 ? Math.ceil(position / 7) : -Math.ceil((length - position + 1) / 7);
+      if (nth === token.ord) return true;
+    }
+    return false;
   }
 
   private addByDayDates(tokens: string[], weekStart: Temporal.PlainDate): Temporal.PlainDate[] {
