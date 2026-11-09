@@ -76,6 +76,29 @@ describe('YEARLY rules with BYYEARDAY or an ordinal BYDAY', () => {
     ]);
   });
 
+  test('parts that can never agree give no occurrences instead of running out of iterations', () => {
+    // Jan 1 is never the 2nd, and the 2nd Monday of a year is never the 1st of a month
+    expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=1;BYMONTHDAY=2;COUNT=1')).toEqual([]);
+    expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYMONTHDAY=1;BYDAY=2MO;COUNT=1')).toEqual([]);
+    // Day 366 needs a leap year, and every 400th year from 2025 is a common one
+    expect(dates('DTSTART:20251231T090000Z\nRRULE:FREQ=YEARLY;INTERVAL=400;BYYEARDAY=366;BYDAY=WE;COUNT=1')).toEqual(
+      [],
+    );
+
+    const rule = new RRuleTemporal({
+      rruleString: 'DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=1;BYMONTHDAY=2',
+    });
+    expect(rule.next(new Date('2025-01-02T00:00:00Z'))).toBeNull();
+    expect(rule.previous(new Date('2050-01-01T00:00:00Z'))).toBeNull();
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2050-01-01T00:00:00Z'))).toEqual([]);
+
+    // A combination that needs a long wait still finds its day
+    expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=366;BYDAY=SU;COUNT=2')).toEqual([
+      '2028-12-31',
+      '2056-12-31',
+    ]);
+  });
+
   test('a named zone gives the same days as UTC', () => {
     expect(
       dates('DTSTART;TZID=America/New_York:20271230T090000\nRRULE:FREQ=YEARLY;BYYEARDAY=-2;BYDAY=TH;COUNT=4'),

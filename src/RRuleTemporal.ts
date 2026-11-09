@@ -752,6 +752,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private numericQueryPlanCache: NumericQueryPlan | null | undefined;
   private periodQueryPlanCache: PeriodQueryPlan | null | undefined;
   private dtstartIsOccurrenceCache?: boolean;
+  private yearlyDaysNeverMatchCache?: boolean;
   private static readonly rscaleCalendarSupport: Record<string, boolean> = {};
 
   /**
@@ -2058,6 +2059,32 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       yearStart = yearStart.add({years: 1});
     }
     return false;
+  }
+
+  /**
+   * BYDAY and BYMONTHDAY limit the days that a YEARLY rule gets from BYYEARDAY, or from an ordinal BYDAY
+   * counted over the year, so they can leave no day in any year (`BYYEARDAY=1;BYMONTHDAY=2`). Gregorian
+   * weekdays and leap years repeat every 400 years, so scanning 400 recurrence years decides it and the
+   * search can stop instead of running into maxIterations.
+   */
+  private yearlyDaysNeverMatch(): boolean {
+    const {freq, byYearDay, byWeekNo, byDay, byMonthDay, byMonth, interval = 1} = this.opts;
+    if (freq !== 'YEARLY' || byWeekNo || !(byDay || byMonthDay)) return false;
+    if (!byYearDay && !(this.hasOrdinalByDay && !byMonth)) return false;
+    if (this.yearlyDaysNeverMatchCache === undefined) {
+      let never = true;
+      try {
+        const firstYear = this.originalDtstart.toPlainDate().with({month: 1, day: 1});
+        for (let k = 0; never && k < 400; k++) {
+          never = this.generateYearlyDateCandidates(firstYear.add({years: k * interval})).length === 0;
+        }
+      } catch {
+        // A year outside the supported range: leave the decision to the search
+        never = false;
+      }
+      this.yearlyDaysNeverMatchCache = never;
+    }
+    return this.yearlyDaysNeverMatchCache;
   }
 
   options(): RRuleResolvedOptions<TOutput> {
@@ -5125,7 +5152,10 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         return this._allRscaleNonGregorian(iterator, queryLowerBound);
       }
     }
-    if (this.opts.byWeekNo && this.opts.byYearDay && !this.hasPossibleYearDayWeekNoCombination()) {
+    if (
+      (this.opts.byWeekNo && this.opts.byYearDay && !this.hasPossibleYearDayWeekNoCombination()) ||
+      this.yearlyDaysNeverMatch()
+    ) {
       const dates: Temporal.ZonedDateTime[] = [];
       this.addDtstartIfNeeded(dates, iterator);
       return this.applyCountLimitAndMergeRDates(dates, iterator);
