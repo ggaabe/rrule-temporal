@@ -1194,6 +1194,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     this.assertCandidateBudget(work.evaluated);
   }
 
+  /**
+   * Charge a fast path's dates to the budget, as the general engine charges
+   * each candidate. A DTSTART that includeDtstart added is not a candidate.
+   */
+  private assertFastPathBudget(dates: Temporal.ZonedDateTime[]): void {
+    this.assertCandidateBudget(dates[0] === this.originalDtstart ? dates.length - 1 : dates.length);
+  }
+
   private assertCandidateBudget(evaluated: number): void {
     if (evaluated > this.maxCandidateEvaluations) {
       throw new Error(`Maximum candidate evaluations (${this.maxCandidateEvaluations}) exceeded in all()`);
@@ -2333,7 +2341,6 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
   private canUseUtcCalendarFastPaths(): boolean {
     return (
-      this.maxCandidateEvaluations === 1_000_000 &&
       this.tzid === 'UTC' &&
       this.originalDtstart.timeZoneId === this.tzid &&
       ['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)
@@ -3383,7 +3390,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
         if (!allowedDays || allowedDays.includes(currentDayOfWeek)) {
           dates.push(this.utcZdtFromEpochMilliseconds(currentMilliseconds));
-          this.assertCandidateBudget(dates.length);
+          this.assertFastPathBudget(dates);
           if (this.shouldBreakForCountLimit(dates.length)) {
             break;
           }
@@ -3420,7 +3427,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
       if (!allowedDays || allowedDays.includes(currentDayOfWeek)) {
         dates.push(this.utcZdtFromEpochNanoseconds(currentNanoseconds));
-        this.assertCandidateBudget(dates.length);
+        this.assertFastPathBudget(dates);
         if (this.shouldBreakForCountLimit(dates.length)) {
           break;
         }
@@ -3475,7 +3482,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
-          this.assertCandidateBudget(dates.length);
+          this.assertFastPathBudget(dates);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -3523,7 +3530,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           }
 
           dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
-          this.assertCandidateBudget(dates.length);
+          this.assertFastPathBudget(dates);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -3554,7 +3561,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         }
 
         dates.push(this.utcZdtFromEpochNanoseconds(occurrenceNanoseconds));
-        this.assertCandidateBudget(dates.length);
+        this.assertFastPathBudget(dates);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
@@ -3600,7 +3607,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
-          this.assertCandidateBudget(dates.length);
+          this.assertFastPathBudget(dates);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -3873,7 +3880,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         }
 
         dates.push(this.utcZdtFromEpochMilliseconds(epochMilliseconds));
-        this.assertCandidateBudget(dates.length);
+        this.assertFastPathBudget(dates);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
@@ -3927,7 +3934,6 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   private canUseTzEpochFastPaths(iterator?: InternalRRuleTemporalIterator): boolean {
     if (
       iterator ||
-      this.maxCandidateEvaluations !== 1_000_000 ||
       this.tzid === 'UTC' ||
       this.originalDtstart.timeZoneId !== this.tzid ||
       this.opts.freq === 'YEARLY' ||
@@ -4102,7 +4108,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           break;
         }
         dates.push(this.zdtFromEpochMs(resolution.epochMs));
-        this.assertCandidateBudget(dates.length);
+        this.assertFastPathBudget(dates);
         if (this.shouldBreakForCountLimit(dates.length)) {
           break;
         }
@@ -4167,7 +4173,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.zdtFromEpochMs(resolution.epochMs));
-          this.assertCandidateBudget(dates.length);
+          this.assertFastPathBudget(dates);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -4263,7 +4269,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           return dates;
         }
         dates.push(this.zdtFromEpochMs(resolution.epochMs));
-        this.assertCandidateBudget(dates.length);
+        this.assertFastPathBudget(dates);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
@@ -4319,7 +4325,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
             return dates;
           }
           dates.push(this.zdtFromEpochMs(resolution.epochMs));
-          this.assertCandidateBudget(dates.length);
+          this.assertFastPathBudget(dates);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -4377,7 +4383,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           return dates;
         }
         dates.push(this.zdtFromEpochMs(resolution.epochMs));
-        this.assertCandidateBudget(dates.length);
+        this.assertFastPathBudget(dates);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
