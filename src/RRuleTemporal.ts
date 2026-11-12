@@ -2078,11 +2078,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * BYDAY and BYMONTHDAY limit the days that a YEARLY rule gets from BYYEARDAY, or from an ordinal BYDAY
    * counted over the year, so they can leave no day in any year (`BYYEARDAY=1;BYMONTHDAY=2`). Gregorian
    * weekdays and leap years repeat every 400 years, so scanning 400 recurrence years decides it and the
-   * search can stop instead of running into maxIterations.
+   * search can stop instead of running into maxIterations. A DTSTART in another calendar (for example
+   * `[u-ca=hebrew]`) counts its years in that calendar, whose years do not repeat that way, so the
+   * shortcut is left to the Gregorian calendar.
    */
   private yearlyDaysNeverMatch(): boolean {
     const {freq, byYearDay, byWeekNo, byDay, byMonthDay, byMonth, interval = 1} = this.opts;
     if (freq !== 'YEARLY' || byWeekNo || !(byDay || byMonthDay)) return false;
+    if (!['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)) return false;
     if (!byYearDay && !(this.hasOrdinalByDay && !byMonth)) return false;
     if (this.yearlyDaysNeverMatchCache === undefined) {
       let never = true;

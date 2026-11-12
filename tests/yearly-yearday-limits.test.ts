@@ -1,4 +1,5 @@
 import {RRuleTemporal} from '../src';
+import {Temporal} from '../src/temporal-impl';
 
 function dates(rruleString: string): string[] {
   return new RRuleTemporal({rruleString}).all().map((date) => date.toPlainDate().toString());
@@ -97,6 +98,22 @@ describe('YEARLY rules with BYYEARDAY or an ordinal BYDAY', () => {
       '2028-12-31',
       '2056-12-31',
     ]);
+  });
+
+  test('a DTSTART in a non-Gregorian calendar is not cut off after 400 of its years', () => {
+    // The years of a Hebrew-calendar DTSTART do not repeat every 400 years: day 179 of the
+    // year is a Sunday and the 1st of its month only in a 355-day year that starts on a
+    // Thursday, and every 131st year from 5786 is first such a year 810 steps later.
+    const rule = new RRuleTemporal({
+      freq: 'YEARLY',
+      dtstart: Temporal.ZonedDateTime.from('2025-09-23T09:00:00[UTC][u-ca=hebrew]'),
+      interval: 131,
+      byYearDay: [179],
+      byMonthDay: [1],
+      byDay: ['SU'],
+      count: 1,
+    });
+    expect(rule.all().map((date) => date.withCalendar('iso8601').toPlainDate().toString())).toEqual(['+108137-06-16']);
   });
 
   test('a named zone gives the same days as UTC', () => {
