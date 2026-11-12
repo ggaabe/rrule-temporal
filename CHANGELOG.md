@@ -3,24 +3,50 @@
 ## Unreleased
 
 - Fixed a non-numeric INTERVAL, such as `INTERVAL=abc`, passing the constructor
-  and then failing `between()` and `all()` with an unrelated `RangeError`. It now
-  throws the same error as `INTERVAL=0`.
+  and then failing `between()` and `all()` with an unrelated `RangeError` (#157).
+  It now throws the same error as `INTERVAL=0`. A fractional or infinite
+  `interval`, which failed in some methods and not in others, throws
+  `interval must be an integer`.
 - Fixed a non-numeric COUNT, such as `COUNT=abc`, passing the constructor, so
   `between()` found no dates for rules like `FREQ=YEARLY;COUNT=abc` while
-  `next()` and `matches()` did. It now throws when the rule is created, also
-  for a stored `COUNT=Infinity` or `COUNT=NaN`, and `toString()` leaves out an
-  infinite `count` instead of writing `COUNT=Infinity`.
+  `next()` and `matches()` did (#157). It now throws when the rule is created.
+  `toString()` leaves out an infinite `count` instead of writing
+  `COUNT=Infinity`; outside strict mode a stored `COUNT=Infinity` still reads
+  as no COUNT, and so does a `null` count.
 - Fixed a non-numeric BYMONTH value in a rule string, such as `BYMONTH=abc`,
-  never matching, so a YEARLY rule had no dates. Outside strict mode it's now
-  dropped, like an out-of-range month.
+  never matching, so a YEARLY rule had no dates (#157). Outside strict mode
+  it's now dropped, like an out-of-range month.
+- Fixed YEARLY rules ignoring BYDAY and BYMONTHDAY next to BYYEARDAY, and
+  ignoring BYMONTHDAY and plain weekdays next to a BYDAY ordinal counted over
+  the year (#158). `FREQ=YEARLY;BYYEARDAY=-2;BYDAY=TH` returned every
+  30 December, whatever its weekday, and `FREQ=YEARLY;BYDAY=MO,2TU` only the
+  second Tuesday. Parts that never agree, such as `BYYEARDAY=1;BYMONTHDAY=2`,
+  leave no occurrences, as does a BYSETPOS beyond the days that remain. Rules
+  with BYWEEKNO, and WEEKLY rules outside strict mode, keep their results.
+  Thanks to @simonkundrik for the fix.
 - Fixed query methods materializing a dense YEARLY rule's candidates before
   checking `maxCandidateEvaluations`, which exhausted the heap again since 2.2.3
-  (#133). `all()` was not affected.
+  (#133, #154). `all()` was not affected.
 - Fixed `all()` and queries on a YEARLY rule with an ordinal BYDAY that a year
-  lacks, such as `53MO`, finding an occurrence in the next or previous year.
+  lacks, such as `53MO`, finding an occurrence in the next or previous year
+  (#154).
 - Fixed dense DAILY, WEEKLY and MONTHLY queries skipping `maxCandidateEvaluations`
-  at its default, which let a one-year `between()` build tens of millions of dates.
-  They now throw at the budget, as a lower budget already does.
+  at its default, which let a one-year `between()` build tens of millions of dates
+  (#155). They now throw at the budget, as a lower budget already did. A window
+  of more than 1,000,000 dates needs a higher `maxCandidateEvaluations`, and
+  raising or lowering it no longer turns the UTC and time zone fast paths off.
+  For a rule without COUNT, only dates inside the query window count toward it.
+- Fixed DAILY, WEEKLY and MONTHLY rules without BYHOUR, BYMINUTE or BYSECOND
+  skipping `maxCandidateEvaluations` when a raised `maxIterations` let them pass
+  1,000,000 dates.
+- Fixed COUNT rules keeping every candidate of their first period for later
+  queries, about 75 MB for a dense YEARLY or MONTHLY rule, so a few dozen of
+  them exhausted the heap (#156). A query now computes each candidate from the
+  period's days and the rule's times: 60 dense rules take 6 MB instead of
+  exhausting the heap, and a query late in such a rule no longer rebuilds a
+  whole period per result.
+- Thanks to @thomasbachem for the reports and fixes in #154, #155, #156 and
+  #157.
 
 ## 2.2.8 (2026-10-01)
 
