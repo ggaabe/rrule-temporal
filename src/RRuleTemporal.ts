@@ -3383,6 +3383,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
         if (!allowedDays || allowedDays.includes(currentDayOfWeek)) {
           dates.push(this.utcZdtFromEpochMilliseconds(currentMilliseconds));
+          this.assertCandidateBudget(dates.length);
           if (this.shouldBreakForCountLimit(dates.length)) {
             break;
           }
@@ -3419,6 +3420,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
       if (!allowedDays || allowedDays.includes(currentDayOfWeek)) {
         dates.push(this.utcZdtFromEpochNanoseconds(currentNanoseconds));
+        this.assertCandidateBudget(dates.length);
         if (this.shouldBreakForCountLimit(dates.length)) {
           break;
         }
@@ -3521,6 +3523,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           }
 
           dates.push(this.utcZdtFromEpochMilliseconds(occurrenceMilliseconds));
+          this.assertCandidateBudget(dates.length);
           if (this.shouldBreakForCountLimit(dates.length)) {
             return dates;
           }
@@ -3551,6 +3554,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         }
 
         dates.push(this.utcZdtFromEpochNanoseconds(occurrenceNanoseconds));
+        this.assertCandidateBudget(dates.length);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
@@ -3869,6 +3873,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         }
 
         dates.push(this.utcZdtFromEpochMilliseconds(epochMilliseconds));
+        this.assertCandidateBudget(dates.length);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
@@ -4097,6 +4102,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           break;
         }
         dates.push(this.zdtFromEpochMs(resolution.epochMs));
+        this.assertCandidateBudget(dates.length);
         if (this.shouldBreakForCountLimit(dates.length)) {
           break;
         }
@@ -4257,6 +4263,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           return dates;
         }
         dates.push(this.zdtFromEpochMs(resolution.epochMs));
+        this.assertCandidateBudget(dates.length);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
@@ -4370,6 +4377,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
           return dates;
         }
         dates.push(this.zdtFromEpochMs(resolution.epochMs));
+        this.assertCandidateBudget(dates.length);
         if (this.shouldBreakForCountLimit(dates.length)) {
           return dates;
         }
@@ -5686,8 +5694,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (firstIndex >= endIndex && !this.opts.rDate) {
       return {handled: true, value: []};
     }
-    // Only rules that expand time slots have a budget on every other path
-    if (this.opts.byHour || this.opts.byMinute || this.opts.bySecond) {
+    // Every path but a fixed-step one charges each date to the budget
+    if (plan.kind !== 'fixed-step') {
       this.assertCandidateBudget(endIndex - firstIndex);
     }
 

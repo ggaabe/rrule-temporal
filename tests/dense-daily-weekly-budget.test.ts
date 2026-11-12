@@ -91,10 +91,7 @@ describe('candidate budget on dense DAILY and WEEKLY rules', () => {
   test.each([
     ['MINUTELY', {freq: 'MINUTELY'}],
     ['HOURLY', {freq: 'HOURLY'}],
-    ['DAILY', {freq: 'DAILY'}],
-    ['WEEKLY', {freq: 'WEEKLY', byDay: ['MO', 'TU']}],
-    ['MONTHLY', {freq: 'MONTHLY', byMonthDay: [1, 15]}],
-  ])('a plan for a %s rule without time slots ignores the budget, like all()', (name, options) => {
+  ])('a plan for a fixed-step %s rule ignores the budget, like all()', (_name, options) => {
     const rule = new RRuleTemporal({
       ...options,
       count: 1000,
@@ -103,14 +100,73 @@ describe('candidate budget on dense DAILY and WEEKLY rules', () => {
       getNumericQueryPlan(): {kind: string} | null;
       maxCandidateEvaluations: number;
     };
-    expect(rule.getNumericQueryPlan()?.kind).toBe(
-      name === 'MINUTELY' || name === 'HOURLY' ? 'fixed-step' : name.toLowerCase(),
-    );
+    expect(rule.getNumericQueryPlan()?.kind).toBe('fixed-step');
 
     // A plan only gets built at the default budget, so lower it afterwards
     rule.maxCandidateEvaluations = 100;
 
     expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('3000-01-01T00:00:00Z'), true)).toHaveLength(1000);
+    expect(
+      new RRuleTemporal({...options, count: 1000, dtstart: utc, maxCandidateEvaluations: 100} as RRuleOptions).all(),
+    ).toHaveLength(1000);
+  });
+
+  test.each([
+    ['DAILY', {freq: 'DAILY'}],
+    ['WEEKLY', {freq: 'WEEKLY', byDay: ['MO', 'TU']}],
+    ['MONTHLY', {freq: 'MONTHLY', byMonthDay: [1, 15]}],
+  ])('a plan for a %s rule without time slots stops at the budget, like all()', (name, options) => {
+    const rule = new RRuleTemporal({
+      ...options,
+      count: 1000,
+      dtstart: utc,
+    } as RRuleOptions) as unknown as RRuleTemporal & {
+      getNumericQueryPlan(): {kind: string} | null;
+      maxCandidateEvaluations: number;
+    };
+    expect(rule.getNumericQueryPlan()?.kind).toBe(name.toLowerCase());
+    rule.maxCandidateEvaluations = 100;
+
+    expect(() => rule.between(new Date('2025-01-01T00:00:00Z'), new Date('3000-01-01T00:00:00Z'), true)).toThrow(
+      'Maximum candidate evaluations (100) exceeded',
+    );
+    expect(() =>
+      new RRuleTemporal({...options, count: 1000, dtstart: utc, maxCandidateEvaluations: 100} as RRuleOptions).all(),
+    ).toThrow('Maximum candidate evaluations (100) exceeded');
+  });
+
+  test('a raised maxIterations does not let a DAILY rule without time slots skip the budget', () => {
+    const options = {freq: 'DAILY', dtstart: utc, maxIterations: 2_000_000} as const;
+    const counted = new RRuleTemporal({...options, count: 1_200_000});
+    expect(() => counted.between(new Date('2025-01-01T00:00:00Z'), new Date('9000-01-01T00:00:00Z'), true)).toThrow(
+      'Maximum candidate evaluations (1000000) exceeded',
+    );
+
+    const until = new RRuleTemporal({...options, until: Temporal.ZonedDateTime.from('5300-01-01T00:00:00+00:00[UTC]')});
+    expect(() => until.all()).toThrow('Maximum candidate evaluations (1000000) exceeded');
+  });
+
+  // Only a raised maxIterations takes these past 1,000,000 dates, so test each at a small budget
+  test.each([
+    ['_allUtcDailySimple', {freq: 'DAILY'}, utc],
+    ['_allUtcWeeklySimple', {freq: 'WEEKLY', byDay: everyWeekday}, utc],
+    ['_allUtcMonthlyByDayOrMonthDay', {freq: 'MONTHLY', byMonthDay: range(1, 28)}, utc],
+    ['_allTzDailySimple', {freq: 'DAILY'}, berlin],
+    ['_allTzWeeklySimple', {freq: 'WEEKLY', byDay: everyWeekday}, berlin],
+    ['_allTzMonthlyByDayOrMonthDay', {freq: 'MONTHLY', byMonthDay: range(1, 28)}, berlin],
+  ])('%s stops just past the budget', (path, options, dtstart) => {
+    const expand = (count: number) => {
+      const rule = new RRuleTemporal({
+        ...options,
+        count,
+        dtstart,
+        maxCandidateEvaluations: 1000,
+      } as RRuleOptions) as unknown as Record<string, () => unknown[]>;
+      return rule[path]!();
+    };
+
+    expect(expand(1000)).toHaveLength(1000);
+    expect(() => expand(1001)).toThrow('Maximum candidate evaluations (1000) exceeded');
   });
 
   test('a plan for a rule with time slots stops at the budget, like all()', () => {
