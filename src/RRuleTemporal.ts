@@ -643,6 +643,9 @@ function parseRRuleString(
         opts.interval = parseIntegerToken(val!, 'INTERVAL', strict);
         break;
       case 'COUNT':
+        // toString() used to write an unbounded `count: Infinity` as COUNT=Infinity,
+        // so a stored rule keeps reading it as no COUNT outside strict mode.
+        if (!strict && /^\+?infinity$/i.test(val!.trim())) break;
         opts.count = parseIntegerToken(val!, 'COUNT', strict);
         break;
       case 'UNTIL': {
@@ -851,6 +854,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (!(manual.interval > 0)) {
       throw new Error('Cannot create RRule: interval must be greater than 0');
     }
+    // A fractional or infinite interval passes the check above and then fails in date arithmetic
+    if (!Number.isInteger(Number(manual.interval))) {
+      throw new Error('Cannot create RRule: interval must be an integer');
+    }
+    // A null count means no COUNT, as a null interval means the default
+    if ((manual.count as number | null | undefined) === null) manual.count = undefined;
     // Coerced to also reject a string like 'abc', which Number.isNaN() alone lets through
     if (manual.count !== undefined && Number.isNaN(Number(manual.count))) {
       throw new Error('Cannot create RRule: count must be a number');

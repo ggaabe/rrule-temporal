@@ -994,12 +994,64 @@ describe('RRuleTemporal - Error Handling and Edge Cases', () => {
     }).toThrow('count must be a number');
   });
 
-  it.each(['abc', '', 'NaN', 'Infinity'])('should reject the non-numeric COUNT value "%s"', (value) => {
+  it.each(['abc', '', 'NaN'])('should reject the non-numeric COUNT value "%s"', (value) => {
     const rruleString = `DTSTART:20250101T000000Z\nRRULE:FREQ=YEARLY;COUNT=${value}`;
 
     expect(() => new RRuleTemporal({rruleString})).toThrow('count must be a number');
     expect(() => new RRuleTemporal({rruleString, strict: true})).toThrow(`Invalid COUNT value: ${value}`);
   });
+
+  it.each([1.5, Infinity, '1.5'])('should reject the non-integer interval %s', (interval) => {
+    expect(() => {
+      new RRuleTemporal({
+        freq: 'DAILY',
+        interval: interval as number,
+        dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]'),
+      });
+    }).toThrow('interval must be an integer');
+  });
+
+  it('should keep reading a numeric string interval', () => {
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      interval: '2' as unknown as number,
+      count: 3,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]'),
+    });
+
+    expect(rule.all().map((date) => date.day)).toEqual([1, 3, 5]);
+  });
+
+  it.each(['YEARLY', 'MONTHLY', 'DAILY'] as const)('should read a null count as no COUNT for %s', (freq) => {
+    const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
+    const window = [new Date('2025-01-01T00:00:00Z'), new Date('2027-01-01T00:00:00Z'), true] as const;
+    const withNull = new RRuleTemporal({freq, count: null as unknown as number, dtstart});
+    const without = new RRuleTemporal({freq, dtstart});
+
+    expect(withNull.options().count).toBeUndefined();
+    expect(withNull.toString()).not.toContain('COUNT');
+    expect(withNull.between(...window).map(String)).toEqual(without.between(...window).map(String));
+    expect(withNull.between(...window).length).toBeGreaterThan(1);
+  });
+
+  it.each(['YEARLY', 'MONTHLY', 'DAILY'])(
+    'should read a stored COUNT=Infinity as no COUNT for %s outside strict mode',
+    (freq) => {
+      // Up to 2.2.8, toString() wrote `count: Infinity` this way
+      const window = [new Date('2025-01-01T00:00:00Z'), new Date('2027-01-01T00:00:00Z'), true] as const;
+      const rruleString = (count: string) => `DTSTART:20250101T100000Z\nRRULE:FREQ=${freq}${count}`;
+      const stored = new RRuleTemporal({rruleString: rruleString(';COUNT=Infinity')});
+      const unbounded = new RRuleTemporal({rruleString: rruleString('')});
+
+      expect(stored.options().count).toBeUndefined();
+      expect(stored.between(...window).map(String)).toEqual(unbounded.between(...window).map(String));
+      expect(stored.between(...window).length).toBeGreaterThan(1);
+      expect(stored.toString()).toBe(unbounded.toString());
+      expect(() => new RRuleTemporal({rruleString: rruleString(';COUNT=Infinity'), strict: true})).toThrow(
+        'Invalid COUNT value: Infinity',
+      );
+    },
+  );
 
   it('should leave only an infinite count out of toString()', () => {
     const dtstart = Temporal.ZonedDateTime.from('2025-01-01T10:00:00[UTC]');
