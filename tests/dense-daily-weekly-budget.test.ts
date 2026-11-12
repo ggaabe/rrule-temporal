@@ -3,29 +3,79 @@ import {Temporal} from '../src/temporal-impl';
 
 const range = (start: number, end: number) => Array.from({length: end - start + 1}, (_, index) => start + index);
 const everyTimeOfDay = {byHour: range(0, 23), byMinute: range(0, 59), bySecond: range(0, 59)};
+const everyMinute = {byHour: range(0, 23), byMinute: range(0, 59)};
 const everyWeekday = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 const utc = Temporal.ZonedDateTime.from('2025-01-01T00:00:00+00:00[UTC]');
 const berlin = Temporal.ZonedDateTime.from('2025-01-01T01:00:00+01:00[Europe/Berlin]');
+
+/**
+ * Runs a query with a stand-in for each UTC date and returns how many it asked for.
+ * Building a million dates takes seconds, and the budget only counts them.
+ */
+function countUtcDatesBuilt(query: () => unknown): number {
+  const prototype = RRuleTemporal.prototype as unknown as Record<string, unknown>;
+  const builder = prototype.utcZdtFromEpochNanoseconds;
+  const standIn = utc.add({days: 1});
+  let built = 0;
+  prototype.utcZdtFromEpochNanoseconds = () => {
+    built += 1;
+    return standIn;
+  };
+  try {
+    query();
+  } finally {
+    prototype.utcZdtFromEpochNanoseconds = builder;
+  }
+  return built;
+}
 
 describe('candidate budget on dense DAILY and WEEKLY rules', () => {
   test('a dense DAILY window stops at the default budget', () => {
     const rule = new RRuleTemporal({freq: 'DAILY', ...everyTimeOfDay, dtstart: utc});
     const from = new Date('2025-01-01T00:00:00Z');
 
-    expect(() => rule.between(from, new Date('2025-01-13T00:00:00Z'), true)).toThrow(
-      'Maximum candidate evaluations (1000000) exceeded',
+    const built = countUtcDatesBuilt(() =>
+      expect(() => rule.between(from, new Date('2025-01-13T00:00:00Z'), true)).toThrow(
+        'Maximum candidate evaluations (1000000) exceeded',
+      ),
     );
+    expect(built).toBe(1_000_001);
   });
 
   test('a window under the budget answers, wherever in its period it starts', () => {
+    // A week of every minute at a budget of 10,000 takes the path a week of every second takes at the default
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      byDay: everyWeekday,
+      ...everyMinute,
+      dtstart: utc,
+      maxCandidateEvaluations: 10_000,
+    });
+    const from = new Date('2025-01-07T00:00:00Z');
+    const expand = vi.spyOn(RRuleTemporal.prototype as never, '_allUtcWeeklyExpanded' as never);
+    try {
+      // Its 6 days and the 6 before them would be over the budget
+      expect(rule.between(from, new Date('2025-01-13T00:00:00Z'), true)).toHaveLength(8_641);
+      expect(() => rule.between(from, new Date('2025-01-20T00:00:00Z'), true)).toThrow(
+        'Maximum candidate evaluations (10000) exceeded',
+      );
+      expect(expand).toHaveBeenCalledTimes(2);
+    } finally {
+      expand.mockRestore();
+    }
+  });
+
+  test('a dense WEEKLY window from past DTSTART stops at the default budget', () => {
     const rule = new RRuleTemporal({freq: 'WEEKLY', byDay: everyWeekday, ...everyTimeOfDay, dtstart: utc});
     const from = new Date('2025-01-07T00:00:00Z');
 
-    // Its 6 days and the 6 before them in the same period would be over the budget
-    expect(rule.between(from, new Date('2025-01-13T00:00:00Z'), true)).toHaveLength(518_401);
-    expect(() => rule.between(from, new Date('2025-01-20T00:00:00Z'), true)).toThrow(
-      'Maximum candidate evaluations (1000000) exceeded',
+    // The 6 days before the window are not built, and 13 days of it are over the budget
+    const built = countUtcDatesBuilt(() =>
+      expect(() => rule.between(from, new Date('2025-01-20T00:00:00Z'), true)).toThrow(
+        'Maximum candidate evaluations (1000000) exceeded',
+      ),
     );
+    expect(built).toBe(1_000_001);
   });
 
   test.each([
@@ -143,7 +193,10 @@ describe('candidate budget on dense DAILY and WEEKLY rules', () => {
     );
 
     const until = new RRuleTemporal({...options, until: Temporal.ZonedDateTime.from('5300-01-01T00:00:00+00:00[UTC]')});
-    expect(() => until.all()).toThrow('Maximum candidate evaluations (1000000) exceeded');
+    const built = countUtcDatesBuilt(() =>
+      expect(() => until.all()).toThrow('Maximum candidate evaluations (1000000) exceeded'),
+    );
+    expect(built).toBe(1_000_001);
   });
 
   // Only a raised maxIterations takes these past 1,000,000 dates, so test each at a small budget
@@ -231,22 +284,35 @@ describe('fast paths at any candidate budget', () => {
     }
   };
 
-  test('a raised budget keeps the dense paths and answers past 1,000,000 dates', () => {
-    const rule = new RRuleTemporal({
-      freq: 'DAILY',
-      ...everyTimeOfDay,
-      dtstart: utc,
-      maxCandidateEvaluations: 1_100_000,
-    });
+  test('a budget other than the default keeps the dense paths and decides what they answer', () => {
+    // A week of every minute, and its first date
+    const window = (maxCandidateEvaluations: number) =>
+      new RRuleTemporal({freq: 'DAILY', ...everyMinute, dtstart: utc, maxCandidateEvaluations}).between(
+        new Date('2025-01-01T00:00:00Z'),
+        new Date('2025-01-08T00:00:00Z'),
+        true,
+      );
     const expand = vi.spyOn(RRuleTemporal.prototype as never, '_allUtcDailyExpanded' as never);
     try {
-      expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2025-01-13T00:00:00Z'), true)).toHaveLength(
-        1_036_801,
-      );
-      expect(expand).toHaveBeenCalledTimes(1);
+      expect(() => window(10_080)).toThrow('Maximum candidate evaluations (10080) exceeded');
+      expect(window(10_081)).toHaveLength(10_081);
+      expect(window(5_000_000)).toHaveLength(10_081);
+      expect(expand).toHaveBeenCalledTimes(3);
     } finally {
       expand.mockRestore();
     }
+  });
+
+  test('a raised budget answers a dense window the default refuses', () => {
+    const window = (maxCandidateEvaluations?: number) =>
+      new RRuleTemporal({freq: 'DAILY', ...everyTimeOfDay, dtstart: utc, maxCandidateEvaluations}).between(
+        new Date('2025-01-01T00:00:00Z'),
+        new Date('2025-01-13T00:00:00Z'),
+        true,
+      );
+
+    expect(countUtcDatesBuilt(() => expect(() => window()).toThrow('(1000000) exceeded'))).toBe(1_000_001);
+    expect(countUtcDatesBuilt(() => window(1_100_000))).toBe(1_036_801);
   });
 
   const hours = {byHour: [1, 9, 17], byMinute: [0, 30]};

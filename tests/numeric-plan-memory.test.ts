@@ -24,15 +24,24 @@ function countPeriodMaterializations(rule: RRuleTemporal) {
   return counter;
 }
 
-/** The same rule, with a budget that keeps it off the numeric plan and the UTC fast paths. */
-function generalEngineRule(options: RRuleOptions): RRuleTemporal {
-  return new RRuleTemporal({...options, maxCandidateEvaluations: 1_000_001} as RRuleOptions);
+/** The rule's occurrences from the general engine: no fast path, and a budget that keeps it off the numeric plan. */
+function generalEngineOccurrences(options: RRuleOptions): Temporal.ZonedDateTime[] {
+  const prototype = RRuleTemporal.prototype as unknown as {allUtcFastPath(): null; allTzEpochFastPath(): null};
+  const spies = [
+    vi.spyOn(prototype, 'allUtcFastPath').mockReturnValue(null),
+    vi.spyOn(prototype, 'allTzEpochFastPath').mockReturnValue(null),
+  ];
+  try {
+    return new RRuleTemporal({...options, maxCandidateEvaluations: 1_000_001} as RRuleOptions).all();
+  } finally {
+    for (const spy of spies) spy.mockRestore();
+  }
 }
 
 function expectSameAnswers(options: RRuleOptions, kind: string, probes: Temporal.ZonedDateTime[]) {
   const rule = new RRuleTemporal(options);
   const materializations = countPeriodMaterializations(rule);
-  const occurrences = generalEngineRule(options).all();
+  const occurrences = generalEngineOccurrences(options);
   const instants = occurrences.map((value) => value.epochNanoseconds);
   const first = occurrences[0]!;
   const last = occurrences.at(-1)!;
@@ -206,7 +215,7 @@ describe('numeric plans that never materialize a period', () => {
 
     expect(window).toHaveLength(1_500);
     expect(window.at(-1)?.toString()).toBe('2027-01-01T08:01:04+00:00[UTC]');
-    expect(keys(window)).toEqual(keys(generalEngineRule(options).all()));
+    expect(keys(window)).toEqual(keys(generalEngineOccurrences(options)));
     expect((rule as InspectableRule).numericQueryPlanCache?.kind).toBe('yearly');
     expect(materializations.calls).toBe(0);
   });
