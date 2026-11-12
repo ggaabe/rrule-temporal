@@ -623,7 +623,7 @@ describe('candidate budget', () => {
     expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
   });
 
-  test('stops a YEARLY plan as soon as its years exceed the budget', () => {
+  test('declines a YEARLY plan whose years exceed the budget', () => {
     // About 998,000 candidates a year, so the second year is already over budget.
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
@@ -658,7 +658,7 @@ describe('candidate budget', () => {
     expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
   });
 
-  test('keeps a 53rd weekday in its year without the plan', () => {
+  test('keeps a 53rd weekday in its year', () => {
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       count: 13,
@@ -673,7 +673,8 @@ describe('candidate budget', () => {
     expect(rule.next(new Date('2025-01-01T00:00:00Z'))?.toPlainDate().toString()).toBe('2029-12-31');
     expect(rule.matches(new Date('2026-01-05T00:00:00Z'))).toBe(false);
     expect(rule.occursOn(Temporal.PlainDate.from('2026-01-05'))).toBe(false);
-    expect((rule as InspectableRule).numericQueryPlanCache).toBeNull();
+    // BYSETPOS leaves one candidate a year, well within the budget, so the plan takes it.
+    expectPlan(rule, 'yearly');
   });
 
   test('skips a year without a 53rd weekday in all()', () => {
