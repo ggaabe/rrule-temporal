@@ -2083,16 +2083,22 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    * shortcut is left to the Gregorian calendar.
    */
   private yearlyDaysNeverMatch(): boolean {
-    const {freq, byYearDay, byWeekNo, byDay, byMonthDay, byMonth, interval = 1} = this.opts;
+    const {freq, byYearDay, byWeekNo, byDay, byMonthDay, byMonth, bySetPos, interval = 1} = this.opts;
     if (freq !== 'YEARLY' || byWeekNo || !(byDay || byMonthDay)) return false;
     if (!['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)) return false;
     if (!byYearDay && !(this.hasOrdinalByDay && !byMonth)) return false;
     if (this.yearlyDaysNeverMatchCache === undefined) {
+      // BYSETPOS picks from a year's days x times, so a year holding fewer of them than the
+      // position nearest to either end has no occurrence either.
+      const {byHour, byMinute, bySecond} = this.opts;
+      const timesPerDay = (byHour?.length || 1) * (byMinute?.length || 1) * (bySecond?.length || 1);
+      const nearestPosition = bySetPos?.length ? Math.min(...bySetPos.map((position) => Math.abs(position))) : 1;
       let never = true;
       try {
         const firstYear = this.originalDtstart.toPlainDate().with({month: 1, day: 1});
         for (let k = 0; never && k < 400; k++) {
-          never = this.generateYearlyDateCandidates(firstYear.add({years: k * interval})).length === 0;
+          const days = this.generateYearlyDateCandidates(firstYear.add({years: k * interval})).length;
+          never = days * timesPerDay < nearestPosition;
         }
       } catch {
         // A year outside the supported range: leave the decision to the search
@@ -6522,9 +6528,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let occs: Temporal.PlainDate[] = [];
 
     const hasOrdinalByDay = this.opts.byDay && this.opts.byDay.some((t) => /^[+-]?\d/.test(t));
-    // BYWEEKNO adds its own days next to BYYEARDAY, so only BYYEARDAY without
-    // it is limited by BYDAY and BYMONTHDAY.
-    const limitYearDays = Boolean(this.opts.byYearDay) && !this.opts.byWeekNo;
+    // BYDAY and BYMONTHDAY limit the days only in the YEARLY shapes RFC 5545 allows. BYWEEKNO
+    // adds its own days, and a WEEKLY rule that gets here for its BYYEARDAY or BYWEEKNO is
+    // outside the RFC, so both keep the reading they had.
+    const limitsApply = this.opts.freq === 'YEARLY' && !this.opts.byWeekNo;
+    const limitYearDays = limitsApply && Boolean(this.opts.byYearDay);
     if (hasOrdinalByDay && !this.opts.byMonth && !limitYearDays) {
       // nth weekday of year
       const dayMap = weekdayToIsoDay;
@@ -6547,16 +6555,18 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         // A year without a 53rd such weekday has no occurrence, rather than one in a neighboring year.
         if (dt.year === sample.year) occs.push(dt);
       }
-      // A weekday without an ordinal next to ordinal ones still means every such day of the year
-      const jan1 = sample.with({month: 1, day: 1});
-      for (const tok of this.opts.byDay!) {
-        const parsed = parseByDayToken(tok);
-        if (!parsed || parsed.ord !== 0) continue;
-        let dt = jan1.add({days: (dayMap[parsed.weekday]! - jan1.dayOfWeek + 7) % 7});
-        for (; dt.year === jan1.year; dt = dt.add({days: 7})) occs.push(dt);
+      if (limitsApply) {
+        // A weekday without an ordinal next to ordinal ones still means every such day of the year
+        const jan1 = sample.with({month: 1, day: 1});
+        for (const tok of this.opts.byDay!) {
+          const parsed = parseByDayToken(tok);
+          if (!parsed || parsed.ord !== 0) continue;
+          let dt = jan1.add({days: (dayMap[parsed.weekday]! - jan1.dayOfWeek + 7) % 7});
+          for (; dt.year === jan1.year; dt = dt.add({days: 7})) occs.push(dt);
+        }
+        // BYMONTHDAY limits the weekdays that BYDAY selects
+        if (this.opts.byMonthDay) occs = occs.filter((dt) => this.matchesByMonthDay(dt));
       }
-      // BYMONTHDAY limits the weekdays that BYDAY selects
-      if (this.opts.byMonthDay) occs = occs.filter((dt) => this.matchesByMonthDay(dt));
     } else if (!this.opts.byYearDay && !this.opts.byWeekNo) {
       // Build per-month then apply RFC 7529 SKIP if RSCALE present and BYMONTHDAY invalid
       occs = [];

@@ -132,6 +132,79 @@ describe('YEARLY rules with BYYEARDAY or an ordinal BYDAY', () => {
     ]);
   });
 
+  test('BYWEEKNO keeps its own days next to an ordinal BYDAY', () => {
+    // RFC 5545 forbids an ordinal BYDAY with BYWEEKNO, so these keep the reading they had:
+    // the plain weekday stays inside the numbered week instead of meaning every such day
+    // of the year, and BYMONTHDAY does not limit them.
+    expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO,2TU;COUNT=6')).toEqual([
+      '2025-01-14',
+      '2025-05-12',
+      '2025-05-13',
+      '2026-01-13',
+      '2026-05-11',
+      '2026-05-12',
+    ]);
+    expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=2TU;BYMONTHDAY=13;COUNT=4')).toEqual([
+      '2025-01-14',
+      '2025-05-13',
+      '2026-01-13',
+      '2026-05-12',
+    ]);
+    expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=WEEKLY;BYWEEKNO=20;BYDAY=MO,2TU;COUNT=3')).toEqual([
+      '2025-01-14',
+      '2025-05-12',
+      '2025-05-13',
+    ]);
+  });
+
+  test('a WEEKLY rule with BYYEARDAY keeps the reading it had', () => {
+    // BYYEARDAY is not valid with FREQ=WEEKLY, and such a rule shares the YEARLY code
+    expect(dates('DTSTART:20090405T070000Z\nRRULE:FREQ=WEEKLY;BYYEARDAY=60;BYDAY=TU;COUNT=5')).toEqual([
+      '2010-03-01',
+      '2011-03-01',
+      '2012-02-29',
+      '2013-03-01',
+      '2014-03-01',
+    ]);
+    expect(
+      dates('DTSTART:20090405T070000Z\nRRULE:FREQ=WEEKLY;BYYEARDAY=60,61,62,63,64,65,66;BYDAY=1TU;COUNT=5'),
+    ).toEqual(['2010-01-05', '2010-03-01', '2010-03-02', '2010-03-03', '2010-03-04']);
+  });
+
+  test('a BYSETPOS that no year can reach leaves no occurrences', () => {
+    // At most one day a year, so there is never a 3rd or 5th candidate
+    expect(
+      dates('DTSTART:20040229T180000Z\nRRULE:FREQ=YEARLY;INTERVAL=3;BYYEARDAY=-2,-366;BYDAY=1WE;BYSETPOS=5,3;COUNT=4'),
+    ).toEqual([]);
+    expect(dates('DTSTART:20011231T114500Z\nRRULE:FREQ=YEARLY;BYDAY=-52WE;BYSETPOS=3;COUNT=1')).toEqual([]);
+    expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=1;BYMONTHDAY=1;BYSETPOS=-2;COUNT=1')).toEqual(
+      [],
+    );
+
+    const rule = new RRuleTemporal({
+      rruleString: 'DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=1;BYMONTHDAY=1;BYSETPOS=2',
+    });
+    expect(rule.next(new Date('2025-01-01T00:00:00Z'))).toBeNull();
+    expect(rule.between(new Date('2025-01-01T00:00:00Z'), new Date('2035-01-01T00:00:00Z'))).toEqual([]);
+  });
+
+  test('a BYSETPOS within reach of the days and times still selects', () => {
+    expect(
+      dates(
+        'DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=1,2,3;BYDAY=MO,TU,WE,TH,FR,SA,SU;BYSETPOS=3;COUNT=2',
+      ),
+    ).toEqual(['2025-01-03', '2026-01-03']);
+    // One day a year, but three times on it
+    expect(
+      new RRuleTemporal({
+        rruleString:
+          'DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=1;BYMONTHDAY=1;BYHOUR=9,10,11;BYSETPOS=3;COUNT=2',
+      })
+        .all()
+        .map((date) => date.toString()),
+    ).toEqual(['2025-01-01T11:00:00+00:00[UTC]', '2026-01-01T11:00:00+00:00[UTC]']);
+  });
+
   test('next(), previous() and between() follow all()', () => {
     const rule = new RRuleTemporal({
       rruleString: 'DTSTART:20271230T090000Z\nRRULE:FREQ=YEARLY;BYYEARDAY=-2;BYDAY=TH',
