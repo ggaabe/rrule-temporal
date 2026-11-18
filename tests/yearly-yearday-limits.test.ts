@@ -135,7 +135,7 @@ describe('YEARLY rules with BYYEARDAY or an ordinal BYDAY', () => {
   test('BYWEEKNO keeps its own days next to an ordinal BYDAY', () => {
     // RFC 5545 forbids an ordinal BYDAY with BYWEEKNO, so these keep the reading they had:
     // the plain weekday stays inside the numbered week instead of meaning every such day
-    // of the year, and BYMONTHDAY does not limit them.
+    // of the year. BYMONTHDAY limits them, as it limits every day BYWEEKNO selects.
     expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO,2TU;COUNT=6')).toEqual([
       '2025-01-14',
       '2025-05-12',
@@ -145,10 +145,10 @@ describe('YEARLY rules with BYYEARDAY or an ordinal BYDAY', () => {
       '2026-05-12',
     ]);
     expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=YEARLY;BYWEEKNO=20;BYDAY=2TU;BYMONTHDAY=13;COUNT=4')).toEqual([
-      '2025-01-14',
       '2025-05-13',
       '2026-01-13',
-      '2026-05-12',
+      '2031-05-13',
+      '2032-01-13',
     ]);
     expect(dates('DTSTART:20250101T090000Z\nRRULE:FREQ=WEEKLY;BYWEEKNO=20;BYDAY=MO,2TU;COUNT=3')).toEqual([
       '2025-01-14',

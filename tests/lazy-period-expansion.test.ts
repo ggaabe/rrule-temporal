@@ -118,19 +118,19 @@ describe('bounded lazy recurrence-period expansion', () => {
   });
 
   test('exact duplicates across adjacent generated years do not receive COUNT credit', () => {
+    // The last Monday of 2018 is also the Monday of week 1 of 2019, so both years generate it
     const rule = new RRuleTemporal({
       freq: 'YEARLY',
       count: 3,
-      byYearDay: [-1],
       byWeekNo: [1],
-      byDay: ['MO'],
+      byDay: ['-1MO'],
       dtstart: Temporal.ZonedDateTime.from('2018-01-01T00:00:00[UTC]'),
     });
 
     expect(strings(rule.all())).toEqual([
       '2018-01-01T00:00:00+00:00[UTC]',
       '2018-12-31T00:00:00+00:00[UTC]',
-      '2019-12-31T00:00:00+00:00[UTC]',
+      '2019-12-30T00:00:00+00:00[UTC]',
     ]);
   });
 

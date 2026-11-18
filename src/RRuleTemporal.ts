@@ -242,6 +242,13 @@ interface BaseOpts<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDat
   skip?: 'OMIT' | 'BACKWARD' | 'FORWARD';
   /** Memoize the full occurrence list computed by all() (defaults to true). */
   cache?: boolean;
+  /**
+   * The rule has DATE values, as an all-day event does: toString() writes DTSTART, RDATE and
+   * EXDATE with VALUE=DATE and UNTIL as a date. Set for a rule read from a DTSTART with
+   * VALUE=DATE, and returned by options(). It takes effect when dtstart is the start of its
+   * day in the rule's time zone, and does not change which occurrences the rule has.
+   */
+  allDay?: boolean;
 }
 
 export type TemporalZonedDateTime = TemporalSpec.ZonedDateTime;
@@ -458,9 +465,10 @@ function parseIcsDateTime(dateStr: string, tzid: string, valueType?: string): Te
 }
 
 /**
- * Parse date values from EXDATE or RDATE lines
+ * Parse date values from EXDATE or RDATE lines, and note the instants of those written as
+ * date-times in `dateTimes`.
  */
-function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', defaultTzid: string) {
+function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', defaultTzid: string, dateTimes: Set<bigint>) {
   const dates: Temporal.ZonedDateTime[] = [];
 
   for (const line of lines) {
@@ -468,8 +476,12 @@ function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', default
     if (!parsed) continue;
 
     const timezone = parsed.tzid || defaultTzid;
-    const dateValues = parsed.value.split(',');
-    dates.push(...dateValues.map((dateValue) => parseIcsDateTime(dateValue, timezone, parsed.valueType)));
+    for (const dateValue of parsed.value.split(',')) {
+      const date = parseIcsDateTime(dateValue, timezone, parsed.valueType);
+      // The same test parseIcsDateTime() reads a DATE by
+      if (parsed.valueType !== 'DATE' && dateValue.includes('T')) dateTimes.add(date.epochNanoseconds);
+      dates.push(date);
+    }
   }
   return dates;
 }
@@ -535,7 +547,9 @@ function parseByMonthArray(val: string, strict = false): Array<number | string> 
 }
 
 /**
- * Parse either a full ICS snippet or an RRULE line into ManualOpts.
+ * Parse either a full ICS snippet or an RRULE line into ManualOpts, and say
+ * whether its DTSTART is a DATE value, which makes the rule an all-day one,
+ * and which RDATE and EXDATE values were written as date-times.
  *
  * @param input - String containing a `DTSTART` line followed by `RRULE` and
  *   optional `EXDATE`/`RDATE` lines. Can also be just an `RRULE:` line or
@@ -572,7 +586,7 @@ function parseRRuleString(
   targetTimezone?: string,
   dtstart?: TemporalZonedDateTimeInput,
   strict = false,
-): ManualOpts {
+): {opts: ManualOpts; dtstartIsDate: boolean; dateTimes: Set<bigint>} {
   // Unfold the input according to RFC 5545 specification
   const unfoldedInput = unfoldLine(input).trim();
 
@@ -584,6 +598,7 @@ function parseRRuleString(
   let rruleLine: string;
   let exDate: Temporal.ZonedDateTime[] = [];
   let rDate: Temporal.ZonedDateTime[] = [];
+  const dateTimes = new Set<bigint>();
 
   if (/^DTSTART/im.test(unfoldedInput)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
@@ -607,8 +622,8 @@ function parseRRuleString(
 
     rruleLine = rrLine!;
 
-    exDate = parseDateLines(exLines, 'EXDATE', tzid ?? 'UTC');
-    rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC');
+    exDate = parseDateLines(exLines, 'EXDATE', tzid ?? 'UTC', dateTimes);
+    rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC', dateTimes);
   } else {
     // Just RRULE or FREQ pattern - use provided dtstart
     parsedDtstart = dtstart ? normalizeZonedDateTime(dtstart, 'dtstart') : undefined;
@@ -744,12 +759,17 @@ function parseRRuleString(
     opts.skip = pendingSkip;
   }
 
-  return opts;
+  return {opts, dtstartIsDate: dtstartValueType === 'DATE', dateTimes};
 }
 
 export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> {
   private readonly tzid: string;
   private readonly originalDtstart: Temporal.ZonedDateTime;
+  /**
+   * The instants of RDATE and EXDATE values that an all-day rule read as date-times. toString()
+   * keeps them so, also when they are the start of a day.
+   */
+  private readDateTimes?: Set<bigint>;
   private originalPlainDtstart?: Temporal.PlainDateTime;
   private readonly opts: ManualOpts;
   private readonly outputTemporal?: TemporalImplementation<TOutput>;
@@ -824,7 +844,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let manual: ManualOpts;
     if (isIcsOpts(params)) {
       // Allow dtstart to be passed separately when rruleString doesn't contain DTSTART
-      const parsed = parseRRuleString(params.rruleString, params.tzid, params.dtstart, params.strict ?? false);
+      const {
+        opts: parsed,
+        dtstartIsDate,
+        dateTimes,
+      } = parseRRuleString(params.rruleString, params.tzid, params.dtstart, params.strict ?? false);
+      if (dtstartIsDate && dateTimes.size > 0) this.readDateTimes = dateTimes;
+      // A DTSTART with a DATE value makes an all-day rule, unless the caller says otherwise
+      const allDay = params.allDay ?? (dtstartIsDate ? true : undefined);
 
       // If no dtstart was found in the string or provided as parameter, throw error
       if (!parsed.dtstart) {
@@ -853,6 +880,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         cache: params.cache,
         temporal: params.temporal,
         tzid: this.tzid,
+        ...(allDay === undefined ? {} : {allDay}),
       } as ManualOpts;
     } else {
       const dtstart = normalizeZonedDateTime(params.dtstart, 'Manual dtstart');
@@ -2111,9 +2139,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    */
   private yearlyDaysNeverMatch(): boolean {
     const {freq, byYearDay, byWeekNo, byDay, byMonthDay, byMonth, bySetPos, interval = 1} = this.opts;
-    if (freq !== 'YEARLY' || byWeekNo || !(byDay || byMonthDay)) return false;
+    if (freq !== 'YEARLY') return false;
     if (!['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)) return false;
-    if (!byYearDay && !(this.hasOrdinalByDay && !byMonth)) return false;
+    if (byWeekNo) {
+      // BYMONTHDAY and BYYEARDAY limit the days of the numbered weeks, which repeat on the same cycle
+      if (!byMonthDay && !byYearDay) return false;
+    } else if (!(byDay || byMonthDay) || (!byYearDay && !(this.hasOrdinalByDay && !byMonth))) {
+      return false;
+    }
     if (this.yearlyDaysNeverMatchCache === undefined) {
       // BYSETPOS picks from a year's days x times, so a year holding fewer of them than the
       // position nearest to either end has no occurrence either.
@@ -2235,7 +2268,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       dtstart: updates.dtstart ?? this.opts.dtstart,
     } as RRuleOptions<TOutput>;
 
-    return new RRuleTemporal<TOutput>(merged);
+    const rule = new RRuleTemporal<TOutput>(merged);
+    // A new dtstart with a time of day is no DATE, unless the update itself says the rule is all-day
+    if (rule.opts.allDay && updates.dtstart && updates.allDay === undefined && !rule.hasDateValues()) {
+      const {allDay: _allDay, ...withTimes} = merged as RRuleOptions<TOutput> & {allDay?: boolean};
+      return new RRuleTemporal<TOutput>(withTimes as RRuleOptions<TOutput>);
+    }
+    rule.readDateTimes = this.readDateTimes;
+    return rule;
   }
 
   /**
@@ -6337,9 +6377,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    */
   private alignedQueryStart(windowStart: Temporal.ZonedDateTime) {
     const dtstart = this.jumpAlignedDtstart(windowStart);
+    const moved = dtstart.epochNanoseconds !== this.originalDtstart.epochNanoseconds;
+    const {freq, byWeekNo, byDay, byMonthDay, byYearDay} = this.opts;
+    // A YEARLY rule with BYWEEKNO and no other day part takes its weekday from DTSTART.
+    // Moving DTSTART by whole years changes that weekday, so the moved rule names it.
+    const weekdayFromDtstart = moved && freq === 'YEARLY' && byWeekNo && !byDay && !byMonthDay && !byYearDay;
     return {
       dtstart,
-      includeDtstart: this.includeDtstart && dtstart.epochNanoseconds === this.originalDtstart.epochNanoseconds,
+      includeDtstart: this.includeDtstart && !moved,
+      ...(weekdayFromDtstart
+        ? {byDay: [allowedWeekdays.find((day) => weekdayToIsoDay[day] === this.originalDtstart.dayOfWeek)!]}
+        : {}),
     };
   }
 
@@ -6488,8 +6536,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   toString(): string {
+    const dateValues = this.hasDateValues();
     const iso = this.originalDtstart.toString({smallestUnit: 'second'}).replace(/[-:]/g, '');
-    const dtLine = `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
+    const dtLine = dateValues
+      ? `DTSTART;VALUE=DATE:${iso.slice(0, 8)}`
+      : `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
     const rule: string[] = [];
     const {
       freq,
@@ -6518,7 +6569,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     // COUNT=Infinity would not parse, and leaving it out keeps every date
     if (count !== undefined && count !== Infinity) rule.push(`COUNT=${count}`);
     if (until) {
-      rule.push(`UNTIL=${this.formatIcsDateTime(until)}`);
+      // UNTIL has the value type of DTSTART
+      rule.push(`UNTIL=${dateValues ? this.formatIcsDate(until) : this.formatIcsDateTime(until)}`);
     }
     if (byHour) rule.push(`BYHOUR=${byHour.join(',')}`);
     if (byMinute) rule.push(`BYMINUTE=${byMinute.join(',')}`);
@@ -6533,12 +6585,50 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     const lines = [dtLine, `RRULE:${rule.join(';')}`];
     if (rDate) {
-      lines.push(`RDATE:${this.joinDates(rDate)}`);
+      lines.push(...this.formatDateLines('RDATE', rDate, dateValues));
     }
     if (exDate) {
-      lines.push(`EXDATE:${this.joinDates(exDate)}`);
+      lines.push(...this.formatDateLines('EXDATE', exDate, dateValues));
     }
     return lines.join('\n');
+  }
+
+  /**
+   * RDATE or EXDATE lines. With DATE values, a date at the start of its day is
+   * written as a DATE. One with a time of day, or one that was read as a
+   * date-time, keeps its time on a line of its own.
+   */
+  private formatDateLines(name: 'RDATE' | 'EXDATE', dates: Temporal.ZonedDateTime[], dateValues: boolean): string[] {
+    if (!dateValues) return [`${name}:${this.joinDates(dates)}`];
+    const days: string[] = [];
+    const times: Temporal.ZonedDateTime[] = [];
+    for (const date of dates) {
+      if (this.isStartOfDay(date) && !this.readDateTimes?.has(date.epochNanoseconds)) {
+        days.push(this.formatIcsDate(date));
+      } else {
+        times.push(date);
+      }
+    }
+    const lines: string[] = [];
+    if (days.length) lines.push(`${name};VALUE=DATE:${days.join(',')}`);
+    if (times.length) lines.push(`${name}:${this.joinDates(times)}`);
+    return lines;
+  }
+
+  /** An all-day rule has DATE values when its DTSTART is one: the start of its day, with no time of day. */
+  private hasDateValues(): boolean {
+    return this.opts.allDay === true && this.isStartOfDay(this.originalDtstart);
+  }
+
+  /** Whether a date is the start of its day in the rule's zone, which is how a DATE value is read. */
+  private isStartOfDay(date: Temporal.ZonedDateTime): boolean {
+    const local = date.withTimeZone(this.tzid);
+    return local.toPlainDate().toZonedDateTime({timeZone: this.tzid}).epochNanoseconds === local.epochNanoseconds;
+  }
+
+  /** The day of a date in the rule's zone, as a DATE value. */
+  private formatIcsDate(date: Temporal.ZonedDateTime): string {
+    return date.withTimeZone(this.tzid).toString().slice(0, 10).replace(/-/g, '');
   }
 
   private formatIcsDateTime(date: Temporal.ZonedDateTime): string {
@@ -6593,6 +6683,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     // outside the RFC, so both keep the reading they had.
     const limitsApply = this.opts.freq === 'YEARLY' && !this.opts.byWeekNo;
     const limitYearDays = limitsApply && Boolean(this.opts.byYearDay);
+    // The days BYWEEKNO selects are limited by BYMONTHDAY and BYYEARDAY, as every occurrence
+    // has to pass every BYxxx part: neither is ignored, and BYYEARDAY adds no days of its own.
+    const limitWeekDays =
+      this.opts.freq === 'YEARLY' &&
+      Boolean(this.opts.byWeekNo) &&
+      Boolean(this.opts.byMonthDay || this.opts.byYearDay);
     if (hasOrdinalByDay && !this.opts.byMonth && !limitYearDays) {
       // nth weekday of year
       const dayMap = weekdayToIsoDay;
@@ -6655,7 +6751,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       }
     }
 
-    if (this.opts.byYearDay) {
+    if (this.opts.byYearDay && !limitWeekDays) {
       const last = sample.with({month: 12, day: 31}).dayOfYear;
       for (const d of this.opts.byYearDay) {
         const dayNum = d > 0 ? d : last + d + 1;
@@ -6675,13 +6771,18 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     if (this.opts.byWeekNo) {
       const {lastWeek, firstWeekStart, tokens} = this.isoWeekByDay(sample);
+      // Without BYDAY the weekday comes from DTSTART, unless BYMONTHDAY or BYYEARDAY name the day
+      const weekdays = limitWeekDays && !this.opts.byDay?.length ? Object.keys(weekdayToIsoDay) : tokens;
       for (const weekNo of this.opts.byWeekNo) {
         if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
           continue;
         }
         const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
         const weekStart = firstWeekStart.add({weeks: weekIndex});
-        occs.push(...this.addByDayDates(tokens, weekStart));
+        occs.push(...this.addByDayDates(weekdays, weekStart));
+      }
+      if (limitWeekDays) {
+        occs = occs.filter((dt) => this.matchesByMonthDay(dt) && this.matchesByYearDay(dt));
       }
     }
 

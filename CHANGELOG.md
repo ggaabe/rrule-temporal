@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+- Fixed `next()`, `previous()`, `between()`, `matches()` and `occursOn()` on a
+  YEARLY rule with BYWEEKNO and no BYDAY returning another weekday than `all()`
+  once the query started after the year of DTSTART. From a Wednesday DTSTART,
+  `FREQ=YEARLY;BYWEEKNO=20` returned Thursday 14 May 2026 from `next()` instead
+  of Wednesday 13 May. Rules with COUNT were not affected.
+- Fixed YEARLY rules with BYWEEKNO ignoring BYMONTHDAY, and adding the days of
+  BYYEARDAY to the numbered weeks instead of limiting them (#161).
+  `FREQ=YEARLY;BYWEEKNO=20;BYMONTHDAY=15` returned the weekday of DTSTART in
+  week 20 of every year; it now returns 15 May in the years it falls in week 20,
+  as python-dateutil and rrule.js do. Parts that never agree, such as
+  `BYWEEKNO=20;BYMONTHDAY=1`, leave no occurrences. Rules with BYWEEKNO alone or
+  with BYDAY keep their results, and so do WEEKLY rules outside strict mode.
+  Thanks to @trackoor for the report.
+- Fixed `toString()` writing a rule read from a `VALUE=DATE` DTSTART as
+  date-times at midnight (#162). DTSTART, RDATE and EXDATE keep `VALUE=DATE` and
+  UNTIL is written as a date, also after `with()`. An RDATE or EXDATE that was
+  read as a date-time stays one. A DATE has no time zone, so a rule read with a
+  `tzid` option needs the same option when its string is read back. Rules with
+  times, also at midnight UTC, are written as before. Thanks to @kolaworld for
+  the report.
+- Added an `allDay` option that says a rule has DATE values, so a rule built
+  from options can be written that way too. `options()` returns it for a rule
+  read from a `VALUE=DATE` DTSTART, so a rule rebuilt from its options keeps its
+  dates. It only changes what `toString()` writes.
+
 ## 2.2.9 (2026-11-13)
 
 - Fixed a non-numeric INTERVAL, such as `INTERVAL=abc`, passing the constructor

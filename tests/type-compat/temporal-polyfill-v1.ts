@@ -13,9 +13,13 @@ const options: RRuleOptions = {
   maxCandidateEvaluations: 100,
   rDate: [rDate],
   exDate: [exDate],
+  allDay: false,
 };
 
 const rule = new RRuleTemporal(options);
+const allDay: boolean | undefined = rule.options().allDay;
+void allDay;
+rule.with({allDay: true});
 const typedOutputRule = new RRuleTemporal({...options, temporal: Temporal});
 
 rule.all((date) => date.equals(dtstart));
