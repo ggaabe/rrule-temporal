@@ -15,6 +15,12 @@
   `BYWEEKNO=20;BYMONTHDAY=1`, leave no occurrences. Rules with BYWEEKNO alone or
   with BYDAY keep their results, and so do WEEKLY rules outside strict mode.
   Thanks to @trackoor for the report.
+- Fixed `toString()` writing a rule read from a `VALUE=DATE` DTSTART as
+  date-times at midnight (#162). DTSTART, RDATE and EXDATE keep `VALUE=DATE` and
+  UNTIL is written as a date, also after `with()`. A DATE has no time zone, so a
+  rule read with a `tzid` option needs the same option when its string is read
+  back. Rules with times, also at midnight UTC, are written as before. Thanks to
+  @kolaworld for the report.
 
 ## 2.2.9 (2026-11-13)
 

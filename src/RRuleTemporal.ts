@@ -535,7 +535,8 @@ function parseByMonthArray(val: string, strict = false): Array<number | string> 
 }
 
 /**
- * Parse either a full ICS snippet or an RRULE line into ManualOpts.
+ * Parse either a full ICS snippet or an RRULE line into ManualOpts, and say
+ * whether its DTSTART is a DATE value, which toString() then writes back.
  *
  * @param input - String containing a `DTSTART` line followed by `RRULE` and
  *   optional `EXDATE`/`RDATE` lines. Can also be just an `RRULE:` line or
@@ -572,7 +573,7 @@ function parseRRuleString(
   targetTimezone?: string,
   dtstart?: TemporalZonedDateTimeInput,
   strict = false,
-): ManualOpts {
+): {opts: ManualOpts; dtstartIsDate: boolean} {
   // Unfold the input according to RFC 5545 specification
   const unfoldedInput = unfoldLine(input).trim();
 
@@ -744,12 +745,14 @@ function parseRRuleString(
     opts.skip = pendingSkip;
   }
 
-  return opts;
+  return {opts, dtstartIsDate: dtstartValueType === 'DATE'};
 }
 
 export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> {
   private readonly tzid: string;
   private readonly originalDtstart: Temporal.ZonedDateTime;
+  /** The rule was read from a DTSTART with a DATE value, so toString() writes DATE values. */
+  private dtstartIsDate = false;
   private originalPlainDtstart?: Temporal.PlainDateTime;
   private readonly opts: ManualOpts;
   private readonly outputTemporal?: TemporalImplementation<TOutput>;
@@ -824,7 +827,13 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let manual: ManualOpts;
     if (isIcsOpts(params)) {
       // Allow dtstart to be passed separately when rruleString doesn't contain DTSTART
-      const parsed = parseRRuleString(params.rruleString, params.tzid, params.dtstart, params.strict ?? false);
+      const {opts: parsed, dtstartIsDate} = parseRRuleString(
+        params.rruleString,
+        params.tzid,
+        params.dtstart,
+        params.strict ?? false,
+      );
+      this.dtstartIsDate = dtstartIsDate;
 
       // If no dtstart was found in the string or provided as parameter, throw error
       if (!parsed.dtstart) {
@@ -2240,7 +2249,9 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       dtstart: updates.dtstart ?? this.opts.dtstart,
     } as RRuleOptions<TOutput>;
 
-    return new RRuleTemporal<TOutput>(merged);
+    const rule = new RRuleTemporal<TOutput>(merged);
+    rule.dtstartIsDate = this.dtstartIsDate;
+    return rule;
   }
 
   /**
@@ -6501,8 +6512,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   toString(): string {
+    // A rule read from a DATE DTSTART keeps DATE values, unless a later dtstart gave it a time of day
+    const dateValues = this.dtstartIsDate && this.isStartOfDay(this.originalDtstart);
     const iso = this.originalDtstart.toString({smallestUnit: 'second'}).replace(/[-:]/g, '');
-    const dtLine = `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
+    const dtLine = dateValues
+      ? `DTSTART;VALUE=DATE:${iso.slice(0, 8)}`
+      : `DTSTART;TZID=${this.tzid}:${iso.slice(0, 15)}`;
     const rule: string[] = [];
     const {
       freq,
@@ -6531,7 +6546,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     // COUNT=Infinity would not parse, and leaving it out keeps every date
     if (count !== undefined && count !== Infinity) rule.push(`COUNT=${count}`);
     if (until) {
-      rule.push(`UNTIL=${this.formatIcsDateTime(until)}`);
+      // UNTIL has the value type of DTSTART
+      rule.push(`UNTIL=${dateValues ? this.formatIcsDate(until) : this.formatIcsDateTime(until)}`);
     }
     if (byHour) rule.push(`BYHOUR=${byHour.join(',')}`);
     if (byMinute) rule.push(`BYMINUTE=${byMinute.join(',')}`);
@@ -6546,12 +6562,41 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     const lines = [dtLine, `RRULE:${rule.join(';')}`];
     if (rDate) {
-      lines.push(`RDATE:${this.joinDates(rDate)}`);
+      lines.push(...this.formatDateLines('RDATE', rDate, dateValues));
     }
     if (exDate) {
-      lines.push(`EXDATE:${this.joinDates(exDate)}`);
+      lines.push(...this.formatDateLines('EXDATE', exDate, dateValues));
     }
     return lines.join('\n');
+  }
+
+  /**
+   * RDATE or EXDATE lines. With DATE values, a date at the start of its day is
+   * written as a DATE, and any other keeps its time on a line of its own.
+   */
+  private formatDateLines(name: 'RDATE' | 'EXDATE', dates: Temporal.ZonedDateTime[], dateValues: boolean): string[] {
+    if (!dateValues) return [`${name}:${this.joinDates(dates)}`];
+    const days: string[] = [];
+    const times: Temporal.ZonedDateTime[] = [];
+    for (const date of dates) {
+      if (this.isStartOfDay(date)) days.push(this.formatIcsDate(date));
+      else times.push(date);
+    }
+    const lines: string[] = [];
+    if (days.length) lines.push(`${name};VALUE=DATE:${days.join(',')}`);
+    if (times.length) lines.push(`${name}:${this.joinDates(times)}`);
+    return lines;
+  }
+
+  /** Whether a date is the start of its day in the rule's zone, which is how a DATE value is read. */
+  private isStartOfDay(date: Temporal.ZonedDateTime): boolean {
+    const local = date.withTimeZone(this.tzid);
+    return local.toPlainDate().toZonedDateTime({timeZone: this.tzid}).epochNanoseconds === local.epochNanoseconds;
+  }
+
+  /** The day of a date in the rule's zone, as a DATE value. */
+  private formatIcsDate(date: Temporal.ZonedDateTime): string {
+    return date.withTimeZone(this.tzid).toString().slice(0, 10).replace(/-/g, '');
   }
 
   private formatIcsDateTime(date: Temporal.ZonedDateTime): string {

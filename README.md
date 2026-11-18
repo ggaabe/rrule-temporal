@@ -314,7 +314,7 @@ Notes
 | `occursOn(date)` | Convenience helper: true if any occurrence falls on the given `Temporal.PlainDate` in the rule's time zone (date-only, ignores time). |
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
-| `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
+| `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. A rule read from a `VALUE=DATE` `DTSTART` keeps `DTSTART`, `UNTIL`, `RDATE` and `EXDATE` as DATE values. |
 | `toText(rule, locale?, options?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). Options: `{ includeDtstart?: boolean, excludeTzAbbreviation?: boolean }`. |
 | `options()` | Return the normalized options object. |
 
