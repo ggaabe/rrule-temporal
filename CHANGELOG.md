@@ -21,6 +21,10 @@
   rule read with a `tzid` option needs the same option when its string is read
   back. Rules with times, also at midnight UTC, are written as before. Thanks to
   @kolaworld for the report.
+- Added an `allDay` option that says a rule has DATE values, so a rule built
+  from options can be written that way too. `options()` returns it for a rule
+  read from a `VALUE=DATE` DTSTART, so a rule rebuilt from its options keeps its
+  dates. It only changes what `toString()` writes.
 
 ## 2.2.9 (2026-11-13)
 

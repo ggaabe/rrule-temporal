@@ -125,11 +125,89 @@ describe('toString() of a rule with DATE values', () => {
     expect(moved.toString()).toBe(allDay.replace('DTSTART;VALUE=DATE:20250101', 'DTSTART;VALUE=DATE:20250108'));
   });
 
-  test('options() is unchanged by the value type', () => {
+  test('options() says which rule has DATE values, and only that', () => {
     const fromDates = new RRuleTemporal({rruleString: allDay}).options();
     const fromTimes = new RRuleTemporal({rruleString: timedAtMidnight}).options();
-    expect(Object.keys(fromDates).sort()).toEqual(Object.keys(fromTimes).sort());
+    expect(fromDates.allDay).toBe(true);
+    expect('allDay' in fromTimes).toBe(false);
+    expect(Object.keys(fromDates).sort()).toEqual([...Object.keys(fromTimes), 'allDay'].sort());
     expect(fromDates.dtstart.toString()).toBe(fromTimes.dtstart.toString());
     expect(fromDates.until?.toString()).toBe(fromTimes.until?.toString());
+  });
+});
+
+describe('the allDay option', () => {
+  const midnight = Temporal.ZonedDateTime.from('2025-01-01T00:00:00+00:00[UTC]');
+
+  test('a rule rebuilt from its options keeps its DATE values', () => {
+    const rule = new RRuleTemporal({rruleString: allDay});
+    const rebuilt = new RRuleTemporal(rule.options());
+    expect(rebuilt.toString()).toBe(allDay);
+    expect(instants(rebuilt)).toEqual(instants(rule));
+  });
+
+  test('a rule built from options is written with DATE values', () => {
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      byDay: ['WE'],
+      dtstart: midnight,
+      until: Temporal.ZonedDateTime.from('2025-03-01T00:00:00+00:00[UTC]'),
+      rDate: [Temporal.ZonedDateTime.from('2025-01-10T00:00:00+00:00[UTC]')],
+      exDate: [Temporal.ZonedDateTime.from('2025-01-08T00:00:00+00:00[UTC]')],
+      allDay: true,
+    });
+    expect(rule.toString()).toBe(allDay);
+    expect(rule.options().allDay).toBe(true);
+    // The same occurrences as without it
+    expect(instants(rule)).toEqual(instants(new RRuleTemporal({...rule.options(), allDay: false})));
+  });
+
+  test('the day is the one in the time zone of the rule', () => {
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 2,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T00:00:00-05:00[America/New_York]'),
+      rDate: [Temporal.ZonedDateTime.from('2025-01-10T05:00:00+00:00[UTC]')],
+      allDay: true,
+    });
+    expect(rule.toString()).toBe('DTSTART;VALUE=DATE:20250101\nRRULE:FREQ=DAILY;COUNT=2\nRDATE;VALUE=DATE:20250110');
+  });
+
+  test('it has no effect on a dtstart with a time of day', () => {
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      count: 2,
+      dtstart: Temporal.ZonedDateTime.from('2025-01-01T09:30:00+00:00[UTC]'),
+      allDay: true,
+    });
+    expect(rule.toString()).toBe('DTSTART;TZID=UTC:20250101T093000\nRRULE:FREQ=DAILY;COUNT=2');
+  });
+
+  test('with() turns it on and off', () => {
+    const timed = new RRuleTemporal({rruleString: timedAtMidnight});
+    expect(timed.with({allDay: true}).toString()).toBe(allDay);
+
+    const dates = new RRuleTemporal({rruleString: allDay});
+    expect(dates.with({allDay: false}).toString()).toBe(timed.toString());
+    expect(dates.with({allDay: false}).options().allDay).toBe(false);
+  });
+
+  test('a new dtstart with a time of day turns it off', () => {
+    const rule = new RRuleTemporal({rruleString: allDay});
+    const timed = rule.with({dtstart: Temporal.ZonedDateTime.from('2025-01-01T09:30:00+00:00[UTC]')});
+    expect('allDay' in timed.options()).toBe(false);
+    // Another day keeps it
+    expect(rule.with({dtstart: midnight.add({days: 7})}).options().allDay).toBe(true);
+  });
+
+  test('it goes with an rruleString too', () => {
+    // A DTSTART given beside the rule
+    expect(new RRuleTemporal({rruleString: 'FREQ=DAILY;COUNT=2', dtstart: midnight, allDay: true}).toString()).toBe(
+      'DTSTART;VALUE=DATE:20250101\nRRULE:FREQ=DAILY;COUNT=2',
+    );
+    // A DATE in the string that the caller wants written with times
+    const timed = new RRuleTemporal({rruleString: allDay, allDay: false});
+    expect(timed.toString()).toBe(new RRuleTemporal({rruleString: timedAtMidnight}).toString());
+    expect(instants(timed)).toEqual(instants(new RRuleTemporal({rruleString: allDay})));
   });
 });

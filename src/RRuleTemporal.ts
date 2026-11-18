@@ -242,6 +242,13 @@ interface BaseOpts<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDat
   skip?: 'OMIT' | 'BACKWARD' | 'FORWARD';
   /** Memoize the full occurrence list computed by all() (defaults to true). */
   cache?: boolean;
+  /**
+   * The rule has DATE values, as an all-day event does: toString() writes DTSTART, RDATE and
+   * EXDATE with VALUE=DATE and UNTIL as a date. Set for a rule read from a DTSTART with
+   * VALUE=DATE, and returned by options(). It takes effect when dtstart is the start of its
+   * day in the rule's time zone, and does not change which occurrences the rule has.
+   */
+  allDay?: boolean;
 }
 
 export type TemporalZonedDateTime = TemporalSpec.ZonedDateTime;
@@ -536,7 +543,7 @@ function parseByMonthArray(val: string, strict = false): Array<number | string> 
 
 /**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts, and say
- * whether its DTSTART is a DATE value, which toString() then writes back.
+ * whether its DTSTART is a DATE value, which makes the rule an all-day one.
  *
  * @param input - String containing a `DTSTART` line followed by `RRULE` and
  *   optional `EXDATE`/`RDATE` lines. Can also be just an `RRULE:` line or
@@ -751,8 +758,6 @@ function parseRRuleString(
 export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> {
   private readonly tzid: string;
   private readonly originalDtstart: Temporal.ZonedDateTime;
-  /** The rule was read from a DTSTART with a DATE value, so toString() writes DATE values. */
-  private dtstartIsDate = false;
   private originalPlainDtstart?: Temporal.PlainDateTime;
   private readonly opts: ManualOpts;
   private readonly outputTemporal?: TemporalImplementation<TOutput>;
@@ -833,7 +838,8 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         params.dtstart,
         params.strict ?? false,
       );
-      this.dtstartIsDate = dtstartIsDate;
+      // A DTSTART with a DATE value makes an all-day rule, unless the caller says otherwise
+      const allDay = params.allDay ?? (dtstartIsDate ? true : undefined);
 
       // If no dtstart was found in the string or provided as parameter, throw error
       if (!parsed.dtstart) {
@@ -862,6 +868,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
         cache: params.cache,
         temporal: params.temporal,
         tzid: this.tzid,
+        ...(allDay === undefined ? {} : {allDay}),
       } as ManualOpts;
     } else {
       const dtstart = normalizeZonedDateTime(params.dtstart, 'Manual dtstart');
@@ -2250,7 +2257,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     } as RRuleOptions<TOutput>;
 
     const rule = new RRuleTemporal<TOutput>(merged);
-    rule.dtstartIsDate = this.dtstartIsDate;
+    // A new dtstart with a time of day is no DATE, unless the update itself says the rule is all-day
+    if (rule.opts.allDay && updates.dtstart && updates.allDay === undefined && !rule.hasDateValues()) {
+      const {allDay: _allDay, ...withTimes} = merged as RRuleOptions<TOutput> & {allDay?: boolean};
+      return new RRuleTemporal<TOutput>(withTimes as RRuleOptions<TOutput>);
+    }
     return rule;
   }
 
@@ -6512,8 +6523,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
   }
 
   toString(): string {
-    // A rule read from a DATE DTSTART keeps DATE values, unless a later dtstart gave it a time of day
-    const dateValues = this.dtstartIsDate && this.isStartOfDay(this.originalDtstart);
+    const dateValues = this.hasDateValues();
     const iso = this.originalDtstart.toString({smallestUnit: 'second'}).replace(/[-:]/g, '');
     const dtLine = dateValues
       ? `DTSTART;VALUE=DATE:${iso.slice(0, 8)}`
@@ -6586,6 +6596,11 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     if (days.length) lines.push(`${name};VALUE=DATE:${days.join(',')}`);
     if (times.length) lines.push(`${name}:${this.joinDates(times)}`);
     return lines;
+  }
+
+  /** An all-day rule has DATE values when its DTSTART is one: the start of its day, with no time of day. */
+  private hasDateValues(): boolean {
+    return this.opts.allDay === true && this.isStartOfDay(this.originalDtstart);
   }
 
   /** Whether a date is the start of its day in the rule's zone, which is how a DATE value is read. */
