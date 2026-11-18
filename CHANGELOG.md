@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Fixed `next()`, `previous()`, `between()`, `matches()` and `occursOn()` on a
+  YEARLY rule with BYWEEKNO and no BYDAY returning another weekday than `all()`
+  once the query started after the year of DTSTART. From a Wednesday DTSTART,
+  `FREQ=YEARLY;BYWEEKNO=20` returned Thursday 14 May 2026 from `next()` instead
+  of Wednesday 13 May. Rules with COUNT were not affected.
+
 ## 2.2.9 (2026-11-13)
 
 - Fixed a non-numeric INTERVAL, such as `INTERVAL=abc`, passing the constructor

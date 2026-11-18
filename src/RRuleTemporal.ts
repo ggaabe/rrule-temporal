@@ -6337,9 +6337,17 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    */
   private alignedQueryStart(windowStart: Temporal.ZonedDateTime) {
     const dtstart = this.jumpAlignedDtstart(windowStart);
+    const moved = dtstart.epochNanoseconds !== this.originalDtstart.epochNanoseconds;
+    const {freq, byWeekNo, byDay, byMonthDay, byYearDay} = this.opts;
+    // A YEARLY rule with BYWEEKNO and no other day part takes its weekday from DTSTART.
+    // Moving DTSTART by whole years changes that weekday, so the moved rule names it.
+    const weekdayFromDtstart = moved && freq === 'YEARLY' && byWeekNo && !byDay && !byMonthDay && !byYearDay;
     return {
       dtstart,
-      includeDtstart: this.includeDtstart && dtstart.epochNanoseconds === this.originalDtstart.epochNanoseconds,
+      includeDtstart: this.includeDtstart && !moved,
+      ...(weekdayFromDtstart
+        ? {byDay: [allowedWeekdays.find((day) => weekdayToIsoDay[day] === this.originalDtstart.dayOfWeek)!]}
+        : {}),
     };
   }
 
