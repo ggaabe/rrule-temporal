@@ -8,7 +8,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/RRuleTemporal.ts', 'src/totext.ts'],
-      reporter: ['html', 'text-summary'],
+      reporter: ['html', 'text-summary', 'json-summary'],
       reportsDirectory: '.coverage',
     },
   },
