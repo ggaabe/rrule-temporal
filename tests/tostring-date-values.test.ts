@@ -90,6 +90,37 @@ describe('toString() of a rule with DATE values', () => {
     expect(instants(new RRuleTemporal({rruleString: rule.toString()}))).toEqual(instants(rule));
   });
 
+  test('an RDATE or EXDATE read as a date-time at midnight stays a date-time', () => {
+    const rruleString = [
+      'DTSTART;VALUE=DATE:20250101',
+      'RRULE:FREQ=WEEKLY;UNTIL=20250301;BYDAY=WE',
+      'RDATE;VALUE=DATE:20250110',
+      'RDATE:20250115T000000Z',
+      'EXDATE;VALUE=DATE:20250108',
+      'EXDATE:20250122T000000Z',
+    ].join('\n');
+    const rule = new RRuleTemporal({rruleString});
+    expect(rule.toString()).toBe(rruleString);
+    expect(rule.with({interval: 2}).toString()).toBe(rruleString.replace('FREQ=WEEKLY', 'FREQ=WEEKLY;INTERVAL=2'));
+    expect(new RRuleTemporal({rruleString: rule.toString(), strict: true}).toString()).toBe(rruleString);
+
+    // Midnight in the zone the rule is read in, written with VALUE=DATE-TIME
+    const inNewYork = 'DTSTART;VALUE=DATE:20250101\nRRULE:FREQ=DAILY;COUNT=2\nRDATE;VALUE=DATE-TIME:20250115T050000Z';
+    expect(new RRuleTemporal({rruleString: inNewYork, tzid: 'America/New_York'}).toString()).toBe(
+      inNewYork.replace(';VALUE=DATE-TIME', ''),
+    );
+
+    // options() has no value type per date, so a rule rebuilt from them goes by the time of day
+    expect(new RRuleTemporal(rule.options()).toString()).toBe(
+      [
+        'DTSTART;VALUE=DATE:20250101',
+        'RRULE:FREQ=WEEKLY;UNTIL=20250301;BYDAY=WE',
+        'RDATE;VALUE=DATE:20250110,20250115',
+        'EXDATE;VALUE=DATE:20250108,20250122',
+      ].join('\n'),
+    );
+  });
+
   test('dates added through with() are written as dates when they start a day', () => {
     const rule = new RRuleTemporal({rruleString: 'DTSTART;VALUE=DATE:20250101\nRRULE:FREQ=DAILY;COUNT=5'});
     const edited = rule.with({

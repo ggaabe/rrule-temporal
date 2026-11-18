@@ -465,9 +465,10 @@ function parseIcsDateTime(dateStr: string, tzid: string, valueType?: string): Te
 }
 
 /**
- * Parse date values from EXDATE or RDATE lines
+ * Parse date values from EXDATE or RDATE lines, and note the instants of those written as
+ * date-times in `dateTimes`.
  */
-function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', defaultTzid: string) {
+function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', defaultTzid: string, dateTimes: Set<bigint>) {
   const dates: Temporal.ZonedDateTime[] = [];
 
   for (const line of lines) {
@@ -475,8 +476,12 @@ function parseDateLines(lines: string[], linePrefix: 'EXDATE' | 'RDATE', default
     if (!parsed) continue;
 
     const timezone = parsed.tzid || defaultTzid;
-    const dateValues = parsed.value.split(',');
-    dates.push(...dateValues.map((dateValue) => parseIcsDateTime(dateValue, timezone, parsed.valueType)));
+    for (const dateValue of parsed.value.split(',')) {
+      const date = parseIcsDateTime(dateValue, timezone, parsed.valueType);
+      // The same test parseIcsDateTime() reads a DATE by
+      if (parsed.valueType !== 'DATE' && dateValue.includes('T')) dateTimes.add(date.epochNanoseconds);
+      dates.push(date);
+    }
   }
   return dates;
 }
@@ -543,7 +548,8 @@ function parseByMonthArray(val: string, strict = false): Array<number | string> 
 
 /**
  * Parse either a full ICS snippet or an RRULE line into ManualOpts, and say
- * whether its DTSTART is a DATE value, which makes the rule an all-day one.
+ * whether its DTSTART is a DATE value, which makes the rule an all-day one,
+ * and which RDATE and EXDATE values were written as date-times.
  *
  * @param input - String containing a `DTSTART` line followed by `RRULE` and
  *   optional `EXDATE`/`RDATE` lines. Can also be just an `RRULE:` line or
@@ -580,7 +586,7 @@ function parseRRuleString(
   targetTimezone?: string,
   dtstart?: TemporalZonedDateTimeInput,
   strict = false,
-): {opts: ManualOpts; dtstartIsDate: boolean} {
+): {opts: ManualOpts; dtstartIsDate: boolean; dateTimes: Set<bigint>} {
   // Unfold the input according to RFC 5545 specification
   const unfoldedInput = unfoldLine(input).trim();
 
@@ -592,6 +598,7 @@ function parseRRuleString(
   let rruleLine: string;
   let exDate: Temporal.ZonedDateTime[] = [];
   let rDate: Temporal.ZonedDateTime[] = [];
+  const dateTimes = new Set<bigint>();
 
   if (/^DTSTART/im.test(unfoldedInput)) {
     // ICS snippet: split DTSTART, RRULE, EXDATE, and RDATE
@@ -615,8 +622,8 @@ function parseRRuleString(
 
     rruleLine = rrLine!;
 
-    exDate = parseDateLines(exLines, 'EXDATE', tzid ?? 'UTC');
-    rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC');
+    exDate = parseDateLines(exLines, 'EXDATE', tzid ?? 'UTC', dateTimes);
+    rDate = parseDateLines(rLines, 'RDATE', tzid ?? 'UTC', dateTimes);
   } else {
     // Just RRULE or FREQ pattern - use provided dtstart
     parsedDtstart = dtstart ? normalizeZonedDateTime(dtstart, 'dtstart') : undefined;
@@ -752,12 +759,17 @@ function parseRRuleString(
     opts.skip = pendingSkip;
   }
 
-  return {opts, dtstartIsDate: dtstartValueType === 'DATE'};
+  return {opts, dtstartIsDate: dtstartValueType === 'DATE', dateTimes};
 }
 
 export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = TemporalZonedDateTime> {
   private readonly tzid: string;
   private readonly originalDtstart: Temporal.ZonedDateTime;
+  /**
+   * The instants of RDATE and EXDATE values that an all-day rule read as date-times. toString()
+   * keeps them so, also when they are the start of a day.
+   */
+  private readDateTimes?: Set<bigint>;
   private originalPlainDtstart?: Temporal.PlainDateTime;
   private readonly opts: ManualOpts;
   private readonly outputTemporal?: TemporalImplementation<TOutput>;
@@ -832,12 +844,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     let manual: ManualOpts;
     if (isIcsOpts(params)) {
       // Allow dtstart to be passed separately when rruleString doesn't contain DTSTART
-      const {opts: parsed, dtstartIsDate} = parseRRuleString(
-        params.rruleString,
-        params.tzid,
-        params.dtstart,
-        params.strict ?? false,
-      );
+      const {
+        opts: parsed,
+        dtstartIsDate,
+        dateTimes,
+      } = parseRRuleString(params.rruleString, params.tzid, params.dtstart, params.strict ?? false);
+      if (dtstartIsDate && dateTimes.size > 0) this.readDateTimes = dateTimes;
       // A DTSTART with a DATE value makes an all-day rule, unless the caller says otherwise
       const allDay = params.allDay ?? (dtstartIsDate ? true : undefined);
 
@@ -2262,6 +2274,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       const {allDay: _allDay, ...withTimes} = merged as RRuleOptions<TOutput> & {allDay?: boolean};
       return new RRuleTemporal<TOutput>(withTimes as RRuleOptions<TOutput>);
     }
+    rule.readDateTimes = this.readDateTimes;
     return rule;
   }
 
@@ -6582,15 +6595,19 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
   /**
    * RDATE or EXDATE lines. With DATE values, a date at the start of its day is
-   * written as a DATE, and any other keeps its time on a line of its own.
+   * written as a DATE. One with a time of day, or one that was read as a
+   * date-time, keeps its time on a line of its own.
    */
   private formatDateLines(name: 'RDATE' | 'EXDATE', dates: Temporal.ZonedDateTime[], dateValues: boolean): string[] {
     if (!dateValues) return [`${name}:${this.joinDates(dates)}`];
     const days: string[] = [];
     const times: Temporal.ZonedDateTime[] = [];
     for (const date of dates) {
-      if (this.isStartOfDay(date)) days.push(this.formatIcsDate(date));
-      else times.push(date);
+      if (this.isStartOfDay(date) && !this.readDateTimes?.has(date.epochNanoseconds)) {
+        days.push(this.formatIcsDate(date));
+      } else {
+        times.push(date);
+      }
     }
     const lines: string[] = [];
     if (days.length) lines.push(`${name};VALUE=DATE:${days.join(',')}`);

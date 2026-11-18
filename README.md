@@ -116,7 +116,7 @@ below. These correspond to the recurrence rule parts defined in RFC&nbsp;5545:
 | `maxIterations` | Safety cap for advancing outer recurrence periods (defaults to 10,000). |
 | `maxCandidateEvaluations` | Safety cap for candidate datetimes evaluated within recurrence periods (defaults to 1,000,000). A query that passes it throws; raise it for a window of more dates. |
 | `includeDtstart` | Include `DTSTART` even if it does not match the pattern. |
-| `allDay` | The rule has DATE values, as an all-day event does: `toString()` writes `DTSTART`, `RDATE` and `EXDATE` with `VALUE=DATE` and `UNTIL` as a date. Set for a rule read from a `VALUE=DATE` `DTSTART`. Takes effect when `dtstart` is the start of its day in the rule's time zone; the occurrences are the same either way. |
+| `allDay` | The rule has DATE values, as an all-day event does: `toString()` writes `DTSTART`, `RDATE` and `EXDATE` with `VALUE=DATE` and `UNTIL` as a date. Set for a rule read from a `VALUE=DATE` `DTSTART`. Takes effect when `dtstart` is the start of its day in the rule's time zone; the occurrences are the same either way. An `RDATE` or `EXDATE` with a time of day, or one that was read as a date-time, keeps its time. |
 | `strict` | Enforce RFC 5545 constraints strictly (defaults to false). |
 | `temporal` | Optional Temporal namespace used for public output values and their inferred types. |
 | `dtstart` | First occurrence as `Temporal.ZonedDateTime`. |
