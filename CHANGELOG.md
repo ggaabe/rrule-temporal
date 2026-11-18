@@ -7,6 +7,14 @@
   once the query started after the year of DTSTART. From a Wednesday DTSTART,
   `FREQ=YEARLY;BYWEEKNO=20` returned Thursday 14 May 2026 from `next()` instead
   of Wednesday 13 May. Rules with COUNT were not affected.
+- Fixed YEARLY rules with BYWEEKNO ignoring BYMONTHDAY, and adding the days of
+  BYYEARDAY to the numbered weeks instead of limiting them (#161).
+  `FREQ=YEARLY;BYWEEKNO=20;BYMONTHDAY=15` returned the weekday of DTSTART in
+  week 20 of every year; it now returns 15 May in the years it falls in week 20,
+  as python-dateutil and rrule.js do. Parts that never agree, such as
+  `BYWEEKNO=20;BYMONTHDAY=1`, leave no occurrences. Rules with BYWEEKNO alone or
+  with BYDAY keep their results, and so do WEEKLY rules outside strict mode.
+  Thanks to @trackoor for the report.
 
 ## 2.2.9 (2026-11-13)
 

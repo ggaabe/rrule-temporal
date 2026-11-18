@@ -2111,9 +2111,14 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
    */
   private yearlyDaysNeverMatch(): boolean {
     const {freq, byYearDay, byWeekNo, byDay, byMonthDay, byMonth, bySetPos, interval = 1} = this.opts;
-    if (freq !== 'YEARLY' || byWeekNo || !(byDay || byMonthDay)) return false;
+    if (freq !== 'YEARLY') return false;
     if (!['iso8601', 'gregory'].includes(this.originalDtstart.calendarId)) return false;
-    if (!byYearDay && !(this.hasOrdinalByDay && !byMonth)) return false;
+    if (byWeekNo) {
+      // BYMONTHDAY and BYYEARDAY limit the days of the numbered weeks, which repeat on the same cycle
+      if (!byMonthDay && !byYearDay) return false;
+    } else if (!(byDay || byMonthDay) || (!byYearDay && !(this.hasOrdinalByDay && !byMonth))) {
+      return false;
+    }
     if (this.yearlyDaysNeverMatchCache === undefined) {
       // BYSETPOS picks from a year's days x times, so a year holding fewer of them than the
       // position nearest to either end has no occurrence either.
@@ -6601,6 +6606,12 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
     // outside the RFC, so both keep the reading they had.
     const limitsApply = this.opts.freq === 'YEARLY' && !this.opts.byWeekNo;
     const limitYearDays = limitsApply && Boolean(this.opts.byYearDay);
+    // The days BYWEEKNO selects are limited by BYMONTHDAY and BYYEARDAY, as every occurrence
+    // has to pass every BYxxx part: neither is ignored, and BYYEARDAY adds no days of its own.
+    const limitWeekDays =
+      this.opts.freq === 'YEARLY' &&
+      Boolean(this.opts.byWeekNo) &&
+      Boolean(this.opts.byMonthDay || this.opts.byYearDay);
     if (hasOrdinalByDay && !this.opts.byMonth && !limitYearDays) {
       // nth weekday of year
       const dayMap = weekdayToIsoDay;
@@ -6663,7 +6674,7 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
       }
     }
 
-    if (this.opts.byYearDay) {
+    if (this.opts.byYearDay && !limitWeekDays) {
       const last = sample.with({month: 12, day: 31}).dayOfYear;
       for (const d of this.opts.byYearDay) {
         const dayNum = d > 0 ? d : last + d + 1;
@@ -6683,13 +6694,18 @@ export class RRuleTemporal<TOutput extends TemporalZonedDateTimeInput = Temporal
 
     if (this.opts.byWeekNo) {
       const {lastWeek, firstWeekStart, tokens} = this.isoWeekByDay(sample);
+      // Without BYDAY the weekday comes from DTSTART, unless BYMONTHDAY or BYYEARDAY name the day
+      const weekdays = limitWeekDays && !this.opts.byDay?.length ? Object.keys(weekdayToIsoDay) : tokens;
       for (const weekNo of this.opts.byWeekNo) {
         if ((weekNo > 0 && weekNo > lastWeek) || (weekNo < 0 && -weekNo > lastWeek)) {
           continue;
         }
         const weekIndex = weekNo > 0 ? weekNo - 1 : lastWeek + weekNo;
         const weekStart = firstWeekStart.add({weeks: weekIndex});
-        occs.push(...this.addByDayDates(tokens, weekStart));
+        occs.push(...this.addByDayDates(weekdays, weekStart));
+      }
+      if (limitWeekDays) {
+        occs = occs.filter((dt) => this.matchesByMonthDay(dt) && this.matchesByYearDay(dt));
       }
     }
 
