@@ -78,5 +78,6 @@ jobs:
         with:
           name: coverage-report
           path: .coverage
-          if-no-files-found: ignore
+          include-hidden-files: true
+          if-no-files-found: warn
           retention-days: 14
