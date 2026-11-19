@@ -34,3 +34,49 @@ jobs:
 
       - name: Run unit tests
         run: npm test
+
+  coverage:
+    runs-on: ubuntu-latest
+    name: coverage
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run tests with coverage
+        run: npm run coverage
+
+      - name: Write coverage summary
+        if: always()
+        run: |
+          node -e '
+            const fs = require("fs");
+            const file = ".coverage/coverage-summary.json";
+            if (!fs.existsSync(file)) process.exit(0);
+            const {total} = JSON.parse(fs.readFileSync(file, "utf8"));
+            const rows = ["statements", "branches", "functions", "lines"].map(
+              (k) => `| ${k[0].toUpperCase() + k.slice(1)} | ${total[k].pct}% | ${total[k].covered} / ${total[k].total} |`,
+            );
+            const md = ["### Test coverage", "", "| Metric | Coverage | Covered |", "| --- | --- | --- |", ...rows, ""].join("\n");
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
+          '
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
+          if-no-files-found: ignore
+          retention-days: 14
